@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Recolección ProteinAgro</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase (Versión de compatibilidad para CDN sencilla) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- App Script -->
+    <script src="app.js" defer></script>
+</head>
+<body>
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-card">
+            <div class="logo-icon" style="font-size: 3rem; text-align: center; margin-bottom: 10px;">🌿</div>
+            <h2 style="text-align: center; margin-bottom: 5px; color: var(--primary);">ProteinAgro</h2>
+            <p style="text-align: center; color: var(--text-muted); margin-bottom: 25px;">Acceso al Sistema</p>
+            
+            <div class="form-group">
+                <label for="login-user">Usuario / Conductor</label>
+                <input type="text" id="login-user" class="premium-input" placeholder="Ej. Juan Gomez o admin">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label for="login-pin">PIN de Seguridad</label>
+                <input type="password" id="login-pin" class="premium-input" placeholder="****" inputmode="numeric">
+            </div>
+            
+            <p id="login-error" style="color: #ef4444; text-align: center; font-weight: 500; display: none; margin-bottom: 15px;">PIN o usuario incorrecto</p>
+            
+            <button id="btn-login" class="btn-primary" style="width: 100%;">
+                <span class="btn-text-content">Ingresar</span>
+            </button>
+            <p style="text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 20px;">(Prueba: admin/0000 o conductor/1234)</p>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard (Oculto por defecto) -->
+    <div id="admin-view" class="admin-view" style="display: none;">
+        <header class="app-header">
+            <div class="logo-container">
+                <div class="logo-icon">👑</div>
+                <h1>Panel Administrativo</h1>
+            </div>
+            <button id="btn-logout-admin" class="btn-secondary" style="padding: 8px 16px;">Salir</button>
+        </header>
+        <main class="main-content" style="max-width: 1000px; margin: 0 auto; width: 100%;">
+            
+            <!-- Dashboard Estadístico -->
+            <div class="dashboard-grid">
+                <div class="card chart-card">
+                    <h3>Kilos por Proveedor</h3>
+                    <div class="chart-container">
+                        <canvas id="chart-proveedor"></canvas>
+                    </div>
+                </div>
+                <div class="card chart-card">
+                    <h3>Kilos por Producto</h3>
+                    <div class="chart-container">
+                        <canvas id="chart-producto"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 class="section-title">Recolecciones en Vivo</h2>
+                    <button id="btn-export" class="btn-primary" style="width: auto; padding: 10px 20px;">📥 Exportar a Excel</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Conductor</th>
+                                <th>Ruta</th>
+                                <th>Proveedor</th>
+                                <th>Kilos Totales</th>
+                                <th>Estado</th>
+                                <th>Firma</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body">
+                            <!-- Los datos caerán aquí -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- App de Conductor (Se muestra al hacer login como conductor) -->
+    <div class="app-container" id="driver-view">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-container">
+                <div class="logo-icon">🌿</div>
+                <h1>ProteinAgro</h1>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="status-indicator offline" id="network-status">
+                    <span class="dot"></span>
+                    <span class="text">Sin conexión</span>
+                </div>
+                <button id="btn-logout-driver" class="btn-text" style="color: #ef4444; font-weight: 600;">Salir</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="card">
+                <h2 class="section-title">Nueva Recolección</h2>
+                <p class="section-subtitle">Registre los datos de la materia prima recolectada.</p>
+
+                <form id="recoleccion-form">
+                    
+                    <!-- Selección de Conductor -->
+                    <div class="form-group">
+                        <label for="conductor">Conductor</label>
+                        <select id="conductor" required class="premium-input">
+                            <option value="" disabled selected>Seleccione su nombre</option>
+                            <option value="camilo">Camilo Perez</option>
+                            <option value="juan">Juan Gomez</option>
+                            <option value="miguel">Miguel Otero</option>
+                            <option value="felipe">Felipe Montilla</option>
+                            <option value="gildardo">Gildardo Tejada</option>
+                        </select>
+                    </div>
+
+                    <!-- Selección de Ruta -->
+                    <div class="form-group">
+                        <label for="ruta">Ruta de Recolección</label>
+                        <select id="ruta" required class="premium-input">
+                            <option value="" disabled selected>Seleccione la ruta</option>
+                            <option value="ruta_norte">Ruta Norte</option>
+                            <option value="ruta_sur">Ruta Sur</option>
+                            <option value="ruta_centro">Ruta Centro</option>
+                            <option value="ruta_oriente">Ruta Oriente</option>
+                            <option value="ruta_occidente">Ruta Occidente</option>
+                        </select>
+                    </div>
+
+                    <!-- Selección de Proveedor -->
+                    <div class="form-group">
+                        <label for="proveedor">Proveedor</label>
+                        <select id="proveedor" required class="premium-input">
+                            <option value="" disabled selected>Seleccione el proveedor</option>
+                            <option value="fruver">FRUVER Lacosecha</option>
+                            <option value="matadero_central">Matadero Central</option>
+                            <option value="carniceria_sur">Carnicería El Sur</option>
+                            <option value="desposte_norte">Desposte Norte</option>
+                        </select>
+                    </div>
+
+                    <!-- Selección de Productos (Botones Grandes) -->
+                    <div class="form-group">
+                        <label>Producto Recolectado</label>
+                        <div class="product-grid" id="product-grid">
+                            <button type="button" class="product-btn" data-value="Hueso Blanco">🦴 Hueso Blanco</button>
+                            <button type="button" class="product-btn" data-value="Desperdicio">🗑️ Desperdicio</button>
+                            <button type="button" class="product-btn" data-value="Sebo en Rama">🧈 Sebo Rama</button>
+                            <button type="button" class="product-btn" data-value="Gordana">🥓 Gordana</button>
+                            <button type="button" class="product-btn" data-value="Empella">🐷 Empella</button>
+                            <button type="button" class="product-btn" data-value="Piel de Pollo">🐔 Piel Pollo</button>
+                            <button type="button" class="product-btn" data-value="Aceite">🛢️ Aceite</button>
+                            <button type="button" class="product-btn" data-value="Manteca">🧈 Manteca</button>
+                        </div>
+                        <input type="hidden" id="producto-seleccionado" required>
+                    </div>
+
+                    <!-- Kilos -->
+                    <div class="form-group" id="kilos-group" style="display: none;">
+                        <label for="kilos">Cantidad (Kilos)</label>
+                        <div class="input-with-unit" style="margin-bottom: 15px;">
+                            <input type="number" id="kilos" inputmode="decimal" step="0.1" min="0.1" placeholder="0.0" class="premium-input huge-input">
+                            <span class="unit">KG</span>
+                        </div>
+                        <button type="button" id="btn-registrar-producto" class="btn-secondary" style="background-color: #e2e8f0; border-color: #cbd5e1; color: #0f172a;">➕ Registrar producto</button>
+                    </div>
+
+                    <!-- Lista de Productos Agregados -->
+                    <div class="added-products" id="added-products" style="display: none; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                        <h3 style="margin-bottom: 10px; font-size: 1.1rem; color: #334155;">Lista de Registros:</h3>
+                        <ul id="products-list"></ul>
+                    </div>
+
+                    <!-- Firma del Proveedor -->
+                    <div class="form-group signature-group">
+                        <label>Firma del Proveedor</label>
+                        <div class="signature-wrapper">
+                            <canvas id="signature-pad" class="signature-pad"></canvas>
+                        </div>
+                        <button type="button" id="btn-clear-signature" class="btn-text">Borrar Firma</button>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" id="btn-submit" class="btn-primary">
+                        <span class="btn-text-content">Guardar Recolección</span>
+                        <div class="spinner" style="display: none;"></div>
+                    </button>
+                </form>
+            </div>
+        </main>
+        
+        <!-- Success Toast -->
+        <div id="toast" class="toast">✅ Recolección guardada exitosamente</div>
+    </div>
+</body>
+</html>
