@@ -1,13 +1,13 @@
 // === CONFIGURACIÓN DE FIREBASE & GOOGLE SHEETS ===
 // TODO: Reemplazar con credenciales reales en producción
 const firebaseConfig = {
-  apiKey: "AIzaSyBRP71kzadR-FncCVPtPiF_U1bVKbYeTzs",
-  authDomain: "proteinagro-cd5fe.firebaseapp.com",
-  projectId: "proteinagro-cd5fe",
-  storageBucket: "proteinagro-cd5fe.firebasestorage.app",
-  messagingSenderId: "296591052004",
-  appId: "1:296591052004:web:30add34e9cf5eb4b4030f1",
-  measurementId: "G-TJ0THSF4RY"
+  apiKey: "AIzaSyC9zOPHxrxq7jezYCfDRwU3IUdvJfFTvTA",
+  authDomain: "inventario-la15.firebaseapp.com",
+  databaseURL: "https://inventario-la15-default-rtdb.firebaseio.com",
+  projectId: "inventario-la15",
+  storageBucket: "inventario-la15.firebasestorage.app",
+  messagingSenderId: "318205537009",
+  appId: "1:318205537009:web:6cb17449ce2189e2041750"
 };
 
 // URL del Webhook de Google Apps Script para sincronización directa con Google Sheets
@@ -267,6 +267,9 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     spinner.style.display = 'block';
     btnSubmit.disabled = true;
 
+    // Obtener observaciones
+    const observacionesVal = document.getElementById('observaciones')?.value.trim() || '';
+
     // Obtener firma base64
     const firmaDataUrl = canvas.toDataURL();
 
@@ -276,6 +279,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         proveedor: proveedorName,
         productos: collectedProducts,
         totalKilos: totalKilos,
+        observaciones: observacionesVal,
         ubicacionGps: "0",
         firma: firmaDataUrl,
         fecha: new Date().toISOString(),
@@ -394,6 +398,8 @@ function loadAdminData() {
               const badgeClass = data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
               const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
 
+              const obsText = data.observaciones ? data.observaciones : '-';
+
               const tr = document.createElement('tr');
               tr.innerHTML = `
                   <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
@@ -401,6 +407,7 @@ function loadAdminData() {
                   <td style="text-transform: capitalize;">${ruta}</td>
                   <td style="text-transform: capitalize;">${data.proveedor.replace('_', ' ')}</td>
                   <td style="font-weight: bold;">${data.totalKilos} kg</td>
+                  <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
                   <td><span class="badge ${badgeClass}">${data.estado}</span></td>
                   <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
               `;
@@ -408,14 +415,14 @@ function loadAdminData() {
           });
           
           if (records.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
           }
           
           renderCharts(records);
       }, (error) => {
           console.error("Error cargando recolecciones: ", error);
           if (error.code === 'permission-denied') {
-              tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: red;">Error de permisos: Las reglas de Firestore no permiten leer. Revisa la configuración de reglas en Firebase Console.</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: red;">Error de permisos: Las reglas de Firestore no permiten leer. Revisa la configuración de reglas en Firebase Console.</td></tr>';
           }
       });
 }
@@ -430,7 +437,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
         }
 
         let csvContent = "\uFEFF"; // UTF-8 BOM para abrir correctamente en Excel
-        csvContent += "ID,Fecha,Conductor,Ruta,Proveedor,Productos,Total Kilos,Estado\n";
+        csvContent += "ID,Fecha,Conductor,Ruta,Proveedor,Productos,Total Kilos,Observaciones,Estado\n";
 
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -447,9 +454,10 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
             productosStr = `"${productosStr}"`;
 
             const totalKilos = data.totalKilos || 0;
+            const observaciones = `"${(data.observaciones || '').replace(/"/g, '""')}"`;
             const estado = `"${data.estado || ''}"`;
 
-            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${productosStr},${totalKilos},${estado}\n`;
+            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${productosStr},${totalKilos},${observaciones},${estado}\n`;
         });
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

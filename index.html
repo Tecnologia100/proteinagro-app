@@ -87,6 +87,7 @@
                                 <th>Ruta</th>
                                 <th>Proveedor</th>
                                 <th>Kilos Totales</th>
+                                <th>Observaciones</th>
                                 <th>Estado</th>
                                 <th>Firma</th>
                             </tr>
@@ -167,14 +168,22 @@
                     <div class="form-group">
                         <label>Producto Recolectado</label>
                         <div class="product-grid" id="product-grid">
-                            <button type="button" class="product-btn" data-value="Hueso Blanco">🦴 Hueso Blanco</button>
-                            <button type="button" class="product-btn" data-value="Desperdicio">🗑️ Desperdicio</button>
-                            <button type="button" class="product-btn" data-value="Sebo en Rama">🧈 Sebo Rama</button>
-                            <button type="button" class="product-btn" data-value="Gordana">🥓 Gordana</button>
-                            <button type="button" class="product-btn" data-value="Empella">🐷 Empella</button>
-                            <button type="button" class="product-btn" data-value="Piel de Pollo">🐔 Piel Pollo</button>
-                            <button type="button" class="product-btn" data-value="Aceite">🛢️ Aceite</button>
-                            <button type="button" class="product-btn" data-value="Manteca">🧈 Manteca</button>
+                            <button type="button" class="product-btn" data-value="ACEITE">🛢️ ACEITE</button>
+                            <button type="button" class="product-btn" data-value="CABEZAS">🐮 CABEZAS</button>
+                            <button type="button" class="product-btn" data-value="DESPERDICIO">🗑️ DESPERDICIO</button>
+                            <button type="button" class="product-btn" data-value="EMPELLA">🐷 EMPELLA</button>
+                            <button type="button" class="product-btn" data-value="GORDANA">🥓 GORDANA</button>
+                            <button type="button" class="product-btn" data-value="HARINA DE CARNE">🥩 HARINA CARNE</button>
+                            <button type="button" class="product-btn" data-value="HARINA DE HUESO VAPORIZADA">🦴 HUESO VAPORIZADO</button>
+                            <button type="button" class="product-btn" data-value="HUESO BLANCO">🦴 HUESO BLANCO</button>
+                            <button type="button" class="product-btn" data-value="HUESO CALCINADO">🦴 HUESO CALCINADO</button>
+                            <button type="button" class="product-btn" data-value="HUESO DE CERDO">🐷 HUESO CERDO</button>
+                            <button type="button" class="product-btn" data-value="HUESO SECO">🦴 HUESO SECO</button>
+                            <button type="button" class="product-btn" data-value="MANTECA">🧈 MANTECA</button>
+                            <button type="button" class="product-btn" data-value="MARGARINA">🧈 MARGARINA</button>
+                            <button type="button" class="product-btn" data-value="PIEL DE POLLO">🐔 PIEL POLLO</button>
+                            <button type="button" class="product-btn" data-value="SEBO">🧈 SEBO</button>
+                            <button type="button" class="product-btn" data-value="SEBO EN RAMA">🧈 SEBO EN RAMA</button>
                         </div>
                         <input type="hidden" id="producto-seleccionado" required>
                     </div>
@@ -193,6 +202,12 @@
                     <div class="added-products" id="added-products" style="display: none; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
                         <h3 style="margin-bottom: 10px; font-size: 1.1rem; color: #334155;">Lista de Registros:</h3>
                         <ul id="products-list"></ul>
+                    </div>
+
+                    <!-- Observaciones / Novedades -->
+                    <div class="form-group">
+                        <label for="observaciones">Observaciones / Novedades</label>
+                        <textarea id="observaciones" class="premium-input" rows="3" placeholder="Ingrese alguna novedad u observación si la hay (opcional)"></textarea>
                     </div>
 
                     <!-- Firma del Proveedor -->
