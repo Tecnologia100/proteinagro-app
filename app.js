@@ -287,13 +287,29 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     };
 
     try {
-        const docRef = await db.collection('recolecciones').add(data);
-        
-        // Sincronizar automáticamente con Google Sheets (vía formulario oculto, sin CORS)
+        // 1. Guardar en respaldo local (LocalStorage) de inmediato
+        let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+        const recordId = 'REC-' + Date.now();
+        const dataWithId = { ...data, id: recordId };
+        savedBackup.unshift(dataWithId);
+        localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
+
+        // 2. Sincronizar inmediatamente con Google Sheets (vía webhook sin bloquear)
         if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== "") {
-            enviarAGoogleSheets({ ...data, id: docRef.id });
+            enviarAGoogleSheets(dataWithId);
         }
-        
+
+        // 3. Intentar guardar en Firebase con un tiempo límite de 4 segundos
+        try {
+            const firestorePromise = db.collection('recolecciones').add(data);
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error("Timeout de conexión a Firebase")), 4000)
+            );
+            await Promise.race([firestorePromise, timeoutPromise]);
+        } catch (fsErr) {
+            console.warn("⚠️ Firebase no respondió a tiempo, pero los datos se guardaron localmente y en Google Sheets:", fsErr);
+        }
+
         // Limpiar form conservando el nombre del conductor
         const conductorActual = document.getElementById('conductor').value;
         document.getElementById('recoleccion-form').reset();
@@ -415,16 +431,50 @@ function loadAdminData() {
           });
           
           if (records.length === 0) {
+              // Si Firebase está vacío, intentar cargar respaldo local
+              let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+              if (savedBackup.length > 0) {
+                  renderRecordsInTable(savedBackup, tbody);
+                  renderCharts(savedBackup);
+                  return;
+              }
               tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
+          } else {
+              renderCharts(records);
           }
-          
-          renderCharts(records);
       }, (error) => {
           console.error("Error cargando recolecciones: ", error);
-          if (error.code === 'permission-denied') {
-              tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: red;">Error de permisos: Las reglas de Firestore no permiten leer. Revisa la configuración de reglas en Firebase Console.</td></tr>';
+          let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+          if (savedBackup.length > 0) {
+              renderRecordsInTable(savedBackup, tbody);
+              renderCharts(savedBackup);
+          } else {
+              tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: red;">Error de permisos o conexión en Firebase. Revisa las reglas de Firestore en Firebase Console.</td></tr>';
           }
       });
+}
+
+function renderRecordsInTable(records, tbody) {
+    tbody.innerHTML = '';
+    records.forEach(data => {
+        const dateObj = new Date(data.fecha);
+        const badgeClass = data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
+        const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
+        const obsText = data.observaciones ? data.observaciones : '-';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
+            <td style="text-transform: capitalize;">${data.conductor}</td>
+            <td style="text-transform: capitalize;">${ruta}</td>
+            <td style="text-transform: capitalize;">${data.proveedor.replace('_', ' ')}</td>
+            <td style="font-weight: bold;">${data.totalKilos} kg</td>
+            <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
+            <td><span class="badge ${badgeClass}">${data.estado}</span></td>
+            <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 // === EXPORTAR A EXCEL / CSV ===
