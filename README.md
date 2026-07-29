@@ -12,20 +12,24 @@ El sistema utiliza una arquitectura **Serverless & Cloud Dual-Persistence**:
    - Publicada en **Vercel** (`https://proteinagro-app.vercel.app`).
    - Accesible desde cualquier navegador móvil/desktop sin instalar aplicaciones (PWA-ready).
    - UX optimizada para conductores: "cero tipeo", botones táctiles grandes para selección de productos e ingreso de kilos.
+   - Catálogo de 16 materias primas: ACEITE, CABEZAS, DESPERDICIO, EMPELLA, GORDANA, HARINA DE CARNE, HARINA DE HUESO VAPORIZADA, HUESO BLANCO, HUESO CALCINADO, HUESO DE CERDO, HUESO SECO, MANTECA, MARGARINA, PIEL DE POLLO, SEBO, SEBO EN RAMA.
    - Canvas interactivo para captura de firma digital del proveedor.
+   - Campo para ingreso de **Observaciones** (novedades de la recolección).
    - Retención del nombre del conductor seleccionado tras cada guardado para agilizar recolecciones continuas.
 
 2. **Capa de Persistencia Nube (Firebase Firestore):**
-   - Proyecto Firebase: `proteinagro-cd5fe`.
-   - Persistencia **Offline** habilitada: si el conductor pierde señal en carretera, los datos se guardan en el almacenamiento local del dispositivo y se sincronizan en la nube automáticamente al recuperar conexión.
+   - Proyecto Firebase: `inventario-la15`.
+   - Persistencia **Offline** habilitada y manejo de fallbacks/timeouts para garantizar la disponibilidad del servicio.
+   - Respaldo automático inmediato en `localStorage` del navegador.
 
 3. **Sincronización Automatizada (Google Apps Script Webhook):**
    - Webhook HTTP POST integrado a Google Sheets (`DB_App_Conductores.gsheet`).
-   - Método de envío mediante formulario HTML e iframe oculto para evitar bloqueos por CORS o redirecciones de Google.
+   - Envío automático de recolecciones, kilos y observaciones.
 
 4. **Dashboard Administrativo Integrado:**
    - Panel accesible con rol de administrador (`admin` / `0000`).
    - Gráficas estadísticas en tiempo real creadas con Chart.js (Kilos por Proveedor y Kilos por Producto).
+   - Visualización de la columna **Observaciones** para control de novedades.
    - Exportación de reportes consolidados en formato CSV / Excel.
 
 ---
