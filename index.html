@@ -74,9 +74,14 @@
             </div>
 
             <div class="card" style="padding: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 class="section-title">Recolecciones en Vivo</h2>
-                    <button id="btn-export" class="btn-primary" style="width: auto; padding: 10px 20px;">📥 Exportar a Excel</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                    <h2 class="section-title" style="margin:0;">Recolecciones en Vivo</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <a href="https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing" target="_blank" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 10px 16px; font-weight: 600; background: #10b981; color: white; border: none; border-radius: 8px; font-size: 0.9rem;">
+                            📊 Abrir Google Sheets
+                        </a>
+                        <button id="btn-export" class="btn-primary" style="width: auto; padding: 10px 20px;">📥 Exportar CSV</button>
+                    </div>
                 </div>
                 <div class="table-responsive">
                     <table class="admin-table">
@@ -86,6 +91,7 @@
                                 <th>Conductor</th>
                                 <th>Ruta</th>
                                 <th>Proveedor</th>
+                                <th>Sucursal / Punto</th>
                                 <th>Kilos Totales</th>
                                 <th>Observaciones</th>
                                 <th>Estado</th>

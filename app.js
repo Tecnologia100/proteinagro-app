@@ -455,6 +455,7 @@ function loadAdminData() {
                   <td style="text-transform: capitalize;">${data.conductor}</td>
                   <td style="text-transform: capitalize;">${ruta}</td>
                   <td style="text-transform: capitalize;">${data.proveedor.replace('_', ' ')}</td>
+                  <td style="font-size: 0.9rem; color: #0284c7;">${data.sucursal || 'General'}</td>
                   <td style="font-weight: bold;">${data.totalKilos} kg</td>
                   <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
                   <td><span class="badge ${badgeClass}">${data.estado}</span></td>
@@ -471,7 +472,7 @@ function loadAdminData() {
                   renderCharts(savedBackup);
                   return;
               }
-              tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
           } else {
               renderCharts(records);
           }
@@ -501,6 +502,7 @@ function renderRecordsInTable(records, tbody) {
             <td style="text-transform: capitalize;">${data.conductor}</td>
             <td style="text-transform: capitalize;">${ruta}</td>
             <td style="text-transform: capitalize;">${data.proveedor.replace('_', ' ')}</td>
+            <td style="font-size: 0.9rem; color: #0284c7;">${data.sucursal || 'General'}</td>
             <td style="font-weight: bold;">${data.totalKilos} kg</td>
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
             <td><span class="badge ${badgeClass}">${data.estado}</span></td>
@@ -520,7 +522,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
         }
 
         let csvContent = "\uFEFF"; // UTF-8 BOM para abrir correctamente en Excel
-        csvContent += "ID,Fecha,Conductor,Ruta,Proveedor,Productos,Total Kilos,Observaciones,Estado\n";
+        csvContent += "ID,Fecha,Conductor,Ruta,Proveedor,Sucursal/Punto,Productos,Total Kilos,Observaciones,Estado\n";
 
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -529,6 +531,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
             const conductor = `"${data.conductor || ''}"`;
             const ruta = `"${(data.ruta || '').replace('_', ' ')}"`;
             const proveedor = `"${(data.proveedor || '').replace('_', ' ')}"`;
+            const sucursal = `"${(data.sucursal || 'General')}"`;
             
             let productosStr = '';
             if (data.productos && Array.isArray(data.productos)) {
@@ -540,7 +543,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
             const observaciones = `"${(data.observaciones || '').replace(/"/g, '""')}"`;
             const estado = `"${data.estado || ''}"`;
 
-            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${productosStr},${totalKilos},${observaciones},${estado}\n`;
+            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${sucursal},${productosStr},${totalKilos},${observaciones},${estado}\n`;
         });
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
