@@ -449,9 +449,10 @@ function loadAdminData() {
               const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
 
               const obsText = data.observaciones ? data.observaciones : '-';
-
               const provDisplay = data.proveedor || 'N/A';
               const sucDisplay = data.punto || data.sucursal || 'General';
+              const docId = doc.id;
+              const recordLocalId = data.id || '';
 
               const tr = document.createElement('tr');
               tr.innerHTML = `
@@ -464,6 +465,11 @@ function loadAdminData() {
                   <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
                   <td><span class="badge ${badgeClass}">${data.estado}</span></td>
                   <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
+                  <td>
+                      <button onclick="eliminarRecoleccion('${docId}', '${recordLocalId}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
+                          🗑️ Eliminar
+                      </button>
+                  </td>
               `;
               tbody.appendChild(tr);
           });
@@ -476,7 +482,7 @@ function loadAdminData() {
                   renderCharts(savedBackup);
                   return;
               }
-              tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
           } else {
               renderCharts(records);
           }
@@ -487,7 +493,7 @@ function loadAdminData() {
               renderRecordsInTable(savedBackup, tbody);
               renderCharts(savedBackup);
           } else {
-              tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: red;">Error de permisos o conexión en Firebase. Revisa las reglas de Firestore en Firebase Console.</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 20px; color: red;">Error de permisos o conexión en Firebase. Revisa las reglas de Firestore en Firebase Console.</td></tr>';
           }
       });
 }
@@ -502,6 +508,7 @@ function renderRecordsInTable(records, tbody) {
 
         const provDisplay = data.proveedor || 'N/A';
         const sucDisplay = data.punto || data.sucursal || 'General';
+        const recordLocalId = data.id || '';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -514,10 +521,64 @@ function renderRecordsInTable(records, tbody) {
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
             <td><span class="badge ${badgeClass}">${data.estado}</span></td>
             <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
+            <td>
+                <button onclick="eliminarRecoleccion('', '${recordLocalId}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
+                    🗑️ Eliminar
+                </button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
 }
+
+// Función global para eliminar un registro individual
+async function eliminarRecoleccion(firestoreDocId, localRecordId) {
+    if (!confirm('¿Está seguro de que desea eliminar esta recolección?')) {
+        return;
+    }
+
+    try {
+        if (firestoreDocId) {
+            await db.collection('recolecciones').doc(firestoreDocId).delete();
+        }
+        
+        // Limpiar también de respaldo en localStorage
+        let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+        if (localRecordId || firestoreDocId) {
+            savedBackup = savedBackup.filter(r => r.id !== localRecordId && r.id !== firestoreDocId);
+            localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
+        }
+
+        console.log("✅ Recolección eliminada correctamente.");
+    } catch (e) {
+        console.error("Error al eliminar recolección: ", e);
+        alert("Hubo un error al eliminar el registro: " + e.message);
+    }
+}
+
+// Borrado masivo de pruebas
+document.getElementById('btn-clear-all')?.addEventListener('click', async () => {
+    const confirmPass = prompt('⚠️ ¡ATENCIÓN! Esto borrará todas las recolecciones guardadas en el panel.\n\nEscriba BORRAR para confirmar:');
+    if (confirmPass !== 'BORRAR') {
+        if (confirmPass !== null) alert('Operación cancelada. Debe escribir BORRAR en mayúsculas.');
+        return;
+    }
+
+    try {
+        const snapshot = await db.collection('recolecciones').get();
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+
+        localStorage.removeItem('recolecciones_backup');
+        alert('✅ Se han eliminado todas las recolecciones de prueba con éxito.');
+    } catch (e) {
+        console.error("Error borrando todas las recolecciones:", e);
+        alert("Error al borrar los registros: " + e.message);
+    }
+});
 
 // === EXPORTAR A EXCEL / CSV ===
 document.getElementById('btn-export')?.addEventListener('click', async () => {
