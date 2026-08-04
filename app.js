@@ -249,6 +249,16 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     } else if (proveedorSel.selectedIndex >= 0) {
         proveedorName = proveedorSel.options[proveedorSel.selectedIndex].text;
     }
+
+    const sucursalSel = document.getElementById('sucursal');
+    let sucursalName = 'General';
+    if (sucursalSel && sucursalSel.value) {
+        if (sucursalSel.value === 'OTRA_SUCURSAL') {
+            sucursalName = document.getElementById('custom-sucursal')?.value.trim() || 'Sucursal Personalizada';
+        } else if (sucursalSel.selectedIndex >= 0) {
+            sucursalName = sucursalSel.options[sucursalSel.selectedIndex].text;
+        }
+    }
     
     // Validar
     if (collectedProducts.length === 0) {
@@ -287,6 +297,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         conductor: conductorName,
         ruta: rutaName,
         proveedor: proveedorName,
+        sucursal: sucursalName,
         productos: collectedProducts,
         totalKilos: totalKilos,
         observaciones: observacionesVal,
@@ -328,8 +339,14 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         // Resetear selectores dinámicos
         document.getElementById('custom-ruta-group').style.display = 'none';
         document.getElementById('custom-proveedor-group').style.display = 'none';
+        if (document.getElementById('custom-sucursal-group')) document.getElementById('custom-sucursal-group').style.display = 'none';
+        
         document.getElementById('proveedor').disabled = true;
         document.getElementById('proveedor').innerHTML = '<option value="" disabled selected>Seleccione primero una ruta</option>';
+        if (document.getElementById('sucursal')) {
+            document.getElementById('sucursal').disabled = true;
+            document.getElementById('sucursal').innerHTML = '<option value="" selected>Seleccione primero un proveedor (opcional)</option>';
+        }
         
         collectedProducts = [];
         renderAddedProducts();
@@ -686,21 +703,152 @@ function initRutasYProveedores() {
 
     // Event listener al cambiar Proveedor
     proveedorSelect.addEventListener('change', () => {
-        if (proveedorSelect.value === 'OTRO') {
+        const selectedProv = proveedorSelect.value;
+        if (selectedProv === 'OTRO') {
             customProveedorGroup.style.display = 'block';
             document.getElementById('custom-proveedor').required = true;
-        } else if (proveedorSelect.value === 'TODOS') {
+            populardropdownSucursales('');
+        } else if (selectedProv === 'TODOS') {
             customProveedorGroup.style.display = 'none';
             document.getElementById('custom-proveedor').required = false;
             populardropdownProveedores(TODOS_LOS_PROVEEDORES, true);
+            populardropdownSucursales('');
         } else {
             customProveedorGroup.style.display = 'none';
             document.getElementById('custom-proveedor').required = false;
+            populardropdownSucursales(selectedProv);
         }
     });
 
+    // Cargar banner con itinerario recomendado según día de la semana
+    actualizarItinerarioDelDia();
+
     // Sincronizar dinámicamente en segundo plano
     sincronizarRutasDesdeSheets();
+}
+
+const SUCURSALES_DATA = {
+    "SUPERTIENDA CAÑAVERAL": [
+        "Sede Principal / General",
+        "Cañaveral Punto 14 (Cra. 5 #14-37)",
+        "Cañaveral Centenario (Av. 4N #46-64)",
+        "Cañaveral Prados del Norte (Av. 2BN #34N-19)",
+        "Cañaveral Álamos (Cl. 75CN #2 Bis-100)",
+        "Cañaveral Los Pinos (Cl. 70 #7M Bis-64)",
+        "Cañaveral La Primera (Cra. 1A #44-50)",
+        "Cañaveral Ingenio",
+        "Cañaveral Limonar",
+        "Cañaveral Pasoancho",
+        "Cañaveral Villanueva (Cl. 13 #75A-185)",
+        "Cañaveral Cootraemcali (Cra. 70 #13B-18)",
+        "Cañaveral Jamundí Terranova",
+        "Cañaveral Jamundí Farallones",
+        "Cañaveral Jamundí Surtimayorista",
+        "Cañaveral Jamundí Rosario",
+        "Cañaveral Jamundí Principal",
+        "Cañaveral Jamundí Centro",
+        "Cañaveral Jamundí Panamericana",
+        "Cañaveral Tuluá - Buga",
+        "Cañaveral Roldanillo - Zarzal",
+        "Cañaveral Palmitex (Palmira)",
+        "Cañaveral Palmicentro (Palmira)",
+        "Cañaveral Villagorgona 1",
+        "Cañaveral Villagorgona 2"
+    ],
+    "CARIBE": [
+        "Sede Principal / General",
+        "Caribe Puerto Tejada Centro (Cra. 19 #17-45)",
+        "Caribe Puerto Tejada Punto 2 (Cl. 16 #20-60)",
+        "Caribe Villa Rica (Cra. 3 #2-60)",
+        "Caribe Buga"
+    ],
+    "CUENTA SEVILLANA": [
+        "Sede Principal / General",
+        "Sevillana Santa Elena",
+        "Sevillana Pasoancho",
+        "Sevillana Lourdes (Transv. 29D #29-50)",
+        "Sevillana República de Israel",
+        "Sevillana Guacarí",
+        "Sevillana Palmira / Villagorgona"
+    ],
+    "MIGAN CAPITAL": [
+        "Sede Principal / General",
+        "Bodega Santa Elena",
+        "Ciudad del Campo Granahorrar",
+        "Ciudad del Campo Punto Rojo",
+        "Ciudad del Campo Surtimercar",
+        "Mercamio Palmira",
+        "Nutrialimentos Valdez (Villagorgona)",
+        "Yénifer Díaz (Villagorgona)",
+        "Jorge Adrián Rodas (Villagorgona)"
+    ],
+    "COMERCIALIZADORA R Y E": [
+        "Sede Principal / General",
+        "Carnes RYE (Cra. 17F #33A-45)"
+    ],
+    "BELALCAZAR": [
+        "Sede Principal / General",
+        "Belalcázar Centro",
+        "Yumbo"
+    ],
+    "CUENTA ALBERTO MILLAN": [
+        "Sede Principal / General",
+        "Alberto Millán Buga"
+    ]
+};
+
+function actualizarItinerarioDelDia() {
+    const bannerText = document.getElementById('day-schedule-text');
+    if (!bannerText) return;
+
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const hoyIndex = new Date().getDay();
+    const hoyNombre = dias[hoyIndex];
+
+    const itinerarioMap = {
+        'Lunes': 'RUTA 1 (Santa Elena), RUTA 4 (Frigorífico Buga), RUTA 6 (Belalcázar/Yumbo)',
+        'Martes': 'RUTA 2 (Cali Norte/Centro), RUTA 4 (Cañaveral Tuluá/Buga), RUTA 1',
+        'Miércoles': 'RUTA 3 (Puerto Tejada/Jamundí), RUTA 1 (Sevillana Santa Elena), RUTA 4 (Guacarí/Buga)',
+        'Jueves': 'RUTA 5 (Palmira/Villagorgona/Carmelo), RUTA 4 (Alberto Millán)',
+        'Viernes': 'RUTA 2 (Cali Sur/Oriente), RUTA 1 (Sevillana/Ciudad del Campo)',
+        'Sábado': 'RUTA 1 (Santa Elena/Los Lagos/La Esperanza), RUTA 4 (Frigorífico Buga)',
+        'Domingo': 'Día sin programación regular. Selección libre de ruta.'
+    };
+
+    const itinHoy = itinerarioMap[hoyNombre] || 'Programación general activa';
+    bannerText.innerHTML = `📅 <strong>Hoy es ${hoyNombre}:</strong> ${itinHoy}`;
+}
+
+function populardropdownSucursales(proveedorSeleccionado) {
+    const sucursalSelect = document.getElementById('sucursal');
+    const customSucursalGroup = document.getElementById('custom-sucursal-group');
+    if (!sucursalSelect) return;
+
+    sucursalSelect.disabled = false;
+    sucursalSelect.innerHTML = '<option value="" selected>Sede Principal / General</option>';
+
+    const listaSucursales = SUCURSALES_DATA[proveedorSeleccionado] || [];
+    listaSucursales.forEach(suc => {
+        if (suc !== "Sede Principal / General") {
+            const opt = document.createElement('option');
+            opt.value = suc;
+            opt.textContent = suc;
+            sucursalSelect.appendChild(opt);
+        }
+    });
+
+    const optOtra = document.createElement('option');
+    optOtra.value = 'OTRA_SUCURSAL';
+    optOtra.textContent = '➕ Otra Sucursal...';
+    sucursalSelect.appendChild(optOtra);
+
+    sucursalSelect.onchange = () => {
+        if (sucursalSelect.value === 'OTRA_SUCURSAL') {
+            if (customSucursalGroup) customSucursalGroup.style.display = 'block';
+        } else {
+            if (customSucursalGroup) customSucursalGroup.style.display = 'none';
+        }
+    };
 }
 
 function populardropdownProveedores(proveedoresList, mostrandoTodos) {

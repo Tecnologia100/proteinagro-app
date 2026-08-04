@@ -124,6 +124,11 @@
                 <h2 class="section-title">Nueva Recolección</h2>
                 <p class="section-subtitle">Registre los datos de la materia prima recolectada.</p>
 
+                <!-- Banner de Programación para Hoy -->
+                <div id="day-schedule-banner" style="background: rgba(46, 204, 113, 0.15); border-left: 4px solid #2ecc71; padding: 12px 15px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; color: var(--text-color);">
+                    <span id="day-schedule-text">📅 <strong>Programación para Hoy:</strong> Cargando itinerario...</span>
+                </div>
+
                 <form id="recoleccion-form">
                     
                     <!-- Selección de Conductor -->
@@ -165,6 +170,20 @@
                     <div class="form-group" id="custom-proveedor-group" style="display: none;">
                         <label for="custom-proveedor">Nombre del Nuevo Proveedor</label>
                         <input type="text" id="custom-proveedor" class="premium-input" placeholder="Escriba el nombre del proveedor...">
+                    </div>
+
+                    <!-- Selección de Sucursal / Punto de Recolección (Opcional/Dinámico) -->
+                    <div class="form-group" id="sucursal-group">
+                        <label for="sucursal">Sucursal / Punto de Recolección</label>
+                        <select id="sucursal" class="premium-input" disabled>
+                            <option value="" selected>Seleccione primero un proveedor (opcional)</option>
+                        </select>
+                    </div>
+
+                    <!-- Campo Sucursal Personalizada (Oculto por defecto) -->
+                    <div class="form-group" id="custom-sucursal-group" style="display: none;">
+                        <label for="custom-sucursal">Nombre de la Sucursal / Punto</label>
+                        <input type="text" id="custom-sucursal" class="premium-input" placeholder="Escriba el nombre del punto...">
                     </div>
 
                     <!-- Selección de Productos (Botones Grandes) -->
