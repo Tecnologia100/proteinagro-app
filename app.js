@@ -355,10 +355,8 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         productBtns.forEach(b => b.classList.remove('active'));
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Mostrar Toast
-        const toast = document.getElementById('toast');
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3000);
+        // Mostrar Comprobante Digital Modal al conductor e información del recibo
+        mostrarComprobanteDigital(dataWithId);
 
     } catch (error) {
         console.error("Error guardando documento: ", error);
@@ -1102,6 +1100,98 @@ async function sincronizarRutasDesdeSheets() {
         console.log("ℹ️ Usando configuración de rutas local/en caché.");
     }
 }
+
+// === SISTEMA DE COMPROBANTE DIGITAL / VOUCHER DE RECOLECCIÓN ===
+let currentReceiptData = null;
+
+function mostrarComprobanteDigital(data) {
+    currentReceiptData = data;
+    const modal = document.getElementById('receipt-modal');
+    if (!modal) return;
+
+    const dateObj = new Date(data.fecha || Date.now());
+    document.getElementById('receipt-number').textContent = `N° ${data.id || 'REC-' + Date.now()}`;
+    document.getElementById('receipt-date').textContent = dateObj.toLocaleDateString();
+    document.getElementById('receipt-time').textContent = dateObj.toLocaleTimeString();
+    document.getElementById('receipt-driver').textContent = data.conductor || '-';
+    document.getElementById('receipt-route').textContent = data.ruta || '-';
+    document.getElementById('receipt-provider').textContent = data.proveedor || '-';
+    document.getElementById('receipt-branch').textContent = data.punto || data.sucursal || 'General';
+
+    // Rellenar tabla de items
+    const tbody = document.getElementById('receipt-items-body');
+    tbody.innerHTML = '';
+    if (data.productos && Array.isArray(data.productos)) {
+        data.productos.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #1e293b;">${p.producto}</td>
+                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #0284c7;">${p.kilos} KG</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    document.getElementById('receipt-total-kilos').textContent = `${data.totalKilos || 0} KG`;
+
+    const obsContainer = document.getElementById('receipt-obs-container');
+    if (data.observaciones && data.observaciones.trim() !== '') {
+        obsContainer.style.display = 'block';
+        document.getElementById('receipt-obs').textContent = data.observaciones;
+    } else {
+        obsContainer.style.display = 'none';
+    }
+
+    const sigImg = document.getElementById('receipt-signature-img');
+    if (data.firma) {
+        sigImg.src = data.firma;
+        sigImg.style.display = 'inline-block';
+    } else {
+        sigImg.style.display = 'none';
+    }
+
+    modal.style.display = 'flex';
+}
+
+document.getElementById('btn-close-receipt')?.addEventListener('click', () => {
+    const modal = document.getElementById('receipt-modal');
+    if (modal) modal.style.display = 'none';
+});
+
+document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
+    if (!currentReceiptData) return;
+    const d = currentReceiptData;
+    const dateObj = new Date(d.fecha || Date.now());
+
+    let prodsTxt = '';
+    if (d.productos && Array.isArray(d.productos)) {
+        prodsTxt = d.productos.map(p => `  • ${p.producto}: *${p.kilos} KG*`).join('\n');
+    }
+
+    const msg = `🌿 *PROTEINAGRO - COMPROBANTE DE RECOLECCIÓN*\n` +
+        `-----------------------------------------\n` +
+        `📄 *N° Recibo:* ${d.id || 'N/A'}\n` +
+        `📅 *Fecha:* ${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}\n` +
+        `🚛 *Conductor:* ${d.conductor}\n` +
+        `🗺️ *Ruta:* ${d.ruta}\n` +
+        `🏬 *Proveedor:* ${d.proveedor}\n` +
+        `📍 *Sucursal/Punto:* ${d.punto || d.sucursal || 'General'}\n` +
+        `-----------------------------------------\n` +
+        `📦 *PRODUCTOS RECOLECTADOS:*\n${prodsTxt}\n` +
+        `-----------------------------------------\n` +
+        `⚖️ *TOTAL RECOLECTADO: ${d.totalKilos} KG*\n` +
+        (d.observaciones ? `📝 *Observaciones:* ${d.observaciones}\n` : '') +
+        `✍️ *Firma Registrada:* OK\n` +
+        `-----------------------------------------\n` +
+        `_Certificado digital emitido en punto por ProteinAgro_`;
+
+    const encoded = encodeURIComponent(msg);
+    window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+});
+
+document.getElementById('btn-print-receipt')?.addEventListener('click', () => {
+    window.print();
+});
 
 // Inicializar selectores dinámicos al cargar el DOM
 document.addEventListener('DOMContentLoaded', initRutasYProveedores);
