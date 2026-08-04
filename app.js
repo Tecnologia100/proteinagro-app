@@ -293,10 +293,16 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     // Obtener firma base64
     const firmaDataUrl = canvas.toDataURL();
 
+    // Formatear Proveedor con Sucursal para visibilidad completa en Google Sheets y Reportes
+    const proveedorCompleto = (sucursalName && sucursalName !== 'General' && sucursalName !== 'Sede Principal / General') 
+        ? `${proveedorName} - ${sucursalName}` 
+        : proveedorName;
+
     const data = {
         conductor: conductorName,
         ruta: rutaName,
-        proveedor: proveedorName,
+        proveedor: proveedorCompleto,
+        proveedorBase: proveedorName,
         sucursal: sucursalName,
         productos: collectedProducts,
         totalKilos: totalKilos,
@@ -449,13 +455,18 @@ function loadAdminData() {
 
               const obsText = data.observaciones ? data.observaciones : '-';
 
+              const provDisplay = data.proveedorBase || (data.proveedor ? data.proveedor.split(' - ')[0] : 'N/A');
+              const sucDisplay = data.sucursal && data.sucursal !== 'General' 
+                  ? data.sucursal 
+                  : (data.proveedor && data.proveedor.includes(' - ') ? data.proveedor.split(' - ')[1] : 'General');
+
               const tr = document.createElement('tr');
               tr.innerHTML = `
                   <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
                   <td style="text-transform: capitalize;">${data.conductor}</td>
                   <td style="text-transform: capitalize;">${ruta}</td>
-                  <td style="text-transform: capitalize;">${data.proveedor.replace('_', ' ')}</td>
-                  <td style="font-size: 0.9rem; color: #0284c7;">${data.sucursal || 'General'}</td>
+                  <td style="text-transform: capitalize;">${provDisplay}</td>
+                  <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
                   <td style="font-weight: bold;">${data.totalKilos} kg</td>
                   <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
                   <td><span class="badge ${badgeClass}">${data.estado}</span></td>
@@ -496,13 +507,18 @@ function renderRecordsInTable(records, tbody) {
         const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
         const obsText = data.observaciones ? data.observaciones : '-';
 
+        const provDisplay = data.proveedorBase || (data.proveedor ? data.proveedor.split(' - ')[0] : 'N/A');
+        const sucDisplay = data.sucursal && data.sucursal !== 'General' 
+            ? data.sucursal 
+            : (data.proveedor && data.proveedor.includes(' - ') ? data.proveedor.split(' - ')[1] : 'General');
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
             <td style="text-transform: capitalize;">${data.conductor}</td>
             <td style="text-transform: capitalize;">${ruta}</td>
-            <td style="text-transform: capitalize;">${data.proveedor.replace('_', ' ')}</td>
-            <td style="font-size: 0.9rem; color: #0284c7;">${data.sucursal || 'General'}</td>
+            <td style="text-transform: capitalize;">${provDisplay}</td>
+            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
             <td style="font-weight: bold;">${data.totalKilos} kg</td>
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
             <td><span class="badge ${badgeClass}">${data.estado}</span></td>
