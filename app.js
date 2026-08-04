@@ -695,9 +695,11 @@ function initRutasYProveedores() {
             customRutaGroup.style.display = 'block';
             document.getElementById('custom-ruta').required = true;
             populardropdownProveedores(TODOS_LOS_PROVEEDORES, true);
+            renderizarCronogramaRuta('');
         } else if (rutasConfig[selectedRuta]) {
             const proveedoresDeRuta = rutasConfig[selectedRuta];
             populardropdownProveedores(proveedoresDeRuta, false);
+            renderizarCronogramaRuta(selectedRuta);
         }
     });
 
@@ -849,6 +851,126 @@ function populardropdownSucursales(proveedorSeleccionado) {
             if (customSucursalGroup) customSucursalGroup.style.display = 'none';
         }
     };
+}
+
+const CRONOGRAMA_RUTAS = {
+    "RUTA 2: Cali (Norte / Sur / Oriente)": [
+        { hora: "06:30 AM", cliente: "Cañaveral Punto 14", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 5 #14-37", tel: "3244935167" },
+        { hora: "07:00 AM", cliente: "Cañaveral Centenario", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Av. 4 Norte #46-64", tel: "3102022829" },
+        { hora: "07:30 AM", cliente: "La Montaña Av. 6A", proveedor: "MIGAN CAPITAL", direccion: "Av. 6A N #30N-47", tel: "" },
+        { hora: "08:00 AM", cliente: "Cañaveral Prados del Norte", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Av. 2B Norte #34N-19", tel: "" },
+        { hora: "09:00 AM", cliente: "Carnes Maiale", proveedor: "MIGAN CAPITAL", direccion: "Cra. 1G #69-02 Esquina", tel: "" },
+        { hora: "09:30 AM", cliente: "Districarnes LG", proveedor: "MIGAN CAPITAL", direccion: "Cra. 4C #65B-18", tel: "" },
+        { hora: "10:00 AM", cliente: "Cañaveral Álamos", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Calle 75C N #2 Bis-100", tel: "3243192838" },
+        { hora: "10:30 AM", cliente: "Cañaveral Los Pinos", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Calle 70 #7M Bis-64", tel: "3243192839" },
+        { hora: "11:00 AM", cliente: "Cañaveral La Primera", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 1A #44-50", tel: "3184277811" },
+        { hora: "11:30 AM", cliente: "La Montaña Torres", proveedor: "MIGAN CAPITAL", direccion: "Cra. 1 #56-20", tel: "" },
+        { hora: "12:00 PM", cliente: "Super Carnes Los Andes", proveedor: "MIGAN CAPITAL", direccion: "Cra. 1D #52-05", tel: "" },
+        { hora: "01:00 PM", cliente: "La Cosecha de Mi Tierra", proveedor: "MIGAN CAPITAL", direccion: "Cra. 15 Calle 54 Esquina", tel: "" },
+        { hora: "01:30 PM", cliente: "Carnes RYE", proveedor: "COMERCIALIZADORA R Y E", direccion: "Cra. 17F #33A-45", tel: "" },
+        { hora: "02:00 PM", cliente: "Baratón Carnes Berlín", proveedor: "MIGAN CAPITAL", direccion: "Calle 44 #19-65", tel: "" },
+        { hora: "02:30 PM", cliente: "El Rebajón", proveedor: "MIGAN CAPITAL", direccion: "Calle 44", tel: "" },
+        { hora: "03:00 PM", cliente: "La Montaña Calima", proveedor: "MIGAN CAPITAL", direccion: "Calima", tel: "" },
+        
+        { hora: "07:00 AM", cliente: "Cañaveral Ingenio (Viernes Sur)", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Ingenio", tel: "" },
+        { hora: "07:30 AM", cliente: "Cañaveral Limonar", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Limonar", tel: "" },
+        { hora: "08:00 AM", cliente: "Cañaveral Pasoancho", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Pasoancho", tel: "" },
+        { hora: "08:30 AM", cliente: "Sevillana Pasoancho", proveedor: "CUENTA SEVILLANA", direccion: "Pasoancho", tel: "" },
+        { hora: "09:00 AM", cliente: "La Montaña Pasoancho", proveedor: "MIGAN CAPITAL", direccion: "Calle 14C #25-16", tel: "" },
+        { hora: "09:30 AM", cliente: "Sevillana Lourdes", proveedor: "CUENTA SEVILLANA", direccion: "Transv. 29D #29-50", tel: "" },
+        { hora: "10:00 AM", cliente: "La Montaña Guadalupe", proveedor: "MIGAN CAPITAL", direccion: "Guadalupe", tel: "" },
+        { hora: "10:30 AM", cliente: "La Montaña Cosmocentro", proveedor: "MIGAN CAPITAL", direccion: "Cosmocentro", tel: "" },
+        { hora: "11:00 AM", cliente: "La Montaña Cristales", proveedor: "MIGAN CAPITAL", direccion: "Cristales", tel: "" },
+        { hora: "11:30 AM", cliente: "Cañaveral Villanueva", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Calle 13 #75A-185", tel: "" },
+        { hora: "12:00 PM", cliente: "Cañaveral Cootraemcali", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 70 #13B-18", tel: "" },
+        { hora: "12:30 PM", cliente: "Mercaunión", proveedor: "MIGAN CAPITAL", direccion: "Calle 25 #85B-100", tel: "" },
+        { hora: "01:00 PM", cliente: "Sevillana República de Israel", proveedor: "CUENTA SEVILLANA", direccion: "Calle 16A #121A-334", tel: "" },
+        { hora: "01:30 PM", cliente: "Jaime Zuluaga", proveedor: "MIGAN CAPITAL", direccion: "Sur", tel: "" },
+        { hora: "02:00 PM", cliente: "Milton Muñoz", proveedor: "MIGAN CAPITAL", direccion: "Sur", tel: "" },
+        { hora: "02:30 PM", cliente: "La Montaña Decepaz", proveedor: "MIGAN CAPITAL", direccion: "Decepaz", tel: "" },
+        { hora: "03:00 PM", cliente: "Ciudadela del Río", proveedor: "MIGAN CAPITAL", direccion: "Oriente", tel: "" },
+        { hora: "03:30 PM", cliente: "La Montaña Morichal", proveedor: "MIGAN CAPITAL", direccion: "Morichal", tel: "" }
+    ],
+    "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance": [
+        { hora: "07:00 AM", cliente: "Puerto Tejada Centro", proveedor: "CARIBE", direccion: "Cra. 19 #17-45", tel: "" },
+        { hora: "08:00 AM", cliente: "Puerto Tejada Punto 2", proveedor: "CARIBE", direccion: "Cl. 16 #20-60", tel: "" },
+        { hora: "09:00 AM", cliente: "Villa Rica Caribe", proveedor: "CARIBE", direccion: "Cra. 3 #2-60", tel: "" },
+        { hora: "10:00 AM", cliente: "Jamundí Terranova", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 51 Sur #16C-04", tel: "" },
+        { hora: "11:00 AM", cliente: "Jamundí Farallones", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cl. 12 Sur #10A-77", tel: "" },
+        { hora: "11:30 AM", cliente: "Jamundí Surtimayorista", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 10 #11-66", tel: "" },
+        { hora: "12:00 PM", cliente: "Jamundí Rosario", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 11 #3-93", tel: "" },
+        { hora: "01:00 PM", cliente: "Jamundí Principal", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 7 #10-48", tel: "" },
+        { hora: "01:30 PM", cliente: "Jamundí Centro", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cl. 11 #9-58", tel: "" },
+        { hora: "02:00 PM", cliente: "Jamundí Panamericana", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 3D #11-145", tel: "" }
+    ]
+};
+
+function renderizarCronogramaRuta(rutaSeleccionada) {
+    const container = document.getElementById('route-schedule-container');
+    const timelineList = document.getElementById('schedule-timeline-list');
+
+    if (!container || !timelineList) return;
+
+    const paradas = CRONOGRAMA_RUTAS[rutaSeleccionada];
+    if (!paradas || paradas.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    timelineList.innerHTML = '';
+
+    paradas.forEach(p => {
+        const item = document.createElement('div');
+        item.style.cssText = 'background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #38bdf8; transition: background 0.2s;';
+        
+        item.innerHTML = `
+            <div>
+                <span style="font-weight: bold; color: #38bdf8; font-size: 0.85rem;">⏰ ${p.hora}</span> - 
+                <span style="color: #f8fafc; font-size: 0.85rem; font-weight: 500;">${p.cliente}</span>
+                <div style="font-size: 0.75rem; color: #94a3b8;">📍 ${p.direccion} ${p.tel ? ' | 📞 ' + p.tel : ''}</div>
+            </div>
+            <button type="button" style="background: #0284c7; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer;">Seleccionar</button>
+        `;
+
+        item.onmouseover = () => item.style.background = 'rgba(56, 189, 248, 0.15)';
+        item.onmouseout = () => item.style.background = 'rgba(255,255,255,0.05)';
+
+        item.onclick = () => {
+            // Autocompletar proveedor y sucursal
+            const proveedorSelect = document.getElementById('proveedor');
+            if (proveedorSelect) {
+                for (let i = 0; i < proveedorSelect.options.length; i++) {
+                    if (proveedorSelect.options[i].value === p.proveedor) {
+                        proveedorSelect.selectedIndex = i;
+                        populardropdownSucursales(p.proveedor);
+                        break;
+                    }
+                }
+            }
+
+            const sucursalSelect = document.getElementById('sucursal');
+            if (sucursalSelect) {
+                let found = false;
+                for (let i = 0; i < sucursalSelect.options.length; i++) {
+                    if (sucursalSelect.options[i].text.toLowerCase().includes(p.cliente.toLowerCase())) {
+                        sucursalSelect.selectedIndex = i;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    const opt = document.createElement('option');
+                    opt.value = p.cliente + ' (' + p.direccion + ')';
+                    opt.textContent = p.cliente + ' (' + p.direccion + ')';
+                    sucursalSelect.appendChild(opt);
+                    sucursalSelect.value = opt.value;
+                }
+            }
+        };
+
+        timelineList.appendChild(item);
+    });
 }
 
 function populardropdownProveedores(proveedoresList, mostrandoTodos) {

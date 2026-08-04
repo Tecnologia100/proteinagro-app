@@ -152,6 +152,17 @@
                         </select>
                     </div>
 
+                    <!-- Horario e Itinerario Cronológico de la Ruta (6:00 AM - 3:30 PM) -->
+                    <div id="route-schedule-container" style="display: none; background: var(--card-bg, #1e293b); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                        <h4 style="margin-top:0; font-size: 0.95rem; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+                            ⏰ <span>Horario y Orden de Recolección (6:00 AM - 3:30 PM)</span>
+                        </h4>
+                        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">Respete el orden de paradas por hora. Haga clic en una parada para autocompletar proveedor y punto:</p>
+                        <div id="schedule-timeline-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px;">
+                            <!-- Paradas dinámicas aquí -->
+                        </div>
+                    </div>
+
                     <!-- Campo Ruta Personalizada (Oculto por defecto) -->
                     <div class="form-group" id="custom-ruta-group" style="display: none;">
                         <label for="custom-ruta">Nombre de la Nueva Ruta</label>
