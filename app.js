@@ -293,17 +293,12 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     // Obtener firma base64
     const firmaDataUrl = canvas.toDataURL();
 
-    // Formatear Proveedor con Sucursal para visibilidad completa en Google Sheets y Reportes
-    const proveedorCompleto = (sucursalName && sucursalName !== 'General' && sucursalName !== 'Sede Principal / General') 
-        ? `${proveedorName} - ${sucursalName}` 
-        : proveedorName;
-
     const data = {
         conductor: conductorName,
         ruta: rutaName,
-        proveedor: proveedorCompleto,
-        proveedorBase: proveedorName,
+        proveedor: proveedorName,
         sucursal: sucursalName,
+        punto: sucursalName,
         productos: collectedProducts,
         totalKilos: totalKilos,
         observaciones: observacionesVal,
@@ -455,10 +450,8 @@ function loadAdminData() {
 
               const obsText = data.observaciones ? data.observaciones : '-';
 
-              const provDisplay = data.proveedorBase || (data.proveedor ? data.proveedor.split(' - ')[0] : 'N/A');
-              const sucDisplay = data.sucursal && data.sucursal !== 'General' 
-                  ? data.sucursal 
-                  : (data.proveedor && data.proveedor.includes(' - ') ? data.proveedor.split(' - ')[1] : 'General');
+              const provDisplay = data.proveedor || 'N/A';
+              const sucDisplay = data.punto || data.sucursal || 'General';
 
               const tr = document.createElement('tr');
               tr.innerHTML = `
@@ -507,10 +500,8 @@ function renderRecordsInTable(records, tbody) {
         const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
         const obsText = data.observaciones ? data.observaciones : '-';
 
-        const provDisplay = data.proveedorBase || (data.proveedor ? data.proveedor.split(' - ')[0] : 'N/A');
-        const sucDisplay = data.sucursal && data.sucursal !== 'General' 
-            ? data.sucursal 
-            : (data.proveedor && data.proveedor.includes(' - ') ? data.proveedor.split(' - ')[1] : 'General');
+        const provDisplay = data.proveedor || 'N/A';
+        const sucDisplay = data.punto || data.sucursal || 'General';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
