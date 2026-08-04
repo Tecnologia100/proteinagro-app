@@ -143,33 +143,28 @@
                     <div class="form-group">
                         <label for="ruta">Ruta de Recolección</label>
                         <select id="ruta" required class="premium-input">
-                            <option value="" disabled selected>Seleccione la ruta</option>
-                            <option value="ruta_norte">Ruta Norte</option>
-                            <option value="ruta_sur">Ruta Sur</option>
-                            <option value="ruta_centro">Ruta Centro</option>
-                            <option value="ruta_oriente">Ruta Oriente</option>
-                            <option value="ruta_occidente">Ruta Occidente</option>
+                            <option value="" disabled selected>Cargando rutas...</option>
                         </select>
+                    </div>
+
+                    <!-- Campo Ruta Personalizada (Oculto por defecto) -->
+                    <div class="form-group" id="custom-ruta-group" style="display: none;">
+                        <label for="custom-ruta">Nombre de la Nueva Ruta</label>
+                        <input type="text" id="custom-ruta" class="premium-input" placeholder="Escriba la nueva ruta...">
                     </div>
 
                     <!-- Selección de Proveedor -->
                     <div class="form-group">
                         <label for="proveedor">Proveedor</label>
-                        <select id="proveedor" required class="premium-input">
-                            <option value="" disabled selected>Seleccione el proveedor</option>
-                            <option value="ANGELO PAREDES PROTEINCOL">ANGELO PAREDES PROTEINCOL</option>
-                            <option value="BELALCAZAR">BELALCAZAR</option>
-                            <option value="CARIBE">CARIBE</option>
-                            <option value="COMERCIALIZADORA R Y E">COMERCIALIZADORA R Y E</option>
-                            <option value="CUENTA 2026">CUENTA 2026</option>
-                            <option value="CUENTA ALBERTO MILLAN">CUENTA ALBERTO MILLAN</option>
-                            <option value="CUENTA FABRICA">CUENTA FABRICA</option>
-                            <option value="CUENTA PROVEEDORES HUESO">CUENTA PROVEEDORES HUESO</option>
-                            <option value="CUENTA SEVILLANA">CUENTA SEVILLANA</option>
-                            <option value="JHOANATAN MARTINEZ">JHOANATAN MARTINEZ</option>
-                            <option value="MIGAN CAPITAL">MIGAN CAPITAL</option>
-                            <option value="SUPERTIENDA CAÑAVERAL">SUPERTIENDA CAÑAVERAL</option>
+                        <select id="proveedor" required class="premium-input" disabled>
+                            <option value="" disabled selected>Seleccione primero una ruta</option>
                         </select>
+                    </div>
+
+                    <!-- Campo Proveedor Personalizado (Oculto por defecto) -->
+                    <div class="form-group" id="custom-proveedor-group" style="display: none;">
+                        <label for="custom-proveedor">Nombre del Nuevo Proveedor</label>
+                        <input type="text" id="custom-proveedor" class="premium-input" placeholder="Escriba el nombre del proveedor...">
                     </div>
 
                     <!-- Selección de Productos (Botones Grandes) -->

@@ -235,10 +235,20 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     const conductorName = conductorSel.options[conductorSel.selectedIndex]?.text || conductorSel.value;
     
     const rutaSel = document.getElementById('ruta');
-    const rutaName = rutaSel.options[rutaSel.selectedIndex]?.text || rutaSel.value;
+    let rutaName = rutaSel.value;
+    if (rutaSel.value === 'OTRA') {
+        rutaName = document.getElementById('custom-ruta')?.value.trim() || 'Ruta Personalizada';
+    } else if (rutaSel.selectedIndex >= 0) {
+        rutaName = rutaSel.options[rutaSel.selectedIndex].text;
+    }
     
     const proveedorSel = document.getElementById('proveedor');
-    const proveedorName = proveedorSel.options[proveedorSel.selectedIndex]?.text || proveedorSel.value;
+    let proveedorName = proveedorSel.value;
+    if (proveedorSel.value === 'OTRO') {
+        proveedorName = document.getElementById('custom-proveedor')?.value.trim() || 'Proveedor Personalizado';
+    } else if (proveedorSel.selectedIndex >= 0) {
+        proveedorName = proveedorSel.options[proveedorSel.selectedIndex].text;
+    }
     
     // Validar
     if (collectedProducts.length === 0) {
@@ -314,6 +324,12 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         const conductorActual = document.getElementById('conductor').value;
         document.getElementById('recoleccion-form').reset();
         document.getElementById('conductor').value = conductorActual;
+        
+        // Resetear selectores dinámicos
+        document.getElementById('custom-ruta-group').style.display = 'none';
+        document.getElementById('custom-proveedor-group').style.display = 'none';
+        document.getElementById('proveedor').disabled = true;
+        document.getElementById('proveedor').innerHTML = '<option value="" disabled selected>Seleccione primero una ruta</option>';
         
         collectedProducts = [];
         renderAddedProducts();
@@ -565,3 +581,170 @@ function enviarAGoogleSheets(data) {
         console.warn("⚠️ Error enviando a Google Sheets:", err);
     }
 }
+
+
+// === SISTEMA DE RUTAS Y PROVEEDORES DINÁMICOS ===
+const DEFAULT_RUTAS_DATA = {
+    "RUTA 1: Santa Elena / Cavasa": [
+        "CUENTA SEVILLANA",
+        "MIGAN CAPITAL",
+        "CUENTA PROVEEDORES HUESO",
+        "CUENTA 2026"
+    ],
+    "RUTA 2: Cali (Norte / Sur / Oriente)": [
+        "SUPERTIENDA CAÑAVERAL",
+        "COMERCIALIZADORA R Y E",
+        "CUENTA SEVILLANA",
+        "MIGAN CAPITAL",
+        "CUENTA 2026"
+    ],
+    "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance": [
+        "CARIBE",
+        "SUPERTIENDA CAÑAVERAL",
+        "CUENTA 2026"
+    ],
+    "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá": [
+        "CUENTA ALBERTO MILLAN",
+        "CARIBE",
+        "SUPERTIENDA CAÑAVERAL",
+        "CUENTA SEVILLANA",
+        "ANGELO PAREDES PROTEINCOL",
+        "CUENTA FABRICA"
+    ],
+    "RUTA 5: Palmira / Villagorgona / Carmelo": [
+        "SUPERTIENDA CAÑAVERAL",
+        "CUENTA SEVILLANA",
+        "JHOANATAN MARTINEZ",
+        "MIGAN CAPITAL"
+    ],
+    "RUTA 6: Belalcázar / Yumbo": [
+        "BELALCAZAR",
+        "CUENTA FABRICA",
+        "CUENTA PROVEEDORES HUESO"
+    ]
+};
+
+const TODOS_LOS_PROVEEDORES = [
+    "ANGELO PAREDES PROTEINCOL",
+    "BELALCAZAR",
+    "CARIBE",
+    "COMERCIALIZADORA R Y E",
+    "CUENTA 2026",
+    "CUENTA ALBERTO MILLAN",
+    "CUENTA FABRICA",
+    "CUENTA PROVEEDORES HUESO",
+    "CUENTA SEVILLANA",
+    "JHOANATAN MARTINEZ",
+    "MIGAN CAPITAL",
+    "SUPERTIENDA CAÑAVERAL"
+];
+
+let rutasConfig = JSON.parse(localStorage.getItem('proteinagro_rutas_config')) || DEFAULT_RUTAS_DATA;
+
+function initRutasYProveedores() {
+    const rutaSelect = document.getElementById('ruta');
+    const proveedorSelect = document.getElementById('proveedor');
+    const customRutaGroup = document.getElementById('custom-ruta-group');
+    const customProveedorGroup = document.getElementById('custom-proveedor-group');
+
+    if (!rutaSelect || !proveedorSelect) return;
+
+    // Poblar selector de rutas
+    rutaSelect.innerHTML = '<option value="" disabled selected>Seleccione la ruta</option>';
+    Object.keys(rutasConfig).forEach(rutaKey => {
+        const opt = document.createElement('option');
+        opt.value = rutaKey;
+        opt.textContent = rutaKey;
+        rutaSelect.appendChild(opt);
+    });
+
+    // Opción para nueva ruta
+    const optOtraRuta = document.createElement('option');
+    optOtraRuta.value = 'OTRA';
+    optOtraRuta.textContent = '➕ Otra / Nueva Ruta...';
+    rutaSelect.appendChild(optOtraRuta);
+
+    // Event listener al cambiar la Ruta
+    rutaSelect.addEventListener('change', () => {
+        const selectedRuta = rutaSelect.value;
+
+        // Reset custom fields
+        customRutaGroup.style.display = 'none';
+        customProveedorGroup.style.display = 'none';
+        document.getElementById('custom-ruta').required = false;
+        document.getElementById('custom-proveedor').required = false;
+
+        if (selectedRuta === 'OTRA') {
+            customRutaGroup.style.display = 'block';
+            document.getElementById('custom-ruta').required = true;
+            populardropdownProveedores(TODOS_LOS_PROVEEDORES, true);
+        } else if (rutasConfig[selectedRuta]) {
+            const proveedoresDeRuta = rutasConfig[selectedRuta];
+            populardropdownProveedores(proveedoresDeRuta, false);
+        }
+    });
+
+    // Event listener al cambiar Proveedor
+    proveedorSelect.addEventListener('change', () => {
+        if (proveedorSelect.value === 'OTRO') {
+            customProveedorGroup.style.display = 'block';
+            document.getElementById('custom-proveedor').required = true;
+        } else if (proveedorSelect.value === 'TODOS') {
+            customProveedorGroup.style.display = 'none';
+            document.getElementById('custom-proveedor').required = false;
+            populardropdownProveedores(TODOS_LOS_PROVEEDORES, true);
+        } else {
+            customProveedorGroup.style.display = 'none';
+            document.getElementById('custom-proveedor').required = false;
+        }
+    });
+
+    // Sincronizar dinámicamente en segundo plano
+    sincronizarRutasDesdeSheets();
+}
+
+function populardropdownProveedores(proveedoresList, mostrandoTodos) {
+    const proveedorSelect = document.getElementById('proveedor');
+    proveedorSelect.disabled = false;
+    proveedorSelect.innerHTML = '<option value="" disabled selected>Seleccione el proveedor</option>';
+
+    proveedoresList.forEach(prov => {
+        const opt = document.createElement('option');
+        opt.value = prov;
+        opt.textContent = prov;
+        proveedorSelect.appendChild(opt);
+    });
+
+    if (!mostrandoTodos) {
+        const optTodos = document.createElement('option');
+        optTodos.value = 'TODOS';
+        optTodos.textContent = '📋 -- Mostrar todos los proveedores --';
+        proveedorSelect.appendChild(optTodos);
+    }
+
+    const optOtro = document.createElement('option');
+    optOtro.value = 'OTRO';
+    optOtro.textContent = '➕ Otro Proveedor...';
+    proveedorSelect.appendChild(optOtro);
+}
+
+// Carga en segundo plano desde el backend si hay actualización de rutas
+async function sincronizarRutasDesdeSheets() {
+    if (!GOOGLE_SHEETS_WEBHOOK_URL) return;
+    try {
+        const response = await fetch(`${GOOGLE_SHEETS_WEBHOOK_URL}?action=getRutas`);
+        if (response.ok) {
+            const remoteConfig = await response.json();
+            if (remoteConfig && typeof remoteConfig === 'object' && Object.keys(remoteConfig).length > 0) {
+                rutasConfig = remoteConfig;
+                localStorage.setItem('proteinagro_rutas_config', JSON.stringify(remoteConfig));
+                console.log("🔄 Configuración de rutas actualizada dinámicamente desde Google Sheets.");
+            }
+        }
+    } catch (e) {
+        console.log("ℹ️ Usando configuración de rutas local/en caché.");
+    }
+}
+
+// Inicializar selectores dinámicos al cargar el DOM
+document.addEventListener('DOMContentLoaded', initRutasYProveedores);
