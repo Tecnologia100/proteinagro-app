@@ -719,7 +719,7 @@ const DEFAULT_RUTAS_DATA = {
         "JHOANATAN MARTINEZ",
         "MIGAN CAPITAL"
     ],
-    "RUTA 6: Belalcázar / Yumbo": [
+    "RUTA 6: Belalcázar / Yumbo (Pendiente por definir)": [
         "BELALCAZAR",
         "CUENTA FABRICA",
         "CUENTA PROVEEDORES HUESO"
@@ -776,11 +776,13 @@ function initRutasYProveedores() {
         document.getElementById('custom-ruta').required = false;
         document.getElementById('custom-proveedor').required = false;
 
-        if (selectedRuta === 'OTRA') {
-            customRutaGroup.style.display = 'block';
-            document.getElementById('custom-ruta').required = true;
+        if (selectedRuta === 'OTRA' || selectedRuta.includes('Pendiente por definir')) {
+            if (selectedRuta === 'OTRA') {
+                customRutaGroup.style.display = 'block';
+                document.getElementById('custom-ruta').required = true;
+            }
             populardropdownProveedores(TODOS_LOS_PROVEEDORES, true);
-            renderizarCronogramaRuta('');
+            renderizarCronogramaRuta(selectedRuta);
         } else if (rutasConfig[selectedRuta]) {
             const proveedoresDeRuta = rutasConfig[selectedRuta];
             populardropdownProveedores(proveedoresDeRuta, false);
@@ -893,7 +895,7 @@ function actualizarItinerarioDelDia() {
     const hoyNombre = dias[hoyIndex];
 
     const itinerarioMap = {
-        'Lunes': 'RUTA 1 (Santa Elena), RUTA 4 (Frigorífico Buga), RUTA 6 (Belalcázar/Yumbo)',
+        'Lunes': 'RUTA 1 (Santa Elena), RUTA 4 (Frigorífico Buga)',
         'Martes': 'RUTA 2 (Cali Norte/Centro), RUTA 4 (Cañaveral Tuluá/Buga), RUTA 1',
         'Miércoles': 'RUTA 3 (Puerto Tejada/Jamundí), RUTA 1 (Sevillana Santa Elena), RUTA 4 (Guacarí/Buga)',
         'Jueves': 'RUTA 5 (Palmira/Villagorgona/Carmelo), RUTA 4 (Alberto Millán)',
