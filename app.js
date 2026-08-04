@@ -559,24 +559,38 @@ async function eliminarRecoleccion(firestoreDocId, localRecordId) {
 // Borrado masivo de pruebas
 document.getElementById('btn-clear-all')?.addEventListener('click', async () => {
     const confirmPass = prompt('⚠️ ¡ATENCIÓN! Esto borrará todas las recolecciones guardadas en el panel.\n\nEscriba BORRAR para confirmar:');
-    if (confirmPass !== 'BORRAR') {
-        if (confirmPass !== null) alert('Operación cancelada. Debe escribir BORRAR en mayúsculas.');
+    if (!confirmPass) return;
+
+    if (confirmPass.trim().toUpperCase() !== 'BORRAR') {
+        alert('Operación cancelada. Debe escribir BORRAR en mayúsculas.');
         return;
     }
 
     try {
         const snapshot = await db.collection('recolecciones').get();
-        const batch = db.batch();
-        snapshot.docs.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-        await batch.commit();
+        if (!snapshot.empty) {
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+        }
 
         localStorage.removeItem('recolecciones_backup');
-        alert('✅ Se han eliminado todas las recolecciones de prueba con éxito.');
+
+        // Refrescar automáticamente la interfaz y gráficas
+        const tbody = document.getElementById('admin-table-body');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
+        }
+        renderCharts([]);
+
+        alert('✅ Se han eliminado todas las recolecciones con éxito y el panel se ha actualizado.');
     } catch (e) {
         console.error("Error borrando todas las recolecciones:", e);
-        alert("Error al borrar los registros: " + e.message);
+        // Fallback limpiar local si Firebase falla
+        localStorage.removeItem('recolecciones_backup');
+        location.reload();
     }
 });
 
