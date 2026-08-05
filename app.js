@@ -123,7 +123,7 @@ btnLogin.addEventListener('click', async () => {
             if (creds.user) {
                 // Verificar rol desde email o custom claims (basico: admin si contiene "admin")
                 if (creds.user.email && creds.user.email.toLowerCase().includes('admin')) {
-                    entrarParaAdmin();
+                    entrarComoAdmin();
                 } else {
                     entrarComoConductor(userInput);
                 }
@@ -136,7 +136,7 @@ btnLogin.addEventListener('click', async () => {
 
     // 2. Fallback a login por PIN heredado (admin/0000 ó conductor/1234)
     if (userInput.toLowerCase() === 'admin' && pin === '0000') {
-        entrarParaAdmin();
+        entrarComoAdmin();
     } else if (userInput !== '' && pin === '1234') {
         entrarComoConductor(userInput);
     } else {
