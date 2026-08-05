@@ -388,7 +388,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
             const hh = String(now.getHours()).padStart(2, '0');
             const mm = String(now.getMinutes()).padStart(2, '0');
             const ss = String(now.getSeconds()).padStart(2, '0');
-            return `${d}/${m}/${y} ${hh}:${mm}:${ss}`;
+            return d + '/' + m + '/' + y + ' ' + hh + ':' + mm + ':' + ss;
         })(),
         estado: navigator.onLine ? 'Sincronizado' : 'Offline'
     };
