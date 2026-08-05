@@ -1,13 +1,13 @@
 // === CONFIGURACIÓN DE FIREBASE & GOOGLE SHEETS ===
 // TODO: Reemplazar con credenciales reales en producción
 const firebaseConfig = {
-  apiKey: "AIzaSyC9zOPHxrxq7jezYCfDRwU3IUdvJfFTvTA",
-  authDomain: "inventario-la15.firebaseapp.com",
-  databaseURL: "https://inventario-la15-default-rtdb.firebaseio.com",
-  projectId: "inventario-la15",
-  storageBucket: "inventario-la15.firebasestorage.app",
-  messagingSenderId: "318205537009",
-  appId: "1:318205537009:web:6cb17449ce2189e2041750"
+  apiKey: "AIzaSyBRP71kzadR-FncCVPtPiF_U1bVKbYeTzs",
+  authDomain: "proteinagro-cd5fe.firebaseapp.com",
+  projectId: "proteinagro-cd5fe",
+  storageBucket: "proteinagro-cd5fe.firebasestorage.app",
+  messagingSenderId: "296591052004",
+  appId: "1:296591052004:web:30add34e9cf5eb4b4030f1",
+  measurementId: "G-TJ0THSF4RY"
 };
 
 // URL del Webhook de Google Apps Script para sincronización directa con Google Sheets
