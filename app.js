@@ -173,7 +173,6 @@ btnLogoutAdmin.addEventListener('click', logout);
 
 
 // === LÓGICA DEL FORMULARIO CONDUCTOR ===
-const productBtns = document.querySelectorAll('.product-btn');
 const kilosGroup = document.getElementById('kilos-group');
 const kilosInput = document.getElementById('kilos');
 const btnRegistrarProducto = document.getElementById('btn-registrar-producto');
@@ -182,20 +181,113 @@ const productsListUl = document.getElementById('products-list');
 let currentProduct = null;
 let collectedProducts = [];
 
-productBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        // Desmarcar todos
-        productBtns.forEach(b => b.classList.remove('active'));
-        // Marcar el seleccionado
-        btn.classList.add('active');
-        currentProduct = btn.dataset.value;
-        document.getElementById('producto-seleccionado').value = currentProduct;
-        
-        // Mostrar campo de kilos
-        kilosGroup.style.display = 'block';
-        kilosInput.focus();
+const DEFAULT_PRODUCTOS = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HARINA CARNE", "HARINA DE HUESO VAPORIZADA", "HUESO BLANCO", "HUESO CALCINADO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
+const DEFAULT_CONDUCTORES = ["Camilo Perez", "Juan Gomez", "Miguel Otero", "Felipe Montilla", "Gildardo Tejada"];
+const DEFAULT_RUTAS = ["Ruta 1", "Ruta 2", "Ruta 3", "Ruta 4", "Ruta 5", "Ruta 6"];
+
+function getEmojiForProduct(name) {
+    const n = (name || '').toUpperCase();
+    if (n.includes('ACEITE')) return '🛢️';
+    if (n.includes('CABEZAS')) return '🐮';
+    if (n.includes('DESPERDICIO')) return '🗑️';
+    if (n.includes('EMPELLA')) return '🐷';
+    if (n.includes('GORDANA')) return '🥓';
+    if (n.includes('HARINA')) return '🥩';
+    if (n.includes('HUESO')) return '🦴';
+    if (n.includes('MANTECA') || n.includes('MARGARINA') || n.includes('SEBO')) return '🧈';
+    if (n.includes('POLLO') || n.includes('PIEL')) return '🐔';
+    return '📦';
+}
+
+function renderDynamicProducts(prods) {
+    const grid = document.getElementById('product-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    prods.forEach(pName => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'product-btn';
+        btn.dataset.value = pName;
+        btn.innerHTML = `${getEmojiForProduct(pName)} ${pName}`;
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentProduct = pName;
+            const selInput = document.getElementById('producto-seleccionado');
+            if (selInput) selInput.value = currentProduct;
+            if (kilosGroup) kilosGroup.style.display = 'block';
+            if (kilosInput) kilosInput.focus();
+        });
+        grid.appendChild(btn);
     });
-});
+}
+
+function renderDynamicDrivers(drivers) {
+    const select = document.getElementById('conductor');
+    if (!select) return;
+    const currentVal = select.value;
+    select.innerHTML = '<option value="" disabled selected>Seleccione su nombre</option>';
+    drivers.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        select.appendChild(opt);
+    });
+    if (currentVal) select.value = currentVal;
+}
+
+function renderDynamicRoutes(routes) {
+    const select = document.getElementById('ruta');
+    if (!select) return;
+    const currentVal = select.value;
+    select.innerHTML = '<option value="" disabled selected>Seleccione la ruta</option>';
+    routes.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r;
+        select.appendChild(opt);
+    });
+    const optOtra = document.createElement('option');
+    optOtra.value = 'OTRA';
+    optOtra.textContent = '➕ Otra / Nueva Ruta...';
+    select.appendChild(optOtra);
+    if (currentVal) select.value = currentVal;
+}
+
+async function cargarCatalogosDinamicos() {
+    // 1. Cargar desde caché local para renderizado instantáneo
+    let cached = null;
+    try {
+        cached = JSON.parse(localStorage.getItem('proteinagro_catalogos_cache'));
+    } catch(e) {}
+
+    const productos = (cached && cached.productos && cached.productos.length > 0) ? cached.productos : DEFAULT_PRODUCTOS;
+    const conductores = (cached && cached.conductores && cached.conductores.length > 0) ? cached.conductores : DEFAULT_CONDUCTORES;
+    const rutas = (cached && cached.rutas && cached.rutas.length > 0) ? cached.rutas : DEFAULT_RUTAS;
+
+    renderDynamicProducts(productos);
+    renderDynamicDrivers(conductores);
+    renderDynamicRoutes(rutas);
+
+    // 2. Intentar actualizar desde Google Sheets si hay red
+    if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
+        try {
+            const res = await fetch(GOOGLE_SHEETS_WEBHOOK_URL);
+            if (res.ok) {
+                const data = await res.json();
+                if (data) {
+                    if (data.productos && data.productos.length > 0) renderDynamicProducts(data.productos);
+                    if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
+                    if (data.rutas && data.rutas.length > 0) renderDynamicRoutes(data.rutas);
+                    localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
+                    console.log("✅ Catálogos dinámicos cargados correctamente desde Google Sheets.");
+                }
+            }
+        } catch (err) {
+            console.warn("⚠️ No se pudo obtener catálogos en vivo desde Sheets, se usan datos locales:", err);
+        }
+    }
+}
 
 btnRegistrarProducto.addEventListener('click', () => {
     if (!currentProduct) {
@@ -1446,5 +1538,8 @@ document.getElementById('btn-print-receipt')?.addEventListener('click', () => {
     window.print();
 });
 
-// Inicializar selectores dinámicos al cargar el DOM
-document.addEventListener('DOMContentLoaded', initRutasYProveedores);
+// Inicializar selectores dinámicos y catálogos al cargar el DOM
+document.addEventListener('DOMContentLoaded', () => {
+    initRutasYProveedores();
+    cargarCatalogosDinamicos();
+});
