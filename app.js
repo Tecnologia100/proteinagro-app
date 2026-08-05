@@ -183,7 +183,14 @@ let collectedProducts = [];
 
 const DEFAULT_PRODUCTOS = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HARINA CARNE", "HARINA DE HUESO VAPORIZADA", "HUESO BLANCO", "HUESO CALCINADO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
 const DEFAULT_CONDUCTORES = ["Camilo Perez", "Juan Gomez", "Miguel Otero", "Felipe Montilla", "Gildardo Tejada"];
-const DEFAULT_RUTAS = ["Ruta 1", "Ruta 2", "Ruta 3", "Ruta 4", "Ruta 5", "Ruta 6"];
+const DEFAULT_RUTAS = [
+    "RUTA 1: Santa Elena / Cavasa",
+    "RUTA 2: Cali (Norte / Sur / Oriente)",
+    "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance",
+    "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá",
+    "RUTA 5: Palmira / Villagorgona / Carmelo",
+    "RUTA 6: Belalcázar / Yumbo (Pendiente por definir)"
+];
 
 function getEmojiForProduct(name) {
     const n = (name || '').toUpperCase();
