@@ -372,3 +372,38 @@ label {
     height: 300px;
     width: 100%;
 }
+
+/* Reglas de Impresión para Voucher Digital */
+@media print {
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+    body * {
+        visibility: hidden;
+    }
+    #receipt-modal, #receipt-modal * {
+        visibility: visible;
+    }
+    #receipt-modal {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        background: transparent !important;
+        padding: 0 !important;
+        display: block !important;
+    }
+    #receipt-card {
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 15px !important;
+    }
+    #btn-share-whatsapp, #btn-print-receipt, #btn-close-receipt {
+        display: none !important;
+    }
+}

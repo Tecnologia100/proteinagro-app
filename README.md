@@ -17,9 +17,11 @@ El sistema utiliza una arquitectura **Serverless & Cloud Dual-Persistence**:
    - Campo para ingreso de **Observaciones** (novedades de la recolección).
    - Retención del nombre del conductor seleccionado tras cada guardado para agilizar recolecciones continuas.
 
-2. **Capa de Persistencia Nube (Firebase Firestore):**
+2. **Capa de Persistencia Nube (Firebase Firestore + Firebase Storage):**
    - Proyecto Firebase: `inventario-la15`.
    - Persistencia **Offline** habilitada y manejo de fallbacks/timeouts para garantizar la disponibilidad del servicio.
+   - **Firmas digitales almacenadas en Firebase Storage** (ruta `firmas/REC-XXXXX.png`) con URL pública guardada en Firestore/Sheets.
+   - Mecanismo de fallback offline: si no hay conexión, la firma se guarda en base64 local hasta que se recupere la señal.
    - Respaldo automático inmediato en `localStorage` del navegador.
 
 3. **Sincronización Automatizada (Google Apps Script Webhook):**
@@ -27,16 +29,17 @@ El sistema utiliza una arquitectura **Serverless & Cloud Dual-Persistence**:
    - Envío automático de recolecciones, kilos y observaciones.
 
 4. **Dashboard Administrativo Integrado:**
-   - Panel accesible con rol de administrador (`admin` / `0000`).
-   - Gráficas estadísticas en tiempo real creadas con Chart.js (Kilos por Proveedor y Kilos por Producto).
-   - Visualización de la columna **Observaciones** para control de novedades.
-   - Exportación de reportes consolidados en formato CSV / Excel.
+    - Panel accesible con rol de administrador (`admin@proteinagro.com` o `admin` / `0000` como fallback).
+    - **Autenticación con Firebase Auth** (email/contraseña) con fallback a PIN heredado.
+    - Gráficas estadísticas en tiempo real creadas con Chart.js (Kilos por Proveedor y Kilos por Producto).
+    - Visualización de la columna **Observaciones** para control de novedades.
+    - Exportación de reportes consolidados en formato CSV / Excel.
 
 ---
 
 ## 📊 Estructura de Datos en Google Sheets (`Recolecciones`)
 
-La hoja de Google Sheets recibe una fila independiente por cada producto recolectado en una transacción con las siguientes 10 columnas en orden exacto:
+La hoja de Google Sheets recibe una fila independiente por cada producto recolectado en una transacción con las siguientes **12 columnas** en orden exacto:
 
 | Columna | Campo | Descripción |
 |---|---|---|
@@ -45,11 +48,13 @@ La hoja de Google Sheets recibe una fila independiente por cada producto recolec
 | **C** | `Ruta` | Nombre de la ruta de recolección seleccionada |
 | **D** | `Conductor` | Nombre del conductor que realizó la recolección |
 | **E** | `Proveedor` | Nombre del proveedor/cliente |
-| **F** | `Materia/Producto` | Nombre del producto recolectado (ej: Hueso Blanco, Sebo) |
-| **G** | `Kg` | Cantidad de kilos recolectados |
-| **H** | `Ubicacion_GPS_Real` | Coordenadas GPS del dispositivo (o `0` por defecto) |
-| **I** | `Precio` | **Precio unitario por kg**: Calculado automáticamente por el script buscando el precio histórico más reciente de ese producto |
-| **J** | `Valor` | **Valor Total**: Resultado automático de la multiplicación (`Kg * Precio`) |
+| **F** | `Punto_Sucursal` | Punto o sucursal exacta de la recolección |
+| **G** | `Materia_Producto` | Nombre del producto recolectado (ej: Hueso Blanco, Sebo) |
+| **H** | `Kg` | Cantidad de kilos recolectados |
+| **I** | `Observaciones` | Novedades u observaciones escritas por el conductor |
+| **J** | `Ubicacion_GPS_Real` | Coordenadas GPS del dispositivo (o `0` por defecto) |
+| **K** | `Precio` | **Precio unitario por kg**: Calculado automáticamente por el script buscando el precio histórico más reciente de ese producto |
+| **L** | `Valor` | **Valor Total**: Resultado automático de la multiplicación (`Kg * Precio`) |
 
 > 🔒 **Nota de Seguridad & Negocio:** El conductor **nunca ve los precios ni valores** en la aplicación móvil. El cálculo de `Precio` y `Valor` ocurre exclusivamente en el servidor/hoja contable.
 
@@ -62,60 +67,86 @@ Este es el script activo en el proyecto de Google Sheets (`DB_App_Conductores`):
 ```javascript
 function doPost(e) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Recolecciones") || ss.getSheets()[0];
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var data = null;
 
-    var data = {};
-    if (e.parameter && e.parameter.payload) {
-      data = JSON.parse(e.parameter.payload);
-    } else if (e.postData && e.postData.contents) {
-      data = JSON.parse(e.postData.contents);
+    if (e && e.parameter && e.parameter.payload) {
+      data = typeof e.parameter.payload === 'string' ? JSON.parse(e.parameter.payload) : e.parameter.payload;
+    } else if (e && e.postData && e.postData.contents) {
+      var raw = e.postData.contents;
+      if (raw.indexOf('payload=') === 0) {
+        var decoded = decodeURIComponent(raw.substring(8).replace(/\+/g, ' '));
+        data = JSON.parse(decoded);
+      } else {
+        data = JSON.parse(raw);
+      }
     }
 
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["ID_Recoleccion", "Fecha_Hora", "Ruta", "Conductor", "Proveedor", "Materia/Producto", "Kg", "Ubicacion_GPS_Real", "Precio", "Valor"]);
+    if (!data) throw new Error("No se recibieron datos.");
+
+    var id = data.id || 'REC-' + new Date().getTime();
+    var fecha = data.fecha ? data.fecha.toString() : '';
+    var ruta = data.ruta || '';
+    var conductor = data.conductor || '';
+    var proveedor = data.proveedor || '';
+    var punto = data.punto || data.sucursal || '';
+    var observaciones = data.observaciones || '';
+    var ubicacionGps = data.ubicacionGps || '0';
+    
+    var productos = data.productos || [];
+    if (typeof productos === 'string') {
+      try { productos = JSON.parse(productos); } catch(err) {}
     }
-
-    var idRecoleccion = data.id || "REC-" + Date.now();
-    var fechaHora = data.fecha ? new Date(data.fecha).toLocaleString("es-CO") : new Date().toLocaleString("es-CO");
-    var ruta = data.ruta || "";
-    var conductor = data.conductor || "";
-    var proveedor = data.proveedor || "";
-    var ubicacionGps = data.ubicacionGps || "0";
-
-    function obtenerUltimoPrecio(nombreProducto) {
-      var lastRow = sheet.getLastRow();
-      if (lastRow <= 1) return 0;
-      var values = sheet.getRange(2, 1, lastRow - 1, 10).getValues();
-      for (var i = values.length - 1; i >= 0; i--) {
-        var prod = values[i][5];   // Columna F (Materia/Producto)
-        var precio = values[i][8]; // Columna I (Precio)
-        if (prod && prod.toString().trim().toLowerCase() === nombreProducto.trim().toLowerCase()) {
-          var p = parseFloat(precio);
-          if (!isNaN(p) && p > 0) return p;
+    
+    if (!Array.isArray(productos) || productos.length === 0) {
+      productos = [{ producto: data.producto || '', kilos: data.totalKilos || 0 }];
+    }
+    
+    var lastRowData = sheet.getLastRow();
+    var searchRange = [];
+    if (lastRowData > 1) {
+      searchRange = sheet.getRange(2, 5, lastRowData - 1, 7).getValues(); 
+    }
+    
+    for (var p = 0; p < productos.length; p++) {
+      var prodItem = productos[p];
+      var prodNombre = (typeof prodItem === 'object' && prodItem.producto) ? prodItem.producto : String(prodItem);
+      var prodKilos = (typeof prodItem === 'object' && prodItem.kilos !== undefined) ? prodItem.kilos : (data.totalKilos || 0);
+      
+      var precio = '';
+      var valor = '';
+      
+      if (searchRange.length > 0) {
+        for (var i = searchRange.length - 1; i >= 0; i--) {
+          var rowProv = String(searchRange[i][0] || '').trim();
+          var rowProd = String(searchRange[i][2] || '').trim();
+          
+          if (rowProv === String(proveedor).trim() && rowProd === String(prodNombre).trim()) {
+            precio = searchRange[i][6];
+            break;
+          }
         }
       }
-      return 0;
+      
+      if (precio !== '' && !isNaN(parseFloat(precio)) && !isNaN(parseFloat(prodKilos))) {
+        valor = parseFloat(precio) * parseFloat(prodKilos);
+      }
+      
+      sheet.appendRow([
+        id, fecha, ruta, conductor, proveedor, punto,
+        prodNombre, prodKilos, observaciones, ubicacionGps, precio, valor
+      ]);
+      
+      var currentRow = sheet.getLastRow();
+      sheet.getRange(currentRow, 2).setNumberFormat('@STRING@');
     }
 
-    var productos = data.productos && Array.isArray(data.productos) && data.productos.length > 0
-      ? data.productos
-      : [{ producto: "Materia Prima", kilos: data.totalKilos || 0 }];
-
-    productos.forEach(function(item) {
-      var nombre = item.producto || item.nombre || "Materia Prima";
-      var kg = parseFloat(item.kilos) || 0;
-      var precio = obtenerUltimoPrecio(nombre);
-      var valor = precio * kg;
-
-      sheet.appendRow([
-        idRecoleccion, fechaHora, ruta, conductor, proveedor, nombre, kg, ubicacionGps, precio, valor
-      ]);
-    });
-
-    return ContentService.createTextOutput("OK");
-  } catch (err) {
-    return ContentService.createTextOutput("ERROR: " + err.toString());
+    return ContentService.createTextOutput(JSON.stringify({"result": "success"}))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": error.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 ```
@@ -124,8 +155,10 @@ function doPost(e) {
 
 ## 📌 Pendientes y Próximos Pasos (TODOs)
 
-- [ ] **1. Mapeo Dinámico de Sectores/Rutas:** Cargar la lista de Rutas y Proveedores dinámicamente desde la pestaña `Proveedores` y `Rutas` de Google Sheets.
-- [ ] **2. Autenticación con Firebase Auth:** Migrar la validación de PIN a usuarios individuales con roles estrictos (Conductor / Administrador / Auditor).
-- [ ] **3. Firma Digital en Google Drive:** Guardar la imagen en Base64 de la firma como un archivo comprimido en una carpeta de Google Drive e insertar su enlace directo en la hoja de cálculo.
+- [x] **1. Mapeo Dinámico de Sectores/Rutas:** Cargar la lista de Rutas y Proveedores dinámicamente desde la pestaña `Proveedores` y `Rutas` de Google Sheets.
+- [x] **2. Autenticación con Firebase Auth:** Migrar la validación de PIN a usuarios individuales con roles estrictos (Conductor / Administrador / Auditor).
+- [x] **3. Firma Digital en Firebase Storage:** La firma se sube como imagen PNG a Firebase Storage (`firmas/REC-XXXXX.png`) y se guarda únicamente la URL de descarga en Firestore y Google Sheets.
 - [ ] **4. Geolocalización GPS Nativa:** Activar `navigator.geolocation` con permisos en el móvil para capturar latitud y longitud reales al guardar.
 - [ ] **5. Notificaciones Automáticas (WhatsApp / Email):** Configurar un trigger en Google Apps Script para enviar un resumen automático por correo/WhatsApp al proveedor tras cada recolección.
+- [ ] **6. Migrar a creación de usuarios reales en Firebase Auth:** Enviar correos de invitación a conductores y administradores con credenciales individuales.
+- [ ] **7. Sincronización Automática de Firmas Offline:** Reintentar subir firmas pendientes a Firebase Storage cuando el dispositivo recupere conexión a internet.
