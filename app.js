@@ -262,7 +262,28 @@ function renderDynamicRoutes(routes) {
 }
 
 async function cargarCatalogosDinamicos() {
-    // 1. Cargar desde caché local para renderizado instantáneo
+    // 1. Intentar obtener catálogos en vivo desde Google Sheets (evitando caché HTTP con timestamp)
+    if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
+        try {
+            const cacheBusterUrl = GOOGLE_SHEETS_WEBHOOK_URL + (GOOGLE_SHEETS_WEBHOOK_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+            const res = await fetch(cacheBusterUrl);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.productos && data.productos.length > 0) {
+                    renderDynamicProducts(data.productos);
+                    if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
+                    if (data.rutas && data.rutas.length > 0) renderDynamicRoutes(data.rutas);
+                    localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
+                    console.log("✅ Catálogos dinámicos actualizados en vivo desde Google Sheets:", data.productos);
+                    return;
+                }
+            }
+        } catch (err) {
+            console.warn("⚠️ No se pudo obtener catálogos en vivo desde Sheets, se usan datos locales:", err);
+        }
+    }
+
+    // 2. Fallback a caché local o valores por defecto si no hay conexión o falla la red
     let cached = null;
     try {
         cached = JSON.parse(localStorage.getItem('proteinagro_catalogos_cache'));
@@ -275,25 +296,6 @@ async function cargarCatalogosDinamicos() {
     renderDynamicProducts(productos);
     renderDynamicDrivers(conductores);
     renderDynamicRoutes(rutas);
-
-    // 2. Intentar actualizar desde Google Sheets si hay red
-    if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
-        try {
-            const res = await fetch(GOOGLE_SHEETS_WEBHOOK_URL);
-            if (res.ok) {
-                const data = await res.json();
-                if (data) {
-                    if (data.productos && data.productos.length > 0) renderDynamicProducts(data.productos);
-                    if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
-                    if (data.rutas && data.rutas.length > 0) renderDynamicRoutes(data.rutas);
-                    localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
-                    console.log("✅ Catálogos dinámicos cargados correctamente desde Google Sheets.");
-                }
-            }
-        } catch (err) {
-            console.warn("⚠️ No se pudo obtener catálogos en vivo desde Sheets, se usan datos locales:", err);
-        }
-    }
 }
 
 btnRegistrarProducto.addEventListener('click', () => {
