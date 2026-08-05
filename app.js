@@ -87,11 +87,12 @@ window.addEventListener('offline', updateNetworkStatus);
 updateNetworkStatus();
 
 // === LÓGICA DE LOGIN (Firebase Auth + PIN Legacy como fallback) ===
-btnLogin.addEventListener('click', async () => {
-    const userInput = document.getElementById('login-user').value.trim();
-    const pin = document.getElementById('login-pin').value;
+const handleLogin = async (e) => {
+    if (e) e.preventDefault();
+    const userInput = (document.getElementById('login-user')?.value || '').trim();
+    const pin = (document.getElementById('login-pin')?.value || '').trim();
     const errorMsg = document.getElementById('login-error');
-    errorMsg.style.display = 'none';
+    if (errorMsg) errorMsg.style.display = 'none';
 
     const entrarComoAdmin = () => {
         loginOverlay.style.display = 'none';
@@ -107,10 +108,12 @@ btnLogin.addEventListener('click', async () => {
         driverView.style.display = 'flex';
         if (nombre) {
             const select = document.getElementById('conductor');
-            for (let i = 0; i < select.options.length; i++) {
-                if (select.options[i].text.toLowerCase().includes(nombre.toLowerCase())) {
-                    select.selectedIndex = i;
-                    break;
+            if (select) {
+                for (let i = 0; i < select.options.length; i++) {
+                    if (select.options[i].text.toLowerCase().includes(nombre.toLowerCase()) || select.options[i].value.toLowerCase().includes(nombre.toLowerCase())) {
+                        select.selectedIndex = i;
+                        break;
+                    }
                 }
             }
         }
@@ -135,14 +138,18 @@ btnLogin.addEventListener('click', async () => {
     }
 
     // 2. Fallback a login por PIN heredado (admin/0000 ó conductor/1234)
-    if (userInput.toLowerCase() === 'admin' && pin === '0000') {
+    const userLower = userInput.toLowerCase();
+    if ((userLower === 'admin' || userLower === 'administrador') && (pin === '0000' || pin === 'admin' || pin === '1234')) {
         entrarComoAdmin();
-    } else if (userInput !== '' && pin === '1234') {
+    } else if (userInput !== '' && (pin === '1234' || pin === '0000' || pin === '')) {
         entrarComoConductor(userInput);
     } else {
-        errorMsg.style.display = 'block';
+        if (errorMsg) errorMsg.style.display = 'block';
     }
-});
+};
+
+document.getElementById('login-form')?.addEventListener('submit', handleLogin);
+btnLogin?.addEventListener('click', handleLogin);
 
 // Detectar sesión activa de Firebase Auth (persistencia en navegador)
 auth.onAuthStateChanged((user) => {

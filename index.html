@@ -12,6 +12,8 @@
     <!-- Firebase (Versión de compatibilidad para CDN sencilla) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -22,28 +24,28 @@
 <body>
     <!-- Login Overlay -->
     <div id="login-overlay" class="login-overlay">
-        <div class="login-card">
+        <form class="login-card" id="login-form">
             <div class="logo-icon" style="font-size: 3rem; text-align: center; margin-bottom: 10px;">🌿</div>
             <h2 style="text-align: center; margin-bottom: 5px; color: var(--primary);">ProteinAgro</h2>
             <p style="text-align: center; color: var(--text-muted); margin-bottom: 25px;">Acceso al Sistema</p>
             
             <div class="form-group">
                 <label for="login-user">Usuario / Conductor</label>
-                <input type="text" id="login-user" class="premium-input" placeholder="Ej. Juan Gomez o admin">
+                <input type="text" id="login-user" class="premium-input" placeholder="Ej. Juan Gomez o admin" required>
             </div>
             
             <div class="form-group" style="margin-bottom: 25px;">
                 <label for="login-pin">PIN de Seguridad</label>
-                <input type="password" id="login-pin" class="premium-input" placeholder="****" inputmode="numeric">
+                <input type="password" id="login-pin" class="premium-input" placeholder="****" inputmode="numeric" required>
             </div>
             
             <p id="login-error" style="color: #ef4444; text-align: center; font-weight: 500; display: none; margin-bottom: 15px;">PIN o usuario incorrecto</p>
             
-            <button id="btn-login" class="btn-primary" style="width: 100%;">
+            <button type="submit" id="btn-login" class="btn-primary" style="width: 100%;">
                 <span class="btn-text-content">Ingresar</span>
             </button>
             <p style="text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 20px;">(Prueba: admin/0000 o conductor/1234)</p>
-        </div>
+        </form>
     </div>
 
     <!-- Admin Dashboard (Oculto por defecto) -->
