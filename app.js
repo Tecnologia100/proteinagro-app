@@ -709,7 +709,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
             
             let productosStr = '';
             if (data.productos && Array.isArray(data.productos)) {
-                productosStr = data.productos.map(p => `${p.producto}: ${p.kilos}kg`).join(' | ');
+                productosStr = data.productos.map(p => p.producto).join(', ');
             }
             productosStr = `"${productosStr}"`;
 
