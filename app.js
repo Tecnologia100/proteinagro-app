@@ -16,6 +16,38 @@ let GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby5L1az
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
+const storage = firebase.storage();
+
+// Función auxiliar para subir firma a Firebase Storage (o mantener base64 si falla/offline)
+async function subirFirmaAStorage(dataUrl, recordId) {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) return dataUrl;
+    if (!navigator.onLine || !storage) return dataUrl;
+
+    try {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const storageRef = storage.ref().child(`firmas/${recordId}.png`);
+        
+        const uploadTask = storageRef.put(blob);
+        const uploadPromise = new Promise((resolve, reject) => {
+            uploadTask.on('state_changed', null, reject, async () => {
+                const downloadURL = await storageRef.getDownloadURL();
+                resolve(downloadURL);
+            });
+        });
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout subiendo firma a Firebase Storage")), 5000)
+        );
+
+        const urlFinal = await Promise.race([uploadPromise, timeoutPromise]);
+        console.log("✅ Firma subida a Firebase Storage exitosamente:", urlFinal);
+        return urlFinal;
+    } catch (err) {
+        console.warn("⚠️ No se pudo subir firma a Storage (se mantendrá copia local):", err);
+        return dataUrl;
+    }
+}
 
 // Habilitar persistencia Offline (Magia de Firebase)
 db.enablePersistence()
@@ -54,38 +86,75 @@ window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 updateNetworkStatus();
 
-// === LÓGICA DE LOGIN ===
-btnLogin.addEventListener('click', () => {
-    const user = document.getElementById('login-user').value.trim().toLowerCase();
+// === LÓGICA DE LOGIN (Firebase Auth + PIN Legacy como fallback) ===
+btnLogin.addEventListener('click', async () => {
+    const userInput = document.getElementById('login-user').value.trim();
     const pin = document.getElementById('login-pin').value;
     const errorMsg = document.getElementById('login-error');
+    errorMsg.style.display = 'none';
 
-    if (user === 'admin' && pin === '0000') {
-        // Entrar a vista de administrador
+    const entrarComoAdmin = () => {
         loginOverlay.style.display = 'none';
         driverView.style.display = 'none';
         adminView.style.display = 'block';
         document.body.style.backgroundColor = 'var(--bg-color)';
         loadAdminData();
-    } else if (user !== '' && pin === '1234') {
-        // Entrar a vista de conductor
+    };
+
+    const entrarComoConductor = (nombre = null) => {
         loginOverlay.style.display = 'none';
         adminView.style.display = 'none';
         driverView.style.display = 'flex';
-        // Autoseleccionar conductor si coincide el nombre
-        const select = document.getElementById('conductor');
-        for(let i=0; i<select.options.length; i++) {
-            if(select.options[i].text.toLowerCase().includes(user)) {
-                select.selectedIndex = i;
-                break;
+        if (nombre) {
+            const select = document.getElementById('conductor');
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].text.toLowerCase().includes(nombre.toLowerCase())) {
+                    select.selectedIndex = i;
+                    break;
+                }
             }
         }
+    };
+
+    // 1. Intentar Firebase Auth si el input contiene "@" (email)
+    if (userInput.includes('@')) {
+        try {
+            const creds = await auth.signInWithEmailAndPassword(userInput, pin);
+            if (creds.user) {
+                // Verificar rol desde email o custom claims (basico: admin si contiene "admin")
+                if (creds.user.email && creds.user.email.toLowerCase().includes('admin')) {
+                    entrarParaAdmin();
+                } else {
+                    entrarComoConductor(userInput);
+                }
+                return;
+            }
+        } catch (authErr) {
+            console.warn("⚠️ Firebase Auth falló, intentando PIN heredado:", authErr.message);
+        }
+    }
+
+    // 2. Fallback a login por PIN heredado (admin/0000 ó conductor/1234)
+    if (userInput.toLowerCase() === 'admin' && pin === '0000') {
+        entrarParaAdmin();
+    } else if (userInput !== '' && pin === '1234') {
+        entrarComoConductor(userInput);
     } else {
         errorMsg.style.display = 'block';
     }
 });
 
+// Detectar sesión activa de Firebase Auth (persistencia en navegador)
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        console.log("✅ Usuario autenticado:", user.email);
+    }
+});
+
 const logout = () => {
+    if (auth.currentUser) {
+        auth.signOut().catch(() => {});
+    }
     loginOverlay.style.display = 'flex';
     driverView.style.display = 'none';
     adminView.style.display = 'none';
@@ -304,26 +373,44 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         observaciones: observacionesVal,
         ubicacionGps: "0",
         firma: firmaDataUrl,
-        fecha: new Date().toISOString(),
+        fecha: (() => {
+            const now = new Date();
+            const d = now.getDate();
+            const m = now.getMonth() + 1;
+            const y = now.getFullYear();
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            return `${d}/${m}/${y} ${hh}:${mm}:${ss}`;
+        })(),
         estado: navigator.onLine ? 'Sincronizado' : 'Offline'
     };
 
     try {
+        // 0. Generar ID único de recolección
+        const recordId = 'REC-' + Date.now();
+
+        // 0.1 Intentar subir firma a Firebase Storage (o mantener base64 offline)
+        let firmaURL = firmaDataUrl;
+        if (navigator.onLine) {
+            firmaURL = await subirFirmaAStorage(firmaDataUrl, recordId);
+        }
+
         // 1. Guardar en respaldo local (LocalStorage) de inmediato
         let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
-        const recordId = 'REC-' + Date.now();
-        const dataWithId = { ...data, id: recordId };
-        savedBackup.unshift(dataWithId);
+        const dataForBackup = { ...data, firma: firmaURL, id: recordId };
+        // El backup local guarda URL o base64 para factibilidad futura
+        savedBackup.unshift(dataForBackup);
         localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
 
-        // 2. Sincronizar inmediatamente con Google Sheets (vía webhook sin bloquear)
+        // 2. Sincronizar inmediatamente con Google Sheets (vía webhook sin bloquear) - con URL de firma
         if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== "") {
-            enviarAGoogleSheets(dataWithId);
+            enviarAGoogleSheets({ ...data, firma: firmaURL, id: recordId });
         }
 
         // 3. Intentar guardar en Firebase con un tiempo límite de 4 segundos
         try {
-            const firestorePromise = db.collection('recolecciones').add(data);
+            const firestorePromise = db.collection('recolecciones').add({ ...data, firma: firmaURL });
             const timeoutPromise = new Promise((_, reject) => 
                 setTimeout(() => reject(new Error("Timeout de conexión a Firebase")), 4000)
             );
@@ -356,7 +443,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         // Mostrar Comprobante Digital Modal al conductor e información del recibo
-        mostrarComprobanteDigital(dataWithId);
+        mostrarComprobanteDigital({ ...data, firma: firmaURL, id: recordId });
 
     } catch (error) {
         console.error("Error guardando documento: ", error);
