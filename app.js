@@ -185,7 +185,8 @@ const DEFAULT_PRODUCTOS = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDA
 const DEFAULT_CONDUCTORES = ["Elvis reyes", "Hernando Prado", "Emer Rodriguez", "Jairo Peña"];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
-    "RUTA 2: Cali (Norte / Centro / Sur / Oriente)",
+    "RUTA 2: Cali (Norte / Centro)",
+    "RUTA 2: Cali (Sur / Oriente)",
     "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance",
     "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá",
     "RUTA 5: Palmira / Villagorgona / Carmelo"
@@ -245,7 +246,7 @@ function renderDynamicDrivers(drivers) {
 function renderDynamicRoutes(routes) {
     const select = document.getElementById('ruta');
     if (!select) return;
-    const currentVal = select.value;
+    const currentVal = select.value || '';
     select.innerHTML = '<option value="" disabled selected>Seleccione la ruta</option>';
     routes.forEach(r => {
         const opt = document.createElement('option');
@@ -257,16 +258,12 @@ function renderDynamicRoutes(routes) {
     optOtra.value = 'OTRA';
     optOtra.textContent = '➕ Otra / Nueva Ruta...';
     select.appendChild(optOtra);
-
-    const hasMatchingOption = Array.from(select.options).some(o => o.value === currentVal);
-    if (currentVal && hasMatchingOption) {
+    if (currentVal) {
         select.value = currentVal;
-        populardropdownSucursalesPorRuta(currentVal);
-        renderizarCronogramaRuta(currentVal);
-    } else {
-        select.selectedIndex = 0;
-        populardropdownSucursalesPorRuta('');
-        renderizarCronogramaRuta('');
+    }
+    populardropdownSucursalesPorRuta(select.value || '');
+    if (select.value) {
+        renderizarCronogramaRuta(select.value);
     }
 }
 
@@ -280,10 +277,10 @@ function procesarPuntosRutasDinamicos(puntosArray) {
     for (let k in CRONOGRAMA_RUTAS) delete CRONOGRAMA_RUTAS[k];
 
     puntosArray.forEach(item => {
-        if (!item || !item.punto || String(item.estado || '').trim().toLowerCase() === 'inactivo') return;
-        const punto = String(item.punto).trim();
-        const prov = String(item.proveedor || 'PROVEEDOR GENERAL').trim();
-        const ruta = String(item.ruta || 'Ruta General').trim();
+        if (!item || !item.punto || item.estado === 'Inactivo') return;
+        const punto = item.punto;
+        const prov = item.proveedor || 'PROVEEDOR GENERAL';
+        const ruta = item.ruta || 'Ruta General';
 
         PUNTO_TO_PROVEEDOR_MAP[punto] = prov;
 
@@ -293,12 +290,12 @@ function procesarPuntosRutasDinamicos(puntosArray) {
         if (!PROVEEDORES_POR_RUTA[ruta]) PROVEEDORES_POR_RUTA[ruta] = [];
         if (!PROVEEDORES_POR_RUTA[ruta].includes(prov)) PROVEEDORES_POR_RUTA[ruta].push(prov);
 
-        if (item.horario && String(item.horario).trim() !== '') {
+        if (item.horario && item.horario.trim() !== '') {
             if (!CRONOGRAMA_RUTAS[ruta]) CRONOGRAMA_RUTAS[ruta] = [];
             const exists = CRONOGRAMA_RUTAS[ruta].some(c => c.cliente === punto);
             if (!exists) {
                 CRONOGRAMA_RUTAS[ruta].push({
-                    hora: String(item.horario).trim(),
+                    hora: item.horario,
                     cliente: punto,
                     proveedor: prov,
                     direccion: item.direccion || '',
@@ -307,6 +304,9 @@ function procesarPuntosRutasDinamicos(puntosArray) {
             }
         }
     });
+
+    const activeRuta = document.getElementById('ruta')?.value || '';
+    populardropdownSucursalesPorRuta(activeRuta);
 }
 
 async function cargarCatalogosDinamicos() {
@@ -942,9 +942,14 @@ const DEFAULT_RUTAS_DATA = {
         "CUENTA PROVEEDORES HUESO",
         "CUENTA 2026"
     ],
-    "RUTA 2: Cali (Norte / Centro / Sur / Oriente)": [
+    "RUTA 2: Cali (Norte / Centro)": [
         "SUPERTIENDA CAÑAVERAL",
         "COMERCIALIZADORA R Y E",
+        "CUENTA SEVILLANA",
+        "MIGAN CAPITAL"
+    ],
+    "RUTA 2: Cali (Sur / Oriente)": [
+        "SUPERTIENDA CAÑAVERAL",
         "CUENTA SEVILLANA",
         "MIGAN CAPITAL"
     ],
@@ -988,9 +993,20 @@ const TODOS_LOS_PROVEEDORES = [
 
 let savedRutasConfig = null;
 try {
+    const rawRutas = localStorage.getItem('proteinagro_rutas_config');
+    if (rawRutas) {
+        const parsed = JSON.parse(rawRutas);
+        if (parsed && typeof parsed === 'object' && !parsed.productos && Object.keys(parsed).length > 0) {
+            delete parsed["RUTA 6: Belalcázar / Yumbo"];
+            savedRutasConfig = parsed;
+        } else {
+            localStorage.removeItem('proteinagro_rutas_config');
+        }
+    }
+} catch (e) {
     localStorage.removeItem('proteinagro_rutas_config');
-} catch (e) {}
-let rutasConfig = DEFAULT_RUTAS_DATA;
+}
+let rutasConfig = savedRutasConfig || DEFAULT_RUTAS_DATA;
 
 function initRutasYProveedores() {
     const rutaSelect = document.getElementById('ruta');
@@ -1160,14 +1176,13 @@ function populardropdownSucursalesPorRuta(rutaSeleccionada) {
     if (!sucursalSelect) return;
 
     sucursalSelect.disabled = false;
+    sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
 
     let listaPuntos = getPuntosParaRuta(rutaSeleccionada);
-    if (!listaPuntos || listaPuntos.length === 0) {
+    if (listaPuntos.length === 0) {
+        // Mostrar todos si es ruta genérica o no definida
         listaPuntos = Object.keys(PUNTO_TO_PROVEEDOR_MAP);
     }
-
-    const countMsg = listaPuntos.length > 0 ? ` (${listaPuntos.length} puntos disponibles)` : '';
-    sucursalSelect.innerHTML = `<option value="" disabled selected>Seleccione el punto de recolección${countMsg}</option>`;
 
     listaPuntos.forEach(pt => {
         const opt = document.createElement('option');
