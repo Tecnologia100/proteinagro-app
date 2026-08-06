@@ -19,7 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- App Script -->
-    <script src="app.js" defer></script>
+    <script src="app.js?v=1.0.5" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -181,8 +181,8 @@
                     <!-- Selección de Sucursal / Punto de Recolección (Prioritaria) -->
                     <div class="form-group" id="sucursal-group">
                         <label for="sucursal">📍 Punto / Lugar de Recolección</label>
-                        <select id="sucursal" class="premium-input" disabled>
-                            <option value="" selected>Seleccione primero una ruta</option>
+                        <select id="sucursal" class="premium-input">
+                            <option value="" disabled selected>Seleccione el punto de recolección</option>
                         </select>
                     </div>
 
@@ -195,8 +195,8 @@
                     <!-- Selección de Proveedor (Autocompletado automáticamente) -->
                     <div class="form-group">
                         <label for="proveedor">🏬 Proveedor / Razon Social <span id="autofill-badge" style="display:none; font-size:0.75rem; background:#10b981; color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">✨ Asignado automáticamente</span></label>
-                        <select id="proveedor" required class="premium-input" disabled>
-                            <option value="" disabled selected>Seleccione primero un punto</option>
+                        <select id="proveedor" required class="premium-input">
+                            <option value="" disabled selected>Seleccione el proveedor</option>
                         </select>
                     </div>
 

@@ -189,7 +189,7 @@ const DEFAULT_RUTAS = [
     "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance",
     "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá",
     "RUTA 5: Palmira / Villagorgona / Carmelo",
-    "RUTA 6: Belalcázar / Yumbo (Pendiente por definir)"
+    "RUTA 6: Belalcázar / Yumbo"
 ];
 
 function getEmojiForProduct(name) {
@@ -272,7 +272,10 @@ async function cargarCatalogosDinamicos() {
                 if (data && data.productos && data.productos.length > 0) {
                     renderDynamicProducts(data.productos);
                     if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
-                    if (data.rutas && data.rutas.length > 0) renderDynamicRoutes(data.rutas);
+                    if (data.rutas && data.rutas.length > 0) {
+                        const combinedRoutes = Array.from(new Set([...data.rutas, ...DEFAULT_RUTAS]));
+                        renderDynamicRoutes(combinedRoutes);
+                    }
                     localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
                     console.log("✅ Catálogos dinámicos actualizados en vivo desde Google Sheets:", data.productos);
                     return;
@@ -904,7 +907,8 @@ const DEFAULT_RUTAS_DATA = {
         "SUPERTIENDA CAÑAVERAL",
         "CUENTA SEVILLANA",
         "ANGELO PAREDES PROTEINCOL",
-        "CUENTA FABRICA"
+        "CUENTA FABRICA",
+        "BELALCAZAR"
     ],
     "RUTA 5: Palmira / Villagorgona / Carmelo": [
         "SUPERTIENDA CAÑAVERAL",
@@ -912,7 +916,7 @@ const DEFAULT_RUTAS_DATA = {
         "JHOANATAN MARTINEZ",
         "MIGAN CAPITAL"
     ],
-    "RUTA 6: Belalcázar / Yumbo (Pendiente por definir)": [
+    "RUTA 6: Belalcázar / Yumbo": [
         "BELALCAZAR",
         "CUENTA FABRICA",
         "CUENTA PROVEEDORES HUESO"
@@ -934,7 +938,21 @@ const TODOS_LOS_PROVEEDORES = [
     "SUPERTIENDA CAÑAVERAL"
 ];
 
-let rutasConfig = JSON.parse(localStorage.getItem('proteinagro_rutas_config')) || DEFAULT_RUTAS_DATA;
+let savedRutasConfig = null;
+try {
+    const rawRutas = localStorage.getItem('proteinagro_rutas_config');
+    if (rawRutas) {
+        const parsed = JSON.parse(rawRutas);
+        if (parsed && typeof parsed === 'object' && !parsed.productos && Object.keys(parsed).length > 0) {
+            savedRutasConfig = parsed;
+        } else {
+            localStorage.removeItem('proteinagro_rutas_config');
+        }
+    }
+} catch (e) {
+    localStorage.removeItem('proteinagro_rutas_config');
+}
+let rutasConfig = savedRutasConfig || DEFAULT_RUTAS_DATA;
 
 function initRutasYProveedores() {
     const rutaSelect = document.getElementById('ruta');
@@ -961,6 +979,10 @@ function initRutasYProveedores() {
     optOtraRuta.value = 'OTRA';
     optOtraRuta.textContent = '➕ Otra / Nueva Ruta...';
     rutaSelect.appendChild(optOtraRuta);
+
+    // Inicializar proveedores y puntos por defecto activados desde el inicio
+    populardropdownProveedores(TODOS_LOS_PROVEEDORES, true);
+    populardropdownSucursalesPorRuta('');
 
     // Event listener al cambiar la Ruta
     rutaSelect.addEventListener('change', () => {
@@ -1026,6 +1048,7 @@ function initRutasYProveedores() {
         } else {
             customProveedorGroup.style.display = 'none';
             document.getElementById('custom-proveedor').required = false;
+            populardropdownSucursales(selectedProv);
         }
     });
 
@@ -1103,6 +1126,14 @@ const PUNTO_TO_PROVEEDOR_MAP = {
     "Sevillana Guacarí": "CUENTA SEVILLANA",
     "Caribe Buga": "CARIBE",
     "Alberto Millán Buga": "CUENTA ALBERTO MILLAN",
+    "B1-PRINCIPAL (Carrera 5 # 5-48)": "BELALCAZAR",
+    "B2- GALERIA (Calle 9 # 2-26)": "BELALCAZAR",
+    "B3- PLANTA BELOMO (Carrera 4 # 14-66)": "BELALCAZAR",
+    "B5- GUACANDA (Transversal 6 # 13-194)": "BELALCAZAR",
+    "B6- ROZO (Calle 10 N # 14 A 211 Rozo- Palmira)": "BELALCAZAR",
+    "B8- BOLIVAR (Carrera 3 # 13-44)": "BELALCAZAR",
+    "B9- URIBE (Carrera 12 # 11-03)": "BELALCAZAR",
+    "B11- GUABINAS (Calle 8 #19 B 55)": "BELALCAZAR",
 
     // RUTA 5 - Palmira / Villagorgona / Carmelo
     "Mercamio Palmira": "MIGAN CAPITAL",
@@ -1189,7 +1220,15 @@ const PUNTOS_POR_RUTA = {
         "Cañaveral Roldanillo - Zarzal",
         "Sevillana Guacarí",
         "Caribe Buga",
-        "Alberto Millán Buga"
+        "Alberto Millán Buga",
+        "B1-PRINCIPAL (Carrera 5 # 5-48)",
+        "B2- GALERIA (Calle 9 # 2-26)",
+        "B3- PLANTA BELOMO (Carrera 4 # 14-66)",
+        "B5- GUACANDA (Transversal 6 # 13-194)",
+        "B6- ROZO (Calle 10 N # 14 A 211 Rozo- Palmira)",
+        "B8- BOLIVAR (Carrera 3 # 13-44)",
+        "B9- URIBE (Carrera 12 # 11-03)",
+        "B11- GUABINAS (Calle 8 #19 B 55)"
     ],
     "RUTA 5: Palmira / Villagorgona / Carmelo": [
         "Mercamio Palmira",
@@ -1204,8 +1243,37 @@ const PUNTOS_POR_RUTA = {
         "Jorge Adrián Rodas (Villagorgona)",
         "Carnicería JAP (Carmelo)",
         "Carnicería Fabián López (Águila Roja)"
+    ],
+    "RUTA 6: Belalcázar / Yumbo": [
+        "Belalcázar Centro",
+        "Yumbo",
+        "B1-PRINCIPAL (Carrera 5 # 5-48)",
+        "B2- GALERIA (Calle 9 # 2-26)",
+        "B3- PLANTA BELOMO (Carrera 4 # 14-66)",
+        "B5- GUACANDA (Transversal 6 # 13-194)",
+        "B6- ROZO (Calle 10 N # 14 A 211 Rozo- Palmira)",
+        "B8- BOLIVAR (Carrera 3 # 13-44)",
+        "B9- URIBE (Carrera 12 # 11-03)",
+        "B11- GUABINAS (Calle 8 #19 B 55)"
     ]
 };
+
+function getPuntosParaRuta(rutaSeleccionada) {
+    if (!rutaSeleccionada) return [];
+    if (PUNTOS_POR_RUTA[rutaSeleccionada]) return PUNTOS_POR_RUTA[rutaSeleccionada];
+    
+    // Fuzzy match por número de ruta ("RUTA 1", "RUTA 4", etc.)
+    const match = rutaSeleccionada.match(/RUTA\s*(\d+)/i);
+    if (match) {
+        const num = match[1];
+        for (const key in PUNTOS_POR_RUTA) {
+            if (key.includes(`RUTA ${num}`) || key.includes(`RUTA${num}`)) {
+                return PUNTOS_POR_RUTA[key];
+            }
+        }
+    }
+    return [];
+}
 
 function populardropdownSucursalesPorRuta(rutaSeleccionada) {
     const sucursalSelect = document.getElementById('sucursal');
@@ -1215,7 +1283,7 @@ function populardropdownSucursalesPorRuta(rutaSeleccionada) {
     sucursalSelect.disabled = false;
     sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
 
-    let listaPuntos = PUNTOS_POR_RUTA[rutaSeleccionada] || [];
+    let listaPuntos = getPuntosParaRuta(rutaSeleccionada);
     if (listaPuntos.length === 0) {
         // Mostrar todos si es ruta genérica o no definida
         listaPuntos = Object.keys(PUNTO_TO_PROVEEDOR_MAP);
@@ -1266,21 +1334,34 @@ function populardropdownSucursales(proveedorSeleccionado) {
     if (!sucursalSelect) return;
 
     sucursalSelect.disabled = false;
-    sucursalSelect.innerHTML = '<option value="" selected>Sede Principal / General</option>';
 
-    const listaSucursales = SUCURSALES_DATA[proveedorSeleccionado] || [];
-    listaSucursales.forEach(suc => {
-        if (suc !== "Sede Principal / General") {
+    if (!proveedorSeleccionado) {
+        sucursalSelect.innerHTML = '<option value="" selected>Sede Principal / General</option>';
+        return;
+    }
+
+    const normProv = proveedorSeleccionado.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    const listaSucursales = Object.keys(PUNTO_TO_PROVEEDOR_MAP).filter(punto => {
+        const target = (PUNTO_TO_PROVEEDOR_MAP[punto] || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return target === normProv || target.includes(normProv) || normProv.includes(target);
+    });
+    
+    if (listaSucursales.length > 0) {
+        sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
+        listaSucursales.forEach(suc => {
             const opt = document.createElement('option');
             opt.value = suc;
             opt.textContent = suc;
             sucursalSelect.appendChild(opt);
-        }
-    });
+        });
+    } else {
+        sucursalSelect.innerHTML = '<option value="" selected>Sede Principal / General</option>';
+    }
 
     const optOtra = document.createElement('option');
     optOtra.value = 'OTRA_SUCURSAL';
-    optOtra.textContent = '➕ Otra Sucursal...';
+    optOtra.textContent = '➕ Otro Punto / Sucursal...';
     sucursalSelect.appendChild(optOtra);
 
     sucursalSelect.onchange = () => {
@@ -1444,10 +1525,12 @@ async function sincronizarRutasDesdeSheets() {
         const response = await fetch(`${GOOGLE_SHEETS_WEBHOOK_URL}?action=getRutas`);
         if (response.ok) {
             const remoteConfig = await response.json();
-            if (remoteConfig && typeof remoteConfig === 'object' && Object.keys(remoteConfig).length > 0) {
+            if (remoteConfig && typeof remoteConfig === 'object' && !remoteConfig.productos && Object.keys(remoteConfig).length > 0) {
                 rutasConfig = remoteConfig;
                 localStorage.setItem('proteinagro_rutas_config', JSON.stringify(remoteConfig));
                 console.log("🔄 Configuración de rutas actualizada dinámicamente desde Google Sheets.");
+            } else {
+                localStorage.removeItem('proteinagro_rutas_config');
             }
         }
     } catch (e) {
