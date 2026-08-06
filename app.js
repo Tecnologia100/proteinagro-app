@@ -185,8 +185,7 @@ const DEFAULT_PRODUCTOS = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDA
 const DEFAULT_CONDUCTORES = ["Elvis reyes", "Hernando Prado", "Emer Rodriguez", "Jairo Peña"];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
-    "RUTA 2: Cali (Norte / Centro)",
-    "RUTA 2: Cali (Sur / Oriente)",
+    "RUTA 2: Cali (Norte / Centro / Sur / Oriente)",
     "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance",
     "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá",
     "RUTA 5: Palmira / Villagorgona / Carmelo"
@@ -258,10 +257,16 @@ function renderDynamicRoutes(routes) {
     optOtra.value = 'OTRA';
     optOtra.textContent = '➕ Otra / Nueva Ruta...';
     select.appendChild(optOtra);
-    if (currentVal) {
+
+    const hasMatchingOption = Array.from(select.options).some(o => o.value === currentVal);
+    if (currentVal && hasMatchingOption) {
         select.value = currentVal;
         populardropdownSucursalesPorRuta(currentVal);
         renderizarCronogramaRuta(currentVal);
+    } else {
+        select.selectedIndex = 0;
+        populardropdownSucursalesPorRuta('');
+        renderizarCronogramaRuta('');
     }
 }
 
@@ -937,14 +942,9 @@ const DEFAULT_RUTAS_DATA = {
         "CUENTA PROVEEDORES HUESO",
         "CUENTA 2026"
     ],
-    "RUTA 2: Cali (Norte / Centro)": [
+    "RUTA 2: Cali (Norte / Centro / Sur / Oriente)": [
         "SUPERTIENDA CAÑAVERAL",
         "COMERCIALIZADORA R Y E",
-        "CUENTA SEVILLANA",
-        "MIGAN CAPITAL"
-    ],
-    "RUTA 2: Cali (Sur / Oriente)": [
-        "SUPERTIENDA CAÑAVERAL",
         "CUENTA SEVILLANA",
         "MIGAN CAPITAL"
     ],
@@ -988,20 +988,9 @@ const TODOS_LOS_PROVEEDORES = [
 
 let savedRutasConfig = null;
 try {
-    const rawRutas = localStorage.getItem('proteinagro_rutas_config');
-    if (rawRutas) {
-        const parsed = JSON.parse(rawRutas);
-        if (parsed && typeof parsed === 'object' && !parsed.productos && Object.keys(parsed).length > 0) {
-            delete parsed["RUTA 6: Belalcázar / Yumbo"];
-            savedRutasConfig = parsed;
-        } else {
-            localStorage.removeItem('proteinagro_rutas_config');
-        }
-    }
-} catch (e) {
     localStorage.removeItem('proteinagro_rutas_config');
-}
-let rutasConfig = savedRutasConfig || DEFAULT_RUTAS_DATA;
+} catch (e) {}
+let rutasConfig = DEFAULT_RUTAS_DATA;
 
 function initRutasYProveedores() {
     const rutaSelect = document.getElementById('ruta');
