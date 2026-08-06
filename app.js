@@ -262,6 +262,13 @@ function renderDynamicRoutes(routes) {
 
 function procesarPuntosRutasDinamicos(puntosArray) {
     if (!Array.isArray(puntosArray) || puntosArray.length === 0) return;
+
+    // Reiniciar mapas dinámicos completamente para permitir actualizaciones en tiempo real de nombres, paradas u horarios retirados
+    for (let k in PUNTO_TO_PROVEEDOR_MAP) delete PUNTO_TO_PROVEEDOR_MAP[k];
+    for (let k in PUNTOS_POR_RUTA) delete PUNTOS_POR_RUTA[k];
+    for (let k in PROVEEDORES_POR_RUTA) delete PROVEEDORES_POR_RUTA[k];
+    for (let k in CRONOGRAMA_RUTAS) delete CRONOGRAMA_RUTAS[k];
+
     puntosArray.forEach(item => {
         if (!item || !item.punto || item.estado === 'Inactivo') return;
         const punto = item.punto;
@@ -276,7 +283,7 @@ function procesarPuntosRutasDinamicos(puntosArray) {
         if (!PROVEEDORES_POR_RUTA[ruta]) PROVEEDORES_POR_RUTA[ruta] = [];
         if (!PROVEEDORES_POR_RUTA[ruta].includes(prov)) PROVEEDORES_POR_RUTA[ruta].push(prov);
 
-        if (item.horario && item.horario.trim() !== '') {
+        if (item.horario && String(item.horario).trim() !== '') {
             if (!CRONOGRAMA_RUTAS[ruta]) CRONOGRAMA_RUTAS[ruta] = [];
             const exists = CRONOGRAMA_RUTAS[ruta].some(c => c.cliente === punto);
             if (!exists) {
@@ -290,6 +297,8 @@ function procesarPuntosRutasDinamicos(puntosArray) {
             }
         }
     });
+
+    rutasConfig = PROVEEDORES_POR_RUTA;
 }
 
 async function cargarCatalogosDinamicos() {
