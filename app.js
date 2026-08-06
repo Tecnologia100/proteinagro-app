@@ -260,10 +260,28 @@ function renderDynamicRoutes(routes) {
     if (currentVal) select.value = currentVal;
 }
 
+function formatHorario(horaStr) {
+    if (!horaStr) return '';
+    const str = String(horaStr).trim();
+    if (!str || str === 'null' || str === 'undefined') return '';
+    if (str.includes('1899') || str.includes('GMT')) {
+        const match = str.match(/(\d{2}):(\d{2}):\d{2}/);
+        if (match) {
+            let h = parseInt(match[1], 10);
+            const m = match[2];
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            const strH = h < 10 ? '0' + h : h;
+            return `${strH}:${m} ${ampm}`;
+        }
+    }
+    return str;
+}
+
 function procesarPuntosRutasDinamicos(puntosArray) {
     if (!Array.isArray(puntosArray) || puntosArray.length === 0) return;
 
-    // Reiniciar mapas dinámicos completamente para permitir actualizaciones en tiempo real de nombres, paradas u horarios retirados
+    // Reset complet de mapas para reemplazar rutas anteriores si cambiaron en Sheets
     for (let k in PUNTO_TO_PROVEEDOR_MAP) delete PUNTO_TO_PROVEEDOR_MAP[k];
     for (let k in PUNTOS_POR_RUTA) delete PUNTOS_POR_RUTA[k];
     for (let k in PROVEEDORES_POR_RUTA) delete PROVEEDORES_POR_RUTA[k];
@@ -283,12 +301,13 @@ function procesarPuntosRutasDinamicos(puntosArray) {
         if (!PROVEEDORES_POR_RUTA[ruta]) PROVEEDORES_POR_RUTA[ruta] = [];
         if (!PROVEEDORES_POR_RUTA[ruta].includes(prov)) PROVEEDORES_POR_RUTA[ruta].push(prov);
 
-        if (item.horario && String(item.horario).trim() !== '') {
+        const horaLimpia = formatHorario(item.horario);
+        if (horaLimpia && horaLimpia.trim() !== '') {
             if (!CRONOGRAMA_RUTAS[ruta]) CRONOGRAMA_RUTAS[ruta] = [];
             const exists = CRONOGRAMA_RUTAS[ruta].some(c => c.cliente === punto);
             if (!exists) {
                 CRONOGRAMA_RUTAS[ruta].push({
-                    hora: item.horario,
+                    hora: horaLimpia,
                     cliente: punto,
                     proveedor: prov,
                     direccion: item.direccion || '',
@@ -297,8 +316,6 @@ function procesarPuntosRutasDinamicos(puntosArray) {
             }
         }
     });
-
-    rutasConfig = PROVEEDORES_POR_RUTA;
 }
 
 async function cargarCatalogosDinamicos() {

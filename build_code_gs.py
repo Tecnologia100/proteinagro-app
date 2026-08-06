@@ -51,8 +51,20 @@ function doGet(e) {{
         var pProv = String(prData[m][1] || '').trim();
         var pPunto = String(prData[m][2] || '').trim();
         var pDir = String(prData[m][3] || '').trim();
-        var pTel = String(prData[m][4] || '').trim();
-        var pHora = String(prData[m][5] || '').trim();
+        var pHoraRaw = prData[m][5];
+        var pHora = '';
+        if (pHoraRaw instanceof Date) {{
+          var hours = pHoraRaw.getHours();
+          var minutes = pHoraRaw.getMinutes();
+          var ampm = hours >= 12 ? 'PM' : 'AM';
+          hours = hours % 12;
+          hours = hours ? hours : 12;
+          var strHours = hours < 10 ? '0' + hours : hours;
+          var strMinutes = minutes < 10 ? '0' + minutes : minutes;
+          pHora = strHours + ':' + strMinutes + ' ' + ampm;
+        }} else {{
+          pHora = String(pHoraRaw || '').trim();
+        }}
         var pFrec = String(prData[m][6] || '').trim();
         var pEst = String(prData[m][7] || 'Activo').trim().toLowerCase();
 
