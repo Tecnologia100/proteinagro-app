@@ -324,6 +324,8 @@ async function cargarCatalogosDinamicos() {
                     if (data.rutas && data.rutas.length > 0) {
                         renderDynamicRoutes(data.rutas);
                     }
+                    const currentRuta = document.getElementById('ruta')?.value || '';
+                    populardropdownSucursalesPorRuta(currentRuta);
                     localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
                     console.log("✅ Catálogos dinámicos y matriz de rutas actualizados desde Google Sheets.");
                     return;
@@ -349,6 +351,8 @@ async function cargarCatalogosDinamicos() {
     renderDynamicProducts(productos);
     renderDynamicDrivers(conductores);
     renderDynamicRoutes(rutas);
+    const currentRuta = document.getElementById('ruta')?.value || '';
+    populardropdownSucursalesPorRuta(currentRuta);
 }
 
 btnRegistrarProducto.addEventListener('click', () => {
