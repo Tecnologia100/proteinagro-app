@@ -1117,6 +1117,9 @@ const PUNTO_TO_PROVEEDOR_MAP = {};
 // Puntos por Ruta (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
 const PUNTOS_POR_RUTA = {};
 
+// Proveedores por Ruta (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
+const PROVEEDORES_POR_RUTA = {};
+
 function getPuntosParaRuta(rutaSeleccionada) {
     if (!rutaSeleccionada) return Object.keys(PUNTO_TO_PROVEEDOR_MAP);
     
