@@ -181,8 +181,8 @@ const productsListUl = document.getElementById('products-list');
 let currentProduct = null;
 let collectedProducts = [];
 
-const DEFAULT_PRODUCTOS = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HARINA CARNE", "HARINA DE HUESO VAPORIZADA", "HUESO BLANCO", "HUESO CALCINADO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
-const DEFAULT_CONDUCTORES = [];
+const DEFAULT_PRODUCTOS = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HUESO BLANCO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
+const DEFAULT_CONDUCTORES = ["Elvis reyes", "Hernando Prado", "Emer Rodriguez", "Jairo Peña"];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
     "RUTA 2: Cali (Norte / Sur / Oriente)",
@@ -293,12 +293,9 @@ function procesarPuntosRutasDinamicos(puntosArray) {
 }
 
 async function cargarCatalogosDinamicos() {
-    // Limpieza de caché legada obsoleta
+    // Forzar limpieza de cachés obsoletas de sesiones anteriores
     try {
-        const rawCached = localStorage.getItem('proteinagro_catalogos_cache');
-        if (rawCached && rawCached.includes("Belalcázar / Yumbo")) {
-            localStorage.removeItem('proteinagro_catalogos_cache');
-        }
+        localStorage.removeItem('proteinagro_catalogos_cache');
     } catch(e) {}
 
     // 1. Intentar obtener catálogos en vivo desde Google Sheets (evitando caché HTTP con timestamp)
@@ -1660,6 +1657,8 @@ document.getElementById('btn-print-receipt')?.addEventListener('click', () => {
 
 // Inicializar selectores dinámicos y catálogos al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
+    renderDynamicProducts(DEFAULT_PRODUCTOS);
+    renderDynamicDrivers(DEFAULT_CONDUCTORES);
     initRutasYProveedores();
     cargarCatalogosDinamicos();
 });
