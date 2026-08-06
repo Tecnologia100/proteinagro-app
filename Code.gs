@@ -34,21 +34,7 @@ function doGet(e) {
       }
     }
     
-    // 3. Obtener Rutas Básicas (filtrando Inactivos)
-    var sheetRutas = ss.getSheetByName("Rutas");
-    var rutas = [];
-    if (sheetRutas && sheetRutas.getLastRow() > 1) {
-      var rutaData = sheetRutas.getRange(2, 1, sheetRutas.getLastRow() - 1, 2).getValues();
-      for (var k = 0; k < rutaData.length; k++) {
-        var rNombre = String(rutaData[k][0] || '').trim();
-        var rEstado = String(rutaData[k][1] || 'Activo').trim().toLowerCase();
-        if (rNombre !== '' && rEstado !== 'inactivo' && rNombre.toUpperCase().indexOf('RUTA') === 0) {
-          rutas.push(rNombre);
-        }
-      }
-    }
-
-    // 4. Obtener Puntos y Matriz Completa de Rutas (filtrando Inactivos)
+    // 3. Obtener Puntos y Matriz Completa de Rutas (filtrando Inactivos)
     var sheetPuntosRutas = ss.getSheetByName("Puntos_Rutas");
     var puntosRutas = [];
     if (sheetPuntosRutas && sheetPuntosRutas.getLastRow() > 1) {
@@ -75,6 +61,35 @@ function doGet(e) {
             estado: 'Activo'
           });
         }
+      }
+    }
+
+    // 4. Obtener Rutas Básicas (filtrando Inactivos de la pestaña Rutas y Puntos_Rutas)
+    var inactiveRoutesMap = {};
+    var sheetRutas = ss.getSheetByName("Rutas");
+    if (sheetRutas && sheetRutas.getLastRow() > 1) {
+      var rutaData = sheetRutas.getRange(2, 1, sheetRutas.getLastRow() - 1, 2).getValues();
+      for (var k = 0; k < rutaData.length; k++) {
+        var rName = String(rutaData[k][0] || '').trim();
+        var rState = String(rutaData[k][1] || 'Activo').trim().toLowerCase();
+        if (rState === 'inactivo') {
+          inactiveRoutesMap[rName.toLowerCase()] = true;
+          // Normalización para coincidencias parciales como RUTA 6
+          var rMatch = rName.match(/RUTA\s*(\d+)/i);
+          if (rMatch) inactiveRoutesMap['ruta ' + rMatch[1]] = true;
+        }
+      }
+    }
+
+    var rutasSet = {};
+    var rutas = [];
+    for (var n = 0; n < puntosRutas.length; n++) {
+      var rt = puntosRutas[n].ruta;
+      var rtMatch = rt.match(/RUTA\s*(\d+)/i);
+      var isInactive = inactiveRoutesMap[rt.toLowerCase()] || (rtMatch && inactiveRoutesMap['ruta ' + rtMatch[1]]);
+      if (rt && !isInactive && !rutasSet[rt]) {
+        rutasSet[rt] = true;
+        rutas.push(rt);
       }
     }
 
