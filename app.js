@@ -294,6 +294,14 @@ function procesarPuntosRutasDinamicos(puntosArray) {
 }
 
 async function cargarCatalogosDinamicos() {
+    // Limpieza de caché legada obsoleta
+    try {
+        const rawCached = localStorage.getItem('proteinagro_catalogos_cache');
+        if (rawCached && rawCached.includes("Belalcázar / Yumbo")) {
+            localStorage.removeItem('proteinagro_catalogos_cache');
+        }
+    } catch(e) {}
+
     // 1. Intentar obtener catálogos en vivo desde Google Sheets (evitando caché HTTP con timestamp)
     if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
         try {
@@ -977,6 +985,7 @@ try {
     if (rawRutas) {
         const parsed = JSON.parse(rawRutas);
         if (parsed && typeof parsed === 'object' && !parsed.productos && Object.keys(parsed).length > 0) {
+            delete parsed["RUTA 6: Belalcázar / Yumbo"];
             savedRutasConfig = parsed;
         } else {
             localStorage.removeItem('proteinagro_rutas_config');
