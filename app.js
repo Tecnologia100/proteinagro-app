@@ -305,12 +305,20 @@ function procesarPuntosRutasDinamicos(puntosArray) {
 }
 
 async function cargarCatalogosDinamicos() {
-    // Forzar limpieza de cachés obsoletas de sesiones anteriores
+    // 1. Cargar caché local primero si existe para disponibilidad inmediata
+    let cached = null;
     try {
-        localStorage.removeItem('proteinagro_catalogos_cache');
+        cached = JSON.parse(localStorage.getItem('proteinagro_catalogos_cache'));
     } catch(e) {}
 
-    // 1. Intentar obtener catálogos en vivo desde Google Sheets (evitando caché HTTP con timestamp)
+    if (cached) {
+        if (cached.productos && cached.productos.length > 0) renderDynamicProducts(cached.productos);
+        if (cached.conductores && cached.conductores.length > 0) renderDynamicDrivers(cached.conductores);
+        if (cached.puntos_rutas && cached.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(cached.puntos_rutas);
+        if (cached.rutas && cached.rutas.length > 0) renderDynamicRoutes(cached.rutas);
+    }
+
+    // 2. Obtener catálogos en vivo desde Google Sheets en segundo plano
     if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
         try {
             const cacheBusterUrl = GOOGLE_SHEETS_WEBHOOK_URL + (GOOGLE_SHEETS_WEBHOOK_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -318,16 +326,13 @@ async function cargarCatalogosDinamicos() {
             if (res.ok) {
                 const data = await res.json();
                 if (data && data.productos && data.productos.length > 0) {
+                    if (data.puntos_rutas && data.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(data.puntos_rutas);
                     renderDynamicProducts(data.productos);
                     if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
-                    if (data.puntos_rutas && data.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(data.puntos_rutas);
-                    if (data.rutas && data.rutas.length > 0) {
-                        renderDynamicRoutes(data.rutas);
-                    }
-                    const currentRuta = document.getElementById('ruta')?.value || '';
-                    populardropdownSucursalesPorRuta(currentRuta);
+                    if (data.rutas && data.rutas.length > 0) renderDynamicRoutes(data.rutas);
+
                     localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
-                    console.log("✅ Catálogos dinámicos y matriz de rutas actualizados desde Google Sheets.");
+                    console.log("✅ Catálogos dinámicos actualizados en vivo desde Google Sheets.");
                     return;
                 }
             }
@@ -336,23 +341,12 @@ async function cargarCatalogosDinamicos() {
         }
     }
 
-    // 2. Fallback a caché local o valores por defecto si no hay conexión o falla la red
-    let cached = null;
-    try {
-        cached = JSON.parse(localStorage.getItem('proteinagro_catalogos_cache'));
-    } catch(e) {}
-
-    const productos = (cached && cached.productos && cached.productos.length > 0) ? cached.productos : DEFAULT_PRODUCTOS;
-    const conductores = (cached && cached.conductores && cached.conductores.length > 0) ? cached.conductores : DEFAULT_CONDUCTORES;
-    const rutas = (cached && cached.rutas && cached.rutas.length > 0) ? cached.rutas : DEFAULT_RUTAS;
-
-    if (cached && cached.puntos_rutas) procesarPuntosRutasDinamicos(cached.puntos_rutas);
-
-    renderDynamicProducts(productos);
-    renderDynamicDrivers(conductores);
-    renderDynamicRoutes(rutas);
-    const currentRuta = document.getElementById('ruta')?.value || '';
-    populardropdownSucursalesPorRuta(currentRuta);
+    // 3. Fallback a valores por defecto si no había caché ni red
+    if (!cached || !cached.puntos_rutas || cached.puntos_rutas.length === 0) {
+        renderDynamicProducts(DEFAULT_PRODUCTOS);
+        renderDynamicDrivers(DEFAULT_CONDUCTORES);
+        renderDynamicRoutes(DEFAULT_RUTAS);
+    }
 }
 
 btnRegistrarProducto.addEventListener('click', () => {
@@ -1126,17 +1120,49 @@ const PUNTO_TO_PROVEEDOR_MAP = {};
 const PUNTOS_POR_RUTA = {};
 
 function getPuntosParaRuta(rutaSeleccionada) {
-    if (!rutaSeleccionada) return [];
-    // Coincidencia exacta primero
-    if (PUNTOS_POR_RUTA[rutaSeleccionada]) return PUNTOS_POR_RUTA[rutaSeleccionada];
+    if (!rutaSeleccionada) return Object.keys(PUNTO_TO_PROVEEDOR_MAP);
     
-    // Coincidencia normalizada (sin acentos, ignorando mayúsculas)
-    const norm = rutaSeleccionada.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    for (const key in PUNTOS_POR_RUTA) {
-        const normKey = key.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        if (normKey === norm) return PUNTOS_POR_RUTA[key];
+    // 1. Coincidencia exacta
+    if (PUNTOS_POR_RUTA[rutaSeleccionada] && PUNTOS_POR_RUTA[rutaSeleccionada].length > 0) {
+        return PUNTOS_POR_RUTA[rutaSeleccionada];
     }
-    return [];
+
+    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const normSelected = cleanStr(rutaSeleccionada);
+
+    // 2. Coincidencia normalizada
+    for (const key in PUNTOS_POR_RUTA) {
+        if (cleanStr(key) === normSelected && PUNTOS_POR_RUTA[key].length > 0) {
+            return PUNTOS_POR_RUTA[key];
+        }
+    }
+
+    // 3. Coincidencia flexible por número de ruta (ej: "RUTA 1", "RUTA 2", "RUTA 3", etc.)
+    const matchNum = rutaSeleccionada.match(/RUTA\s*(\d+)/i);
+    if (matchNum) {
+        const num = matchNum[1];
+        let combinados = [];
+        for (const key in PUNTOS_POR_RUTA) {
+            const keyNumMatch = key.match(/RUTA\s*(\d+)/i);
+            if (keyNumMatch && keyNumMatch[1] === num) {
+                combinados = combinados.concat(PUNTOS_POR_RUTA[key]);
+            }
+        }
+        if (combinados.length > 0) {
+            return Array.from(new Set(combinados));
+        }
+    }
+
+    // 4. Coincidencia por subcadena
+    for (const key in PUNTOS_POR_RUTA) {
+        const normKey = cleanStr(key);
+        if ((normKey.includes(normSelected) || normSelected.includes(normKey)) && PUNTOS_POR_RUTA[key].length > 0) {
+            return PUNTOS_POR_RUTA[key];
+        }
+    }
+
+    // 5. Fallback general: mostrar todos los puntos cargados para no bloquear al usuario
+    return Object.keys(PUNTO_TO_PROVEEDOR_MAP);
 }
 
 function populardropdownSucursalesPorRuta(rutaSeleccionada) {
