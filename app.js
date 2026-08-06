@@ -306,8 +306,7 @@ async function cargarCatalogosDinamicos() {
                     if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
                     if (data.puntos_rutas && data.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(data.puntos_rutas);
                     if (data.rutas && data.rutas.length > 0) {
-                        const combinedRoutes = Array.from(new Set([...data.rutas, ...DEFAULT_RUTAS]));
-                        renderDynamicRoutes(combinedRoutes);
+                        renderDynamicRoutes(data.rutas);
                     }
                     localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
                     console.log("✅ Catálogos dinámicos y matriz de rutas actualizados desde Google Sheets.");
