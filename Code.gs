@@ -226,15 +226,12 @@ function inicializarTablasYCatalogos() {
   ];
   sheetProd.getRange(2, 1, defaultProds.length, 2).setValues(defaultProds);
 
-  // 2. Pestaña Conductores
+  // 2. Pestaña Conductores (Solo inicializa si está completamente vacía)
   var sheetCond = ss.getSheetByName("Conductores") || ss.insertSheet("Conductores");
-  sheetCond.clearContents();
-  sheetCond.appendRow(["Nombre", "Estado"]);
-  var defaultConds = [
-    ["Camilo Perez", "Activo"], ["Juan Gomez", "Activo"],
-    ["Miguel Otero", "Activo"], ["Felipe Montilla", "Activo"], ["Gildardo Tejada", "Activo"]
-  ];
-  sheetCond.getRange(2, 1, defaultConds.length, 2).setValues(defaultConds);
+  if (sheetCond.getLastRow() <= 1) {
+    sheetCond.clearContents();
+    sheetCond.appendRow(["Nombre", "Estado"]);
+  }
 
   // 3. Pestaña Rutas
   var sheetRutas = ss.getSheetByName("Rutas") || ss.insertSheet("Rutas");
@@ -246,7 +243,7 @@ function inicializarTablasYCatalogos() {
     ["RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance", "Activo"],
     ["RUTA 4: Buga / Roldanillo / Zarzal / Tuluá", "Activo"],
     ["RUTA 5: Palmira / Villagorgona / Carmelo", "Activo"],
-    ["RUTA 6: Yumbo / Otras", "Activo"]
+    ["RUTA 6: Yumbo / Otras", "Inactivo"]
   ];
   sheetRutas.getRange(2, 1, defaultRutas.length, 2).setValues(defaultRutas);
 
