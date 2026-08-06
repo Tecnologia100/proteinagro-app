@@ -189,7 +189,7 @@ const DEFAULT_RUTAS = [
     "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance",
     "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá",
     "RUTA 5: Palmira / Villagorgona / Carmelo",
-    "RUTA 6: Belalcázar / Yumbo"
+    "RUTA 6: Yumbo / Otras"
 ];
 
 function getEmojiForProduct(name) {
@@ -951,8 +951,7 @@ const DEFAULT_RUTAS_DATA = {
         "JHOANATAN MARTINEZ",
         "MIGAN CAPITAL"
     ],
-    "RUTA 6: Belalcázar / Yumbo": [
-        "BELALCAZAR",
+    "RUTA 6: Yumbo / Otras": [
         "CUENTA FABRICA",
         "CUENTA PROVEEDORES HUESO"
     ]
@@ -1279,17 +1278,8 @@ const PUNTOS_POR_RUTA = {
         "Carnicería JAP (Carmelo)",
         "Carnicería Fabián López (Águila Roja)"
     ],
-    "RUTA 6: Belalcázar / Yumbo": [
-        "Belalcázar Centro",
-        "Yumbo",
-        "B1-PRINCIPAL (Carrera 5 # 5-48)",
-        "B2- GALERIA (Calle 9 # 2-26)",
-        "B3- PLANTA BELOMO (Carrera 4 # 14-66)",
-        "B5- GUACANDA (Transversal 6 # 13-194)",
-        "B6- ROZO (Calle 10 N # 14 A 211 Rozo- Palmira)",
-        "B8- BOLIVAR (Carrera 3 # 13-44)",
-        "B9- URIBE (Carrera 12 # 11-03)",
-        "B11- GUABINAS (Calle 8 #19 B 55)"
+    "RUTA 6: Yumbo / Otras": [
+        "Yumbo"
     ]
 };
 

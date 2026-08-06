@@ -238,7 +238,7 @@ function inicializarTablasYCatalogos() {{
     ["RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance", "Activo"],
     ["RUTA 4: Buga / Roldanillo / Zarzal / Tuluá", "Activo"],
     ["RUTA 5: Palmira / Villagorgona / Carmelo", "Activo"],
-    ["RUTA 6: Belalcázar / Yumbo", "Activo"]
+    ["RUTA 6: Yumbo / Otras", "Activo"]
   ];
   sheetRutas.getRange(2, 1, defaultRutas.length, 2).setValues(defaultRutas);
 
