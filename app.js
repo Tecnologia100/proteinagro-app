@@ -261,6 +261,38 @@ function renderDynamicRoutes(routes) {
     if (currentVal) select.value = currentVal;
 }
 
+function procesarPuntosRutasDinamicos(puntosArray) {
+    if (!Array.isArray(puntosArray) || puntosArray.length === 0) return;
+    puntosArray.forEach(item => {
+        if (!item || !item.punto || item.estado === 'Inactivo') return;
+        const punto = item.punto;
+        const prov = item.proveedor || 'PROVEEDOR GENERAL';
+        const ruta = item.ruta || 'Ruta General';
+
+        PUNTO_TO_PROVEEDOR_MAP[punto] = prov;
+
+        if (!PUNTOS_POR_RUTA[ruta]) PUNTOS_POR_RUTA[ruta] = [];
+        if (!PUNTOS_POR_RUTA[ruta].includes(punto)) PUNTOS_POR_RUTA[ruta].push(punto);
+
+        if (!PROVEEDORES_POR_RUTA[ruta]) PROVEEDORES_POR_RUTA[ruta] = [];
+        if (!PROVEEDORES_POR_RUTA[ruta].includes(prov)) PROVEEDORES_POR_RUTA[ruta].push(prov);
+
+        if (item.horario && item.horario.trim() !== '') {
+            if (!CRONOGRAMA_RUTAS[ruta]) CRONOGRAMA_RUTAS[ruta] = [];
+            const exists = CRONOGRAMA_RUTAS[ruta].some(c => c.cliente === punto);
+            if (!exists) {
+                CRONOGRAMA_RUTAS[ruta].push({
+                    hora: item.horario,
+                    cliente: punto,
+                    proveedor: prov,
+                    direccion: item.direccion || '',
+                    tel: item.telefono || ''
+                });
+            }
+        }
+    });
+}
+
 async function cargarCatalogosDinamicos() {
     // 1. Intentar obtener catálogos en vivo desde Google Sheets (evitando caché HTTP con timestamp)
     if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
@@ -272,12 +304,13 @@ async function cargarCatalogosDinamicos() {
                 if (data && data.productos && data.productos.length > 0) {
                     renderDynamicProducts(data.productos);
                     if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
+                    if (data.puntos_rutas && data.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(data.puntos_rutas);
                     if (data.rutas && data.rutas.length > 0) {
                         const combinedRoutes = Array.from(new Set([...data.rutas, ...DEFAULT_RUTAS]));
                         renderDynamicRoutes(combinedRoutes);
                     }
                     localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
-                    console.log("✅ Catálogos dinámicos actualizados en vivo desde Google Sheets:", data.productos);
+                    console.log("✅ Catálogos dinámicos y matriz de rutas actualizados desde Google Sheets.");
                     return;
                 }
             }
@@ -295,6 +328,8 @@ async function cargarCatalogosDinamicos() {
     const productos = (cached && cached.productos && cached.productos.length > 0) ? cached.productos : DEFAULT_PRODUCTOS;
     const conductores = (cached && cached.conductores && cached.conductores.length > 0) ? cached.conductores : DEFAULT_CONDUCTORES;
     const rutas = (cached && cached.rutas && cached.rutas.length > 0) ? cached.rutas : DEFAULT_RUTAS;
+
+    if (cached && cached.puntos_rutas) procesarPuntosRutasDinamicos(cached.puntos_rutas);
 
     renderDynamicProducts(productos);
     renderDynamicDrivers(conductores);

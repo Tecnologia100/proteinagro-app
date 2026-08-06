@@ -1,0 +1,954 @@
+{
+  "RUTA 1": [
+    [
+      "PROGRAMACION OFICIAL DE RUTAS DE RECOLECCION ",
+      "",
+      ""
+    ],
+    [
+      "RUTAS POR CONDUCTOR-PROGRAMACION DIARIA",
+      "",
+      ""
+    ],
+    [
+      "RUTA 1",
+      "",
+      ""
+    ],
+    [
+      "SANTA ELENA ",
+      "",
+      ""
+    ],
+    [
+      "FRECUENCIA LUNES A SABADO ",
+      "",
+      ""
+    ],
+    [
+      "DIA",
+      "RECORRIDO",
+      ""
+    ],
+    [
+      "LUNES A SABADO",
+      "BODEGA SANTA ELENA",
+      ""
+    ],
+    [
+      "LUNES A SABADO",
+      "GARAY SANTA ELENA",
+      ""
+    ],
+    [
+      "LUNES A SABADO",
+      "CAVASA",
+      ""
+    ],
+    [
+      "LUNES /MIERCOLES/VIERNES ",
+      "SEVILLANA SANTA ELENA",
+      ""
+    ],
+    [
+      "LUNES /MIERCOLES/VIERNES ",
+      "CIUDAD DEL CAMPO GRANAHORRAR",
+      ""
+    ],
+    [
+      "LUNES /MIERCOLES/VIERNES ",
+      "CIUDAD DEL CAMPO PUNTO ROJO",
+      ""
+    ],
+    [
+      "LUNES /MIERCOLES/VIERNES ",
+      "CIUDAD DEL CAMPO SURTIMERCAR",
+      ""
+    ],
+    [
+      "MIERCOLES/SABADO",
+      "LOS LAGOS ORLANDO MARTINEZ",
+      ""
+    ],
+    [
+      "SABADO",
+      "LA ESPERANZA",
+      ""
+    ]
+  ],
+  "RUTA 2": [
+    [
+      "RUTA 2",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "CALI",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "CAÑAVERAL-LA MONTAÑA-VARIOS",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "DIA",
+      "RECORRIDO",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "VIERNES ",
+      "NORTE/CENTRO",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "martes",
+      "SUR/ORIENTE",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "NORTE/CENTRO viernes",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "Hora",
+      "Cliente",
+      "Dirección",
+      "Teléfono",
+      "¿Hubo recolección?",
+      "Observaciones",
+      "Actualizar datos",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "06:30",
+      "Cañaveral Punto 14",
+      "Cra. 5 #14-37",
+      "3244935167",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "07:00",
+      "Cañaveral Centenario",
+      "Av. 4 Norte #46-64",
+      "3102022829",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "07:30",
+      "La Montaña Av. 6A",
+      "Av. 6A N #30N-47",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "08:00",
+      "Cañaveral Prados del Norte",
+      "Av.2B Norte #34N-19",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "09:00",
+      "Carnes Maiale",
+      "Cra.1G #69-02 Esquina",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "09:30",
+      "Districarnes LG",
+      "Cra.4C #65B-18",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "10:00",
+      "Cañaveral Álamos",
+      "Calle75C N #2 Bis-100",
+      "3243192838",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "10:30",
+      "Cañaveral Los Pinos",
+      "Calle70 #7M Bis-64",
+      "3243192839",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "11:00",
+      "Cañaveral La Primera",
+      "Cra.1A #44-50",
+      "3184277811",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "11:30",
+      "La Montaña Torres",
+      "Cra.1 #56-20",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "12:00",
+      "Super Carnes Los Andes",
+      "Cra.1D #52-05",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "13:00",
+      "La Cosecha de Mi Tierra",
+      "Cra.15 Calle54 Esquina",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "13:30",
+      "Carnes RYE",
+      "Cra.17F #33A-45",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "14:00",
+      "Baratón Carnes Berlín",
+      "Calle44 #19-65",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "14:30",
+      "El Rebajón",
+      "Calle 44",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "15:00",
+      "La Montaña Calima",
+      "Pendiente",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "SUR/ORIENTE martes",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "Hora",
+      "Cliente",
+      "Dirección",
+      "Teléfono",
+      "¿Hubo recolección?",
+      "Observaciones",
+      "Actualizar datos",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "07:00",
+      "Cañaveral Ingenio",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "07:30",
+      "Cañaveral Limonar",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "08:00",
+      "Cañaveral Pasoancho",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "08:30",
+      "Sevillana Pasoancho",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "09:00",
+      "La Montaña Pasoancho",
+      "Calle 14C #25-16",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "09:30",
+      "Sevillana Lourdes",
+      "Transv. 29D #29-50",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "10:00",
+      "La Montaña Guadalupe",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      "1111"
+    ],
+    [
+      "10:30",
+      "La Montaña Cosmocentro",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "11:00",
+      "La Montaña Cristales",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "11:30",
+      "Cañaveral Villanueva",
+      "Calle 13 #75A-185",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "12:00",
+      "Cañaveral Cootraemcali",
+      "Cra.70 #13B-18",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "12:30",
+      "Mercaunión",
+      "Calle 25 #85B-100",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "13:00",
+      "Sevillana República de Israel",
+      "Calle 16A #121A-334",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "13:30",
+      "Jaime Zuluaga",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "14:00",
+      "Milton Muñoz",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "14:30",
+      "La Montaña Decepaz",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "15:00",
+      "Ciudadela del Río",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "15:30",
+      "La Montaña Morichal",
+      "Pendiente actualizar",
+      "",
+      "☐ Sí   ☐ No",
+      "",
+      "☐ Dir   ☐ Tel",
+      "",
+      "",
+      "",
+      ""
+    ]
+  ],
+  "RUTA 3": [
+    [
+      "RUTA 3",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "PUERTO TEJADA-VILLARICA-JAMUNDI-PANCE",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "CARIBE-CAÑAVERAL",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "DIA",
+      "RECORRIDO",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "MIERCOLES",
+      "PUERTO TEJADA-VILLARICA-JAMUNDI-PANCE",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "PLANILLA OPERATIVA DE RUTA - SUPERMERCADOS CARIBE",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    [
+      "#",
+      "Municipio",
+      "Punto",
+      "Dirección",
+      "Hora llegada",
+      "Hora salida",
+      "Firma"
+    ],
+    [
+      "1",
+      "Puerto Tejada",
+      "Centro",
+      "Cra. 19 #17-45",
+      "",
+      "",
+      ""
+    ],
+    [
+      "2",
+      "Puerto Tejada",
+      "Punto 2",
+      "Cl. 16 #20-60",
+      "",
+      "",
+      ""
+    ],
+    [
+      "3",
+      "Villa Rica",
+      "Caribe",
+      "Cra. 3 #2-60",
+      "",
+      "",
+      ""
+    ],
+    [
+      "4",
+      "Jamundí",
+      "Terranova",
+      "Cra. 51 Sur #16C-04",
+      "",
+      "",
+      ""
+    ],
+    [
+      "5",
+      "Jamundí",
+      "Farallones",
+      "Cl. 12 Sur #10A-77",
+      "",
+      "",
+      ""
+    ],
+    [
+      "6",
+      "Jamundí",
+      "Surtimayorista",
+      "Cra. 10 #11-66",
+      "",
+      "",
+      ""
+    ],
+    [
+      "7",
+      "Jamundí",
+      "Rosario",
+      "Cra. 11 #3-93",
+      "",
+      "",
+      ""
+    ],
+    [
+      "8",
+      "Jamundí",
+      "Principal",
+      "Cra. 7 #10-48",
+      "",
+      "",
+      ""
+    ],
+    [
+      "9",
+      "Jamundí",
+      "Centro",
+      "Cl. 11 #9-58",
+      "",
+      "",
+      ""
+    ],
+    [
+      "10",
+      "Jamundí",
+      "Panamericana",
+      "Cra. 3D #11-145",
+      "",
+      "",
+      ""
+    ]
+  ],
+  "RUTA 4": [
+    [
+      "RUTA 4",
+      ""
+    ],
+    [
+      "BUGA-ROLDANILLO-ZARZAL-TULUA",
+      ""
+    ],
+    [
+      "FRIGORIFICO-MILLAN-CAÑAVERAL-CARIBE-SEVILLANA",
+      ""
+    ],
+    [
+      "DIA",
+      "RECORRIDO"
+    ],
+    [
+      "LUNES A SABADO INCLUYE FESTIVO",
+      "FRIGORIFICO BUGA"
+    ],
+    [
+      "MARTES  CADA 8 DIAS ",
+      "CAÑAVERAL  TULUA  -BUGA"
+    ],
+    [
+      "MARTES  CADA 15 DIAS ",
+      "CAÑAVERAL ROLDANILLO-ZARZAL"
+    ],
+    [
+      "MIERCOLES",
+      "SEVILLANA GUACARI-CARIBE BUGA"
+    ],
+    [
+      "JUEVES",
+      "ALBERTO MILLAN"
+    ],
+    [
+      "SEDE BELALCAZAR",
+      "DIRECCION"
+    ],
+    [
+      "B1-PRINCIPAL",
+      "CARRERA 5 # 5-48"
+    ],
+    [
+      "B2- GALERIA",
+      "CALLE 9 # 2-26"
+    ],
+    [
+      "B3- PLANTA BELOMO",
+      "CARRERA 4 # 14-66"
+    ],
+    [
+      "B5- GUACANDA",
+      "TRANSVERSAL 6 # 13-194"
+    ],
+    [
+      "B6- ROZO",
+      "CALLE 10 N # 14 A 211 ROZO- PALMIRA"
+    ],
+    [
+      "B8- BOLIVAR",
+      "CARRERA 3 # 13-44"
+    ],
+    [
+      "B9- URIBE",
+      "CARRERA 12 # 11-03"
+    ],
+    [
+      "B11- GUABINAS",
+      "CALLE 8 #19 B 55"
+    ]
+  ],
+  "RUTA 5": [
+    [
+      "RUTA 5",
+      ""
+    ],
+    [
+      "PALMIRA-VILLAGORGONA-CARMELO",
+      ""
+    ],
+    [
+      "MERCAMIO/CAÑAVERAL/SEVILLANA /MONTAÑA/ VARIOS",
+      ""
+    ],
+    [
+      "DIA",
+      "RECORRIDO"
+    ],
+    [
+      "JUEVES",
+      "MERCAMIO PALMIRA"
+    ],
+    [
+      "JUEVES",
+      "CAÑAVERAL PALMITEX"
+    ],
+    [
+      "JUEVES",
+      "CAÑAVERAL  PALMICENTRO"
+    ],
+    [
+      "JUEVES",
+      "SEVILLANA "
+    ],
+    [
+      "JUEVES",
+      "LA MONTAÑA"
+    ],
+    [
+      "JUEVES",
+      "CAÑAVERAL VILLAGORGONA 1 "
+    ],
+    [
+      "JUEVES",
+      "CAÑAVERAL VILLAGORGONA 2"
+    ],
+    [
+      "JUEVES",
+      "VILLA GORGONA NUTRIALIMENTOS VALDEZ"
+    ],
+    [
+      "JUEVES",
+      "VILLA GORGONA YENIFER DIAZ"
+    ],
+    [
+      "JUEVES",
+      "VILLA GORGONA JORGE ADRIAN RODAS"
+    ],
+    [
+      "JUEVES",
+      "CARMELO  CARNICERIA JAP"
+    ],
+    [
+      "JUEVES",
+      "CARMELO  CARNICERIA FABIAN LOPEZ (AGUILA ROJA)"
+    ]
+  ],
+  "RUTA 6": [
+    [
+      "RUTA 6",
+      ""
+    ]
+  ]
+}
