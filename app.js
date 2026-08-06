@@ -185,7 +185,8 @@ const DEFAULT_PRODUCTOS = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDA
 const DEFAULT_CONDUCTORES = ["Elvis reyes", "Hernando Prado", "Emer Rodriguez", "Jairo Peña"];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
-    "RUTA 2: Cali (Norte / Sur / Oriente)",
+    "RUTA 2: Cali (Norte / Centro)",
+    "RUTA 2: Cali (Sur / Oriente)",
     "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance",
     "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá",
     "RUTA 5: Palmira / Villagorgona / Carmelo"
@@ -257,11 +258,22 @@ function renderDynamicRoutes(routes) {
     optOtra.value = 'OTRA';
     optOtra.textContent = '➕ Otra / Nueva Ruta...';
     select.appendChild(optOtra);
-    if (currentVal) select.value = currentVal;
+    if (currentVal) {
+        select.value = currentVal;
+        populardropdownSucursalesPorRuta(currentVal);
+        renderizarCronogramaRuta(currentVal);
+    }
 }
 
 function procesarPuntosRutasDinamicos(puntosArray) {
     if (!Array.isArray(puntosArray) || puntosArray.length === 0) return;
+
+    // Limpiar mapas dinámicos previos para evitar arrastrar datos obsoletos
+    for (let k in PUNTO_TO_PROVEEDOR_MAP) delete PUNTO_TO_PROVEEDOR_MAP[k];
+    for (let k in PUNTOS_POR_RUTA) delete PUNTOS_POR_RUTA[k];
+    for (let k in PROVEEDORES_POR_RUTA) delete PROVEEDORES_POR_RUTA[k];
+    for (let k in CRONOGRAMA_RUTAS) delete CRONOGRAMA_RUTAS[k];
+
     puntosArray.forEach(item => {
         if (!item || !item.punto || item.estado === 'Inactivo') return;
         const punto = item.punto;
@@ -312,8 +324,6 @@ async function cargarCatalogosDinamicos() {
                     if (data.rutas && data.rutas.length > 0) {
                         renderDynamicRoutes(data.rutas);
                     }
-                    // Re-inicializar selectores de rutas DESPUÉS de tener los datos dinámicos
-                    initRutasYProveedores();
                     localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
                     console.log("✅ Catálogos dinámicos y matriz de rutas actualizados desde Google Sheets.");
                     return;
@@ -339,7 +349,6 @@ async function cargarCatalogosDinamicos() {
     renderDynamicProducts(productos);
     renderDynamicDrivers(conductores);
     renderDynamicRoutes(rutas);
-    initRutasYProveedores();
 }
 
 btnRegistrarProducto.addEventListener('click', () => {
@@ -930,12 +939,16 @@ const DEFAULT_RUTAS_DATA = {
         "CUENTA PROVEEDORES HUESO",
         "CUENTA 2026"
     ],
-    "RUTA 2: Cali (Norte / Sur / Oriente)": [
+    "RUTA 2: Cali (Norte / Centro)": [
         "SUPERTIENDA CAÑAVERAL",
         "COMERCIALIZADORA R Y E",
         "CUENTA SEVILLANA",
-        "MIGAN CAPITAL",
-        "CUENTA 2026"
+        "MIGAN CAPITAL"
+    ],
+    "RUTA 2: Cali (Sur / Oriente)": [
+        "SUPERTIENDA CAÑAVERAL",
+        "CUENTA SEVILLANA",
+        "MIGAN CAPITAL"
     ],
     "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance": [
         "CARIBE",
@@ -949,7 +962,8 @@ const DEFAULT_RUTAS_DATA = {
         "CUENTA SEVILLANA",
         "ANGELO PAREDES PROTEINCOL",
         "CUENTA FABRICA",
-        "BELALCAZAR"
+        "BELALCAZAR",
+        "MATADERO"
     ],
     "RUTA 5: Palmira / Villagorgona / Carmelo": [
         "SUPERTIENDA CAÑAVERAL",
@@ -1002,20 +1016,25 @@ function initRutasYProveedores() {
 
     if (!rutaSelect || !proveedorSelect || !sucursalSelect) return;
 
-    // Poblar selector de rutas
-    rutaSelect.innerHTML = '<option value="" disabled selected>Seleccione la ruta</option>';
-    Object.keys(rutasConfig).forEach(rutaKey => {
-        const opt = document.createElement('option');
-        opt.value = rutaKey;
-        opt.textContent = rutaKey;
-        rutaSelect.appendChild(opt);
-    });
+    // Solo poblar selector si no fue poblado dinámicamente
+    if (rutaSelect.options.length <= 1) {
+        rutaSelect.innerHTML = '<option value="" disabled selected>Seleccione la ruta</option>';
+        Object.keys(rutasConfig).forEach(rutaKey => {
+            const opt = document.createElement('option');
+            opt.value = rutaKey;
+            opt.textContent = rutaKey;
+            rutaSelect.appendChild(opt);
+        });
 
-    // Opción para nueva ruta
-    const optOtraRuta = document.createElement('option');
-    optOtraRuta.value = 'OTRA';
-    optOtraRuta.textContent = '➕ Otra / Nueva Ruta...';
-    rutaSelect.appendChild(optOtraRuta);
+        // Opción para nueva ruta
+        const optOtraRuta = document.createElement('option');
+        optOtraRuta.value = 'OTRA';
+        optOtraRuta.textContent = '➕ Otra / Nueva Ruta...';
+        rutaSelect.appendChild(optOtraRuta);
+    }
+
+    if (rutaSelect.dataset.listenersAttached) return;
+    rutaSelect.dataset.listenersAttached = 'true';
 
     // Inicializar proveedores y puntos por defecto activados desde el inicio
     populardropdownProveedores(TODOS_LOS_PROVEEDORES, true);
@@ -1096,195 +1115,11 @@ function initRutasYProveedores() {
     sincronizarRutasDesdeSheets();
 }
 
-const PUNTO_TO_PROVEEDOR_MAP = {
-    // RUTA 1 - Santa Elena / Cavasa
-    "Bodega Santa Elena": "MIGAN CAPITAL",
-    "Garay Santa Elena": "MIGAN CAPITAL",
-    "Cavasa": "MIGAN CAPITAL",
-    "Sevillana Santa Elena": "CUENTA SEVILLANA",
-    "Ciudad del Campo Granahorrar": "MIGAN CAPITAL",
-    "Ciudad del Campo Punto Rojo": "MIGAN CAPITAL",
-    "Ciudad del Campo Surtimercar": "MIGAN CAPITAL",
-    "Los Lagos Orlando Martínez": "CUENTA PROVEEDORES HUESO",
-    "La Esperanza": "CUENTA 2026",
+// Mapa Punto → Proveedor (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
+const PUNTO_TO_PROVEEDOR_MAP = {};
 
-    // RUTA 2 - Cali
-    "Cañaveral Punto 14 (Cra. 5 #14-37)": "SUPERTIENDA CAÑAVERAL",
-    "Cañaveral Centenario (Av. 4N #46-64)": "SUPERTIENDA CAÑAVERAL",
-    "La Montaña Av. 6A (Av. 6AN #30N-47)": "MIGAN CAPITAL",
-    "Cañaveral Prados del Norte (Av. 2BN #34N-19)": "SUPERTIENDA CAÑAVERAL",
-    "Carnes Maiale (Cra. 1G #69-02)": "MIGAN CAPITAL",
-    "Districarnes LG (Cra. 4C #65B-18)": "MIGAN CAPITAL",
-    "Cañaveral Álamos (Cl. 75CN #2 Bis-100)": "SUPERTIENDA CAÑAVERAL",
-    "Cañaveral Los Pinos (Cl. 70 #7M Bis-64)": "SUPERTIENDA CAÑAVERAL",
-    "Cañaveral La Primera (Cra. 1A #44-50)": "SUPERTIENDA CAÑAVERAL",
-    "La Montaña Torres (Cra. 1 #56-20)": "MIGAN CAPITAL",
-    "Super Carnes Los Andes (Cra. 1D #52-05)": "MIGAN CAPITAL",
-    "La Cosecha de Mi Tierra": "MIGAN CAPITAL",
-    "Carnes RYE (Cra. 17F #33A-45)": "COMERCIALIZADORA R Y E",
-    "Baratón Carnes Berlín (Calle 44 #19-65)": "MIGAN CAPITAL",
-    "El Rebajón": "MIGAN CAPITAL",
-    "La Montaña Calima": "MIGAN CAPITAL",
-    "Cañaveral Ingenio": "SUPERTIENDA CAÑAVERAL",
-    "Cañaveral Limonar": "SUPERTIENDA CAÑAVERAL",
-    "Cañaveral Pasoancho": "SUPERTIENDA CAÑAVERAL",
-    "Sevillana Pasoancho": "CUENTA SEVILLANA",
-    "La Montaña Pasoancho": "MIGAN CAPITAL",
-    "Sevillana Lourdes": "CUENTA SEVILLANA",
-    "La Montaña Guadalupe": "MIGAN CAPITAL",
-    "La Montaña Cosmocentro": "MIGAN CAPITAL",
-    "La Montaña Cristales": "MIGAN CAPITAL",
-    "Cañaveral Villanueva": "SUPERTIENDA CAÑAVERAL",
-    "Cañaveral Cootraemcali": "SUPERTIENDA CAÑAVERAL",
-    "Mercaunión": "MIGAN CAPITAL",
-    "Sevillana República de Israel": "CUENTA SEVILLANA",
-    "Jaime Zuluaga": "MIGAN CAPITAL",
-    "Milton Muñoz": "MIGAN CAPITAL",
-    "La Montaña Decepaz": "MIGAN CAPITAL",
-    "Ciudadela del Río": "MIGAN CAPITAL",
-    "La Montaña Morichal": "MIGAN CAPITAL",
-
-    // RUTA 3 - Puerto Tejada / Villarica / Jamundí / Pance
-    "Puerto Tejada Centro (Cra. 19 #17-45)": "CARIBE",
-    "Puerto Tejada Punto 2 (Cl. 16 #20-60)": "CARIBE",
-    "Villa Rica Caribe (Cra. 3 #2-60)": "CARIBE",
-    "Jamundí Terranova (Cra. 51 Sur #16C-04)": "SUPERTIENDA CAÑAVERAL",
-    "Jamundí Farallones (Cl. 12 Sur #10A-77)": "SUPERTIENDA CAÑAVERAL",
-    "Jamundí Surtimayorista": "SUPERTIENDA CAÑAVERAL",
-    "Jamundí Rosario": "SUPERTIENDA CAÑAVERAL",
-    "Jamundí Principal": "SUPERTIENDA CAÑAVERAL",
-    "Jamundí Centro": "SUPERTIENDA CAÑAVERAL",
-    "Jamundí Panamericana": "SUPERTIENDA CAÑAVERAL",
-
-    // RUTA 4 - Buga / Roldanillo / Zarzal / Tuluá
-    "Frigorífico Buga": "CUENTA FABRICA",
-    "Cañaveral Tuluá - Buga": "SUPERTIENDA CAÑAVERAL",
-    "Cañaveral Roldanillo - Zarzal": "SUPERTIENDA CAÑAVERAL",
-    "Sevillana Guacarí": "CUENTA SEVILLANA",
-    "Caribe Buga": "CARIBE",
-    "Alberto Millán Buga": "CUENTA ALBERTO MILLAN",
-    "B1-PRINCIPAL (Carrera 5 # 5-48)": "BELALCAZAR",
-    "B2- GALERIA (Calle 9 # 2-26)": "BELALCAZAR",
-    "B3- PLANTA BELOMO (Carrera 4 # 14-66)": "BELALCAZAR",
-    "B5- GUACANDA (Transversal 6 # 13-194)": "BELALCAZAR",
-    "B6- ROZO (Calle 10 N # 14 A 211 Rozo- Palmira)": "BELALCAZAR",
-    "B8- BOLIVAR (Carrera 3 # 13-44)": "BELALCAZAR",
-    "B9- URIBE (Carrera 12 # 11-03)": "BELALCAZAR",
-    "B11- GUABINAS (Calle 8 #19 B 55)": "BELALCAZAR",
-
-    // RUTA 5 - Palmira / Villagorgona / Carmelo
-    "Mercamio Palmira": "MIGAN CAPITAL",
-    "Cañaveral Palmitex (Palmira)": "SUPERTIENDA CAÑAVERAL",
-    "Cañaveral Palmicentro (Palmira)": "SUPERTIENDA CAÑAVERAL",
-    "Sevillana Palmira / Villagorgona": "CUENTA SEVILLANA",
-    "La Montaña Palmira": "MIGAN CAPITAL",
-    "Cañaveral Villagorgona 1": "SUPERTIENDA CAÑAVERAL",
-    "Cañaveral Villagorgona 2": "SUPERTIENDA CAÑAVERAL",
-    "Nutrialimentos Valdez (Villagorgona)": "MIGAN CAPITAL",
-    "Yénifer Díaz (Villagorgona)": "MIGAN CAPITAL",
-    "Jorge Adrián Rodas (Villagorgona)": "MIGAN CAPITAL",
-    "Carnicería JAP (Carmelo)": "MIGAN CAPITAL",
-    "Carnicería Fabián López (Águila Roja)": "MIGAN CAPITAL",
-
-    // RUTA 6 - Belalcázar / Yumbo
-    "Belalcázar Centro": "BELALCAZAR",
-    "Yumbo": "CUENTA FABRICA"
-};
-
-const PUNTOS_POR_RUTA = {
-    "RUTA 1: Santa Elena / Cavasa": [
-        "Bodega Santa Elena",
-        "Garay Santa Elena",
-        "Cavasa",
-        "Sevillana Santa Elena",
-        "Ciudad del Campo Granahorrar",
-        "Ciudad del Campo Punto Rojo",
-        "Ciudad del Campo Surtimercar",
-        "Los Lagos Orlando Martínez",
-        "La Esperanza"
-    ],
-    "RUTA 2: Cali (Norte / Sur / Oriente)": [
-        "Cañaveral Punto 14 (Cra. 5 #14-37)",
-        "Cañaveral Centenario (Av. 4N #46-64)",
-        "La Montaña Av. 6A (Av. 6AN #30N-47)",
-        "Cañaveral Prados del Norte (Av. 2BN #34N-19)",
-        "Carnes Maiale (Cra. 1G #69-02)",
-        "Districarnes LG (Cra. 4C #65B-18)",
-        "Cañaveral Álamos (Cl. 75CN #2 Bis-100)",
-        "Cañaveral Los Pinos (Cl. 70 #7M Bis-64)",
-        "Cañaveral La Primera (Cra. 1A #44-50)",
-        "La Montaña Torres (Cra. 1 #56-20)",
-        "Super Carnes Los Andes (Cra. 1D #52-05)",
-        "La Cosecha de Mi Tierra",
-        "Carnes RYE (Cra. 17F #33A-45)",
-        "Baratón Carnes Berlín (Calle 44 #19-65)",
-        "El Rebajón",
-        "La Montaña Calima",
-        "Cañaveral Ingenio",
-        "Cañaveral Limonar",
-        "Cañaveral Pasoancho",
-        "Sevillana Pasoancho",
-        "La Montaña Pasoancho",
-        "Sevillana Lourdes",
-        "La Montaña Guadalupe",
-        "La Montaña Cosmocentro",
-        "La Montaña Cristales",
-        "Cañaveral Villanueva",
-        "Cañaveral Cootraemcali",
-        "Mercaunión",
-        "Sevillana República de Israel",
-        "Jaime Zuluaga",
-        "Milton Muñoz",
-        "La Montaña Decepaz",
-        "Ciudadela del Río",
-        "La Montaña Morichal"
-    ],
-    "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance": [
-        "Puerto Tejada Centro (Cra. 19 #17-45)",
-        "Puerto Tejada Punto 2 (Cl. 16 #20-60)",
-        "Villa Rica Caribe (Cra. 3 #2-60)",
-        "Jamundí Terranova (Cra. 51 Sur #16C-04)",
-        "Jamundí Farallones (Cl. 12 Sur #10A-77)",
-        "Jamundí Surtimayorista",
-        "Jamundí Rosario",
-        "Jamundí Principal",
-        "Jamundí Centro",
-        "Jamundí Panamericana"
-    ],
-    "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá": [
-        "Frigorífico Buga",
-        "Cañaveral Tuluá - Buga",
-        "Cañaveral Roldanillo - Zarzal",
-        "Sevillana Guacarí",
-        "Caribe Buga",
-        "Alberto Millán Buga",
-        "B1-PRINCIPAL (Carrera 5 # 5-48)",
-        "B2- GALERIA (Calle 9 # 2-26)",
-        "B3- PLANTA BELOMO (Carrera 4 # 14-66)",
-        "B5- GUACANDA (Transversal 6 # 13-194)",
-        "B6- ROZO (Calle 10 N # 14 A 211 Rozo- Palmira)",
-        "B8- BOLIVAR (Carrera 3 # 13-44)",
-        "B9- URIBE (Carrera 12 # 11-03)",
-        "B11- GUABINAS (Calle 8 #19 B 55)"
-    ],
-    "RUTA 5: Palmira / Villagorgona / Carmelo": [
-        "Mercamio Palmira",
-        "Cañaveral Palmitex (Palmira)",
-        "Cañaveral Palmicentro (Palmira)",
-        "Sevillana Palmira / Villagorgona",
-        "La Montaña Palmira",
-        "Cañaveral Villagorgona 1",
-        "Cañaveral Villagorgona 2",
-        "Nutrialimentos Valdez (Villagorgona)",
-        "Yénifer Díaz (Villagorgona)",
-        "Jorge Adrián Rodas (Villagorgona)",
-        "Carnicería JAP (Carmelo)",
-        "Carnicería Fabián López (Águila Roja)"
-    ],
-    "RUTA 6: Yumbo / Otras": [
-        "Yumbo"
-    ]
-};
+// Puntos por Ruta (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
+const PUNTOS_POR_RUTA = {};
 
 function getPuntosParaRuta(rutaSeleccionada) {
     if (!rutaSeleccionada) return [];
@@ -1398,57 +1233,8 @@ function populardropdownSucursales(proveedorSeleccionado) {
     };
 }
 
-const CRONOGRAMA_RUTAS = {
-    "RUTA 2: Cali (Norte / Sur / Oriente)": [
-        { hora: "06:30 AM", cliente: "Cañaveral Punto 14", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 5 #14-37", tel: "3244935167" },
-        { hora: "07:00 AM", cliente: "Cañaveral Centenario", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Av. 4 Norte #46-64", tel: "3102022829" },
-        { hora: "07:30 AM", cliente: "La Montaña Av. 6A", proveedor: "MIGAN CAPITAL", direccion: "Av. 6A N #30N-47", tel: "" },
-        { hora: "08:00 AM", cliente: "Cañaveral Prados del Norte", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Av. 2B Norte #34N-19", tel: "" },
-        { hora: "09:00 AM", cliente: "Carnes Maiale", proveedor: "MIGAN CAPITAL", direccion: "Cra. 1G #69-02 Esquina", tel: "" },
-        { hora: "09:30 AM", cliente: "Districarnes LG", proveedor: "MIGAN CAPITAL", direccion: "Cra. 4C #65B-18", tel: "" },
-        { hora: "10:00 AM", cliente: "Cañaveral Álamos", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Calle 75C N #2 Bis-100", tel: "3243192838" },
-        { hora: "10:30 AM", cliente: "Cañaveral Los Pinos", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Calle 70 #7M Bis-64", tel: "3243192839" },
-        { hora: "11:00 AM", cliente: "Cañaveral La Primera", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 1A #44-50", tel: "3184277811" },
-        { hora: "11:30 AM", cliente: "La Montaña Torres", proveedor: "MIGAN CAPITAL", direccion: "Cra. 1 #56-20", tel: "" },
-        { hora: "12:00 PM", cliente: "Super Carnes Los Andes", proveedor: "MIGAN CAPITAL", direccion: "Cra. 1D #52-05", tel: "" },
-        { hora: "01:00 PM", cliente: "La Cosecha de Mi Tierra", proveedor: "MIGAN CAPITAL", direccion: "Cra. 15 Calle 54 Esquina", tel: "" },
-        { hora: "01:30 PM", cliente: "Carnes RYE", proveedor: "COMERCIALIZADORA R Y E", direccion: "Cra. 17F #33A-45", tel: "" },
-        { hora: "02:00 PM", cliente: "Baratón Carnes Berlín", proveedor: "MIGAN CAPITAL", direccion: "Calle 44 #19-65", tel: "" },
-        { hora: "02:30 PM", cliente: "El Rebajón", proveedor: "MIGAN CAPITAL", direccion: "Calle 44", tel: "" },
-        { hora: "03:00 PM", cliente: "La Montaña Calima", proveedor: "MIGAN CAPITAL", direccion: "Calima", tel: "" },
-        
-        { hora: "07:00 AM", cliente: "Cañaveral Ingenio (Viernes Sur)", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Ingenio", tel: "" },
-        { hora: "07:30 AM", cliente: "Cañaveral Limonar", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Limonar", tel: "" },
-        { hora: "08:00 AM", cliente: "Cañaveral Pasoancho", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Pasoancho", tel: "" },
-        { hora: "08:30 AM", cliente: "Sevillana Pasoancho", proveedor: "CUENTA SEVILLANA", direccion: "Pasoancho", tel: "" },
-        { hora: "09:00 AM", cliente: "La Montaña Pasoancho", proveedor: "MIGAN CAPITAL", direccion: "Calle 14C #25-16", tel: "" },
-        { hora: "09:30 AM", cliente: "Sevillana Lourdes", proveedor: "CUENTA SEVILLANA", direccion: "Transv. 29D #29-50", tel: "" },
-        { hora: "10:00 AM", cliente: "La Montaña Guadalupe", proveedor: "MIGAN CAPITAL", direccion: "Guadalupe", tel: "" },
-        { hora: "10:30 AM", cliente: "La Montaña Cosmocentro", proveedor: "MIGAN CAPITAL", direccion: "Cosmocentro", tel: "" },
-        { hora: "11:00 AM", cliente: "La Montaña Cristales", proveedor: "MIGAN CAPITAL", direccion: "Cristales", tel: "" },
-        { hora: "11:30 AM", cliente: "Cañaveral Villanueva", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Calle 13 #75A-185", tel: "" },
-        { hora: "12:00 PM", cliente: "Cañaveral Cootraemcali", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 70 #13B-18", tel: "" },
-        { hora: "12:30 PM", cliente: "Mercaunión", proveedor: "MIGAN CAPITAL", direccion: "Calle 25 #85B-100", tel: "" },
-        { hora: "01:00 PM", cliente: "Sevillana República de Israel", proveedor: "CUENTA SEVILLANA", direccion: "Calle 16A #121A-334", tel: "" },
-        { hora: "01:30 PM", cliente: "Jaime Zuluaga", proveedor: "MIGAN CAPITAL", direccion: "Sur", tel: "" },
-        { hora: "02:00 PM", cliente: "Milton Muñoz", proveedor: "MIGAN CAPITAL", direccion: "Sur", tel: "" },
-        { hora: "02:30 PM", cliente: "La Montaña Decepaz", proveedor: "MIGAN CAPITAL", direccion: "Decepaz", tel: "" },
-        { hora: "03:00 PM", cliente: "Ciudadela del Río", proveedor: "MIGAN CAPITAL", direccion: "Oriente", tel: "" },
-        { hora: "03:30 PM", cliente: "La Montaña Morichal", proveedor: "MIGAN CAPITAL", direccion: "Morichal", tel: "" }
-    ],
-    "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance": [
-        { hora: "07:00 AM", cliente: "Puerto Tejada Centro", proveedor: "CARIBE", direccion: "Cra. 19 #17-45", tel: "" },
-        { hora: "08:00 AM", cliente: "Puerto Tejada Punto 2", proveedor: "CARIBE", direccion: "Cl. 16 #20-60", tel: "" },
-        { hora: "09:00 AM", cliente: "Villa Rica Caribe", proveedor: "CARIBE", direccion: "Cra. 3 #2-60", tel: "" },
-        { hora: "10:00 AM", cliente: "Jamundí Terranova", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 51 Sur #16C-04", tel: "" },
-        { hora: "11:00 AM", cliente: "Jamundí Farallones", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cl. 12 Sur #10A-77", tel: "" },
-        { hora: "11:30 AM", cliente: "Jamundí Surtimayorista", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 10 #11-66", tel: "" },
-        { hora: "12:00 PM", cliente: "Jamundí Rosario", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 11 #3-93", tel: "" },
-        { hora: "01:00 PM", cliente: "Jamundí Principal", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 7 #10-48", tel: "" },
-        { hora: "01:30 PM", cliente: "Jamundí Centro", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cl. 11 #9-58", tel: "" },
-        { hora: "02:00 PM", cliente: "Jamundí Panamericana", proveedor: "SUPERTIENDA CAÑAVERAL", direccion: "Cra. 3D #11-145", tel: "" }
-    ]
-};
+// Cronograma de Rutas (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
+const CRONOGRAMA_RUTAS = {};
 
 function renderizarCronogramaRuta(rutaSeleccionada) {
     const container = document.getElementById('route-schedule-container');
