@@ -310,20 +310,13 @@ function procesarPuntosRutasDinamicos(puntosArray) {
 }
 
 async function cargarCatalogosDinamicos() {
-    // 1. Cargar caché local primero si existe para disponibilidad inmediata
-    let cached = null;
+    // Eliminar cachés obsoletas para garantizar sincronicidad 100% en vivo con Google Sheets
     try {
-        cached = JSON.parse(localStorage.getItem('proteinagro_catalogos_cache'));
+        localStorage.removeItem('proteinagro_catalogos_cache');
+        localStorage.removeItem('proteinagro_rutas_config');
     } catch(e) {}
 
-    if (cached) {
-        if (cached.productos && cached.productos.length > 0) renderDynamicProducts(cached.productos);
-        if (cached.conductores && cached.conductores.length > 0) renderDynamicDrivers(cached.conductores);
-        if (cached.puntos_rutas && cached.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(cached.puntos_rutas);
-        if (cached.rutas && cached.rutas.length > 0) renderDynamicRoutes(cached.rutas);
-    }
-
-    // 2. Obtener catálogos en vivo desde Google Sheets en segundo plano
+    // 1. Obtener catálogos en vivo desde Google Sheets (evitando caché HTTP con timestamp)
     if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
         try {
             const cacheBusterUrl = GOOGLE_SHEETS_WEBHOOK_URL + (GOOGLE_SHEETS_WEBHOOK_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -336,8 +329,7 @@ async function cargarCatalogosDinamicos() {
                     if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
                     if (data.rutas && data.rutas.length > 0) renderDynamicRoutes(data.rutas);
 
-                    localStorage.setItem('proteinagro_catalogos_cache', JSON.stringify(data));
-                    console.log("✅ Catálogos dinámicos actualizados en vivo desde Google Sheets.");
+                    console.log("✅ Catálogos 100% dinámicos cargados en vivo desde Google Sheets.");
                     return;
                 }
             }
@@ -346,12 +338,10 @@ async function cargarCatalogosDinamicos() {
         }
     }
 
-    // 3. Fallback a valores por defecto si no había caché ni red
-    if (!cached || !cached.puntos_rutas || cached.puntos_rutas.length === 0) {
-        renderDynamicProducts(DEFAULT_PRODUCTOS);
-        renderDynamicDrivers(DEFAULT_CONDUCTORES);
-        renderDynamicRoutes(DEFAULT_RUTAS);
-    }
+    // 2. Fallback a valores por defecto si no hay conexión
+    renderDynamicProducts(DEFAULT_PRODUCTOS);
+    renderDynamicDrivers(DEFAULT_CONDUCTORES);
+    renderDynamicRoutes(DEFAULT_RUTAS);
 }
 
 btnRegistrarProducto.addEventListener('click', () => {
@@ -942,14 +932,9 @@ const DEFAULT_RUTAS_DATA = {
         "CUENTA PROVEEDORES HUESO",
         "CUENTA 2026"
     ],
-    "RUTA 2: Cali (Norte / Centro)": [
+    "RUTA 2: Cali (Norte / Centro / Sur / Oriente)": [
         "SUPERTIENDA CAÑAVERAL",
         "COMERCIALIZADORA R Y E",
-        "CUENTA SEVILLANA",
-        "MIGAN CAPITAL"
-    ],
-    "RUTA 2: Cali (Sur / Oriente)": [
-        "SUPERTIENDA CAÑAVERAL",
         "CUENTA SEVILLANA",
         "MIGAN CAPITAL"
     ],
@@ -1089,6 +1074,14 @@ function initRutasYProveedores() {
                     found = true;
                     break;
                 }
+            }
+            if (!found && targetProv) {
+                const opt = document.createElement('option');
+                opt.value = targetProv;
+                opt.textContent = targetProv;
+                proveedorSelect.appendChild(opt);
+                proveedorSelect.value = targetProv;
+                found = true;
             }
             if (found && autofillBadge) {
                 autofillBadge.style.display = 'inline-block';
