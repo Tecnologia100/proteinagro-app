@@ -280,10 +280,10 @@ function procesarPuntosRutasDinamicos(puntosArray) {
     for (let k in CRONOGRAMA_RUTAS) delete CRONOGRAMA_RUTAS[k];
 
     puntosArray.forEach(item => {
-        if (!item || !item.punto || item.estado === 'Inactivo') return;
-        const punto = item.punto;
-        const prov = item.proveedor || 'PROVEEDOR GENERAL';
-        const ruta = item.ruta || 'Ruta General';
+        if (!item || !item.punto || String(item.estado || '').trim().toLowerCase() === 'inactivo') return;
+        const punto = String(item.punto).trim();
+        const prov = String(item.proveedor || 'PROVEEDOR GENERAL').trim();
+        const ruta = String(item.ruta || 'Ruta General').trim();
 
         PUNTO_TO_PROVEEDOR_MAP[punto] = prov;
 
@@ -293,12 +293,12 @@ function procesarPuntosRutasDinamicos(puntosArray) {
         if (!PROVEEDORES_POR_RUTA[ruta]) PROVEEDORES_POR_RUTA[ruta] = [];
         if (!PROVEEDORES_POR_RUTA[ruta].includes(prov)) PROVEEDORES_POR_RUTA[ruta].push(prov);
 
-        if (item.horario && item.horario.trim() !== '') {
+        if (item.horario && String(item.horario).trim() !== '') {
             if (!CRONOGRAMA_RUTAS[ruta]) CRONOGRAMA_RUTAS[ruta] = [];
             const exists = CRONOGRAMA_RUTAS[ruta].some(c => c.cliente === punto);
             if (!exists) {
                 CRONOGRAMA_RUTAS[ruta].push({
-                    hora: item.horario,
+                    hora: String(item.horario).trim(),
                     cliente: punto,
                     proveedor: prov,
                     direccion: item.direccion || '',
@@ -1160,13 +1160,14 @@ function populardropdownSucursalesPorRuta(rutaSeleccionada) {
     if (!sucursalSelect) return;
 
     sucursalSelect.disabled = false;
-    sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
 
     let listaPuntos = getPuntosParaRuta(rutaSeleccionada);
-    if (listaPuntos.length === 0) {
-        // Mostrar todos si es ruta genérica o no definida
+    if (!listaPuntos || listaPuntos.length === 0) {
         listaPuntos = Object.keys(PUNTO_TO_PROVEEDOR_MAP);
     }
+
+    const countMsg = listaPuntos.length > 0 ? ` (${listaPuntos.length} puntos disponibles)` : '';
+    sucursalSelect.innerHTML = `<option value="" disabled selected>Seleccione el punto de recolección${countMsg}</option>`;
 
     listaPuntos.forEach(pt => {
         const opt = document.createElement('option');
