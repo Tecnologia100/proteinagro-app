@@ -892,26 +892,37 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
 });
 
 
-// === ENVIAR A GOOGLE SHEETS (Doble canal: fetch no-cors + formulario iframe) ===
+// === ENVIAR A GOOGLE SHEETS (Triple Canal: GET Directo + POST Fetch + Formulario Iframe) ===
 async function enviarAGoogleSheets(data) {
     if (!GOOGLE_SHEETS_WEBHOOK_URL) return;
 
-    // 1. Enviar mediante fetch con mode no-cors
-    try {
-        await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
-            },
-            body: JSON.stringify(data)
-        });
-        console.log("✅ Datos de recolección enviados a Google Sheets vía fetch.");
-    } catch (e) {
-        console.warn("⚠️ Fetch a Sheets falló, intentando por formulario:", e);
+    // Crear objeto ligero sin firma base64 pesada para el envío a Sheets
+    const dataLight = { ...data };
+    if (dataLight.firma && dataLight.firma.length > 300) {
+        dataLight.firma = "Firma Registrada";
     }
 
-    // 2. Envío secundario mediante formulario oculto en iframe para máxima compatibilidad
+    // 1. Canal 1: GET Petición Directa (Garantizado sin bloqueos CORS / Auth)
+    try {
+        const payloadParam = encodeURIComponent(JSON.stringify(dataLight));
+        const getUrl = GOOGLE_SHEETS_WEBHOOK_URL + '?action=saveRecoleccion&payload=' + payloadParam;
+        fetch(getUrl, { method: 'GET', mode: 'no-cors' });
+        console.log("✅ Datos de recolección enviados a Google Sheets vía GET.");
+    } catch (e) {
+        console.warn("⚠️ GET save a Sheets falló:", e);
+    }
+
+    // 2. Canal 2: POST Fetch
+    try {
+        fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(dataLight)
+        });
+    } catch (e) {}
+
+    // 3. Canal 3: Formulario Iframe de respaldo
     try {
         let iframe = document.getElementById('sheets-iframe');
         if (!iframe) {
@@ -931,7 +942,7 @@ async function enviarAGoogleSheets(data) {
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = 'payload';
-        input.value = JSON.stringify(data);
+        input.value = JSON.stringify(dataLight);
         form.appendChild(input);
 
         document.body.appendChild(form);

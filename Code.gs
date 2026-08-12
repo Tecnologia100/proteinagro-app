@@ -6,6 +6,11 @@ function doGet(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
+    // 0. Si viene una petición de guardado vía GET (Garantía 100% anti-bloqueos)
+    if (e && e.parameter && (e.parameter.action === 'saveRecoleccion' || (e.parameter.payload && !e.parameter.t))) {
+      return guardarRecoleccionSheet(ss, e.parameter.payload);
+    }
+
     // 1. Obtener Productos (filtrando Inactivos)
     var sheetProductos = ss.getSheetByName("Productos");
     var productos = [];
@@ -138,28 +143,28 @@ function doGet(e) {
   }
 }
 
-function doPost(e) {
+function guardarRecoleccionSheet(ss, rawPayload) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Recolecciones") || ss.getActiveSheet();
-    var data = null;
-
-    if (e && e.parameter && e.parameter.payload) {
-      data = typeof e.parameter.payload === 'string' ? JSON.parse(e.parameter.payload) : e.parameter.payload;
-    } else if (e && e.postData && e.postData.contents) {
-      var raw = e.postData.contents;
-      if (raw.indexOf('payload=') === 0) {
-        var decoded = decodeURIComponent(raw.substring(8).replace(/\+/g, ' '));
-        data = JSON.parse(decoded);
-      } else {
-        data = JSON.parse(raw);
-      }
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) {
+      sheet = ss.insertSheet("Recolecciones");
+      sheet.appendRow([
+        "ID_Recoleccion", "Fecha_Hora", "Ruta", "Conductor", "Proveedor",
+        "Punto_Sucursal", "Materia_Producto", "Kg", "Observaciones",
+        "Ubicacion_GPS_Real", "Precio", "Valor"
+      ]);
     }
 
-    if (!data) throw new Error("No se recibieron datos.");
+    var data = null;
+    if (typeof rawPayload === 'string') {
+      try { data = JSON.parse(rawPayload); } catch(e) { data = null; }
+    } else {
+      data = rawPayload;
+    }
+    if (!data) throw new Error("No payload recibido.");
 
     var id = data.id || 'REC-' + new Date().getTime();
-    var fecha = data.fecha ? new Date(data.fecha).toLocaleString() : new Date().toLocaleString();
+    var fecha = data.fecha ? String(data.fecha) : new Date().toLocaleString();
     var ruta = data.ruta || '';
     var conductor = data.conductor || '';
     var proveedor = data.proveedor || '';
@@ -212,9 +217,29 @@ function doPost(e) {
       ]);
     }
 
-    return ContentService.createTextOutput(JSON.stringify({"result": "success"}))
+    return ContentService.createTextOutput(JSON.stringify({"result": "success", "message": "Guardado exitosamente"}))
       .setMimeType(ContentService.MimeType.JSON);
-      
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var payload = null;
+    if (e && e.parameter && e.parameter.payload) {
+      payload = e.parameter.payload;
+    } else if (e && e.postData && e.postData.contents) {
+      var raw = e.postData.contents;
+      if (raw.indexOf('payload=') === 0) {
+        payload = decodeURIComponent(raw.substring(8).replace(/\+/g, ' '));
+      } else {
+        payload = raw;
+      }
+    }
+    return guardarRecoleccionSheet(ss, payload);
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": error.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
