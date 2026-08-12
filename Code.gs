@@ -49,6 +49,7 @@ function doGet(e) {
         var pProv = String(prData[m][1] || '').trim();
         var pPunto = String(prData[m][2] || '').trim();
         var pDir = String(prData[m][3] || '').trim();
+        var pTel = String(prData[m][4] || '').trim();
         var pHoraRaw = prData[m][5];
         var pHora = '';
         if (pHoraRaw instanceof Date) {
