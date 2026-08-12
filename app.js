@@ -376,9 +376,12 @@ function renderAddedProducts() {
         productsListUl.innerHTML = '';
         collectedProducts.forEach((p, index) => {
             productsListUl.innerHTML += `
-                <li>
-                    <span>${p.producto}</span>
-                    <span>${p.kilos} kg</span>
+                <li style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 600;">${p.producto}</span>
+                    <span style="display: flex; align-items: center; gap: 10px;">
+                        <strong>${p.kilos} kg</strong>
+                        <button type="button" onclick="eliminarProductoRegistrado(${index})" title="Borrar este producto" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; cursor: pointer;">✕ Borrar</button>
+                    </span>
                 </li>
             `;
         });
@@ -386,6 +389,13 @@ function renderAddedProducts() {
         addedProductsDiv.style.display = 'none';
     }
 }
+
+window.eliminarProductoRegistrado = function(index) {
+    if (index >= 0 && index < collectedProducts.length) {
+        collectedProducts.splice(index, 1);
+        renderAddedProducts();
+    }
+};
 
 // === CANVAS (FIRMA) ===
 const canvas = document.getElementById('signature-pad');
@@ -483,18 +493,22 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         }
     }
     
-    // Validar
-    if (collectedProducts.length === 0) {
-        if (currentProduct && kilosInput.value) {
-            alert("No has registrado el producto. Haz clic en '➕ Registrar producto' antes de guardar.");
-        } else {
-            alert("Debe registrar al menos un producto en la lista.");
-        }
-        return;
+    // Auto-registrar cualquier producto que el usuario haya seleccionado y colocado kilos pero no haya hecho clic en +
+    if (currentProduct && kilosInput && kilosInput.value && parseFloat(kilosInput.value) > 0) {
+        collectedProducts.push({
+            producto: currentProduct,
+            kilos: parseFloat(kilosInput.value)
+        });
+        currentProduct = null;
+        kilosInput.value = '';
+        if (kilosGroup) kilosGroup.style.display = 'none';
+        document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
+        renderAddedProducts();
     }
     
-    if (currentProduct && kilosInput.value) {
-        alert("Tienes un producto pendiente sin registrar. Haz clic en '➕ Registrar producto' antes de guardar, o bórralo.");
+    // Validar que exista al menos un producto registrado
+    if (collectedProducts.length === 0) {
+        alert("Debe registrar al menos un producto con su cantidad en kilos.");
         return;
     }
 
