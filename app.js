@@ -892,10 +892,27 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
 });
 
 
-// === ENVIAR A GOOGLE SHEETS (Formulario oculto - Sin problemas de CORS) ===
-function enviarAGoogleSheets(data) {
+// === ENVIAR A GOOGLE SHEETS (Doble canal: fetch no-cors + formulario iframe) ===
+async function enviarAGoogleSheets(data) {
+    if (!GOOGLE_SHEETS_WEBHOOK_URL) return;
+
+    // 1. Enviar mediante fetch con mode no-cors
     try {
-        // Crear iframe oculto para recibir la respuesta sin redirigir la página
+        await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(data)
+        });
+        console.log("✅ Datos de recolección enviados a Google Sheets vía fetch.");
+    } catch (e) {
+        console.warn("⚠️ Fetch a Sheets falló, intentando por formulario:", e);
+    }
+
+    // 2. Envío secundario mediante formulario oculto en iframe para máxima compatibilidad
+    try {
         let iframe = document.getElementById('sheets-iframe');
         if (!iframe) {
             iframe = document.createElement('iframe');
@@ -905,14 +922,12 @@ function enviarAGoogleSheets(data) {
             document.body.appendChild(iframe);
         }
 
-        // Crear formulario oculto
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = GOOGLE_SHEETS_WEBHOOK_URL;
         form.target = 'sheets-iframe';
         form.style.display = 'none';
 
-        // Agregar los datos como campo oculto
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = 'payload';
@@ -922,14 +937,11 @@ function enviarAGoogleSheets(data) {
         document.body.appendChild(form);
         form.submit();
 
-        // Limpiar el formulario del DOM
         setTimeout(() => {
-            document.body.removeChild(form);
-        }, 2000);
-
-        console.log("✅ Datos enviados a Google Sheets correctamente.");
+            if (form && form.parentNode) form.parentNode.removeChild(form);
+        }, 2500);
     } catch (err) {
-        console.warn("⚠️ Error enviando a Google Sheets:", err);
+        console.warn("⚠️ Error enviando formulario a Sheets:", err);
     }
 }
 
