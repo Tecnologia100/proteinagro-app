@@ -364,10 +364,10 @@ btnRegistrarProducto.addEventListener('click', () => {
     renderAddedProducts();
     
     // Resetear form para el siguiente
-    productBtns.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
     currentProduct = null;
     kilosInput.value = '';
-    kilosGroup.style.display = 'none';
+    if (kilosGroup) kilosGroup.style.display = 'none';
 });
 
 function renderAddedProducts() {
@@ -588,28 +588,24 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         }
 
         // Limpiar form conservando el nombre del conductor
-        const conductorActual = document.getElementById('conductor').value;
+        const conductorEl = document.getElementById('conductor');
+        const conductorActual = conductorEl ? conductorEl.value : '';
         document.getElementById('recoleccion-form').reset();
-        document.getElementById('conductor').value = conductorActual;
+        if (conductorEl && conductorActual) conductorEl.value = conductorActual;
         
         // Resetear selectores dinámicos
-        document.getElementById('custom-ruta-group').style.display = 'none';
-        document.getElementById('custom-proveedor-group').style.display = 'none';
+        if (document.getElementById('custom-ruta-group')) document.getElementById('custom-ruta-group').style.display = 'none';
+        if (document.getElementById('custom-proveedor-group')) document.getElementById('custom-proveedor-group').style.display = 'none';
         if (document.getElementById('custom-sucursal-group')) document.getElementById('custom-sucursal-group').style.display = 'none';
-        
-        document.getElementById('proveedor').disabled = true;
-        document.getElementById('proveedor').innerHTML = '<option value="" disabled selected>Seleccione primero una ruta</option>';
-        if (document.getElementById('sucursal')) {
-            document.getElementById('sucursal').disabled = true;
-            document.getElementById('sucursal').innerHTML = '<option value="" selected>Seleccione primero un proveedor (opcional)</option>';
-        }
         
         collectedProducts = [];
         renderAddedProducts();
-        kilosGroup.style.display = 'none';
-        productBtns.forEach(b => b.classList.remove('active'));
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (kilosGroup) kilosGroup.style.display = 'none';
+        document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
+        if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
         
+        populardropdownSucursalesPorRuta('');
+
         // Mostrar Comprobante Digital Modal al conductor e información del recibo
         mostrarComprobanteDigital({ ...data, firma: firmaURL, id: recordId });
 
@@ -1402,10 +1398,10 @@ function mostrarComprobanteDigital(data) {
     const modal = document.getElementById('receipt-modal');
     if (!modal) return;
 
-    const dateObj = new Date(data.fecha || Date.now());
+    const now = new Date();
     document.getElementById('receipt-number').textContent = `N° ${data.id || 'REC-' + Date.now()}`;
-    document.getElementById('receipt-date').textContent = dateObj.toLocaleDateString();
-    document.getElementById('receipt-time').textContent = dateObj.toLocaleTimeString();
+    document.getElementById('receipt-date').textContent = now.toLocaleDateString();
+    document.getElementById('receipt-time').textContent = now.toLocaleTimeString();
     document.getElementById('receipt-driver').textContent = data.conductor || '-';
     document.getElementById('receipt-route').textContent = data.ruta || '-';
     document.getElementById('receipt-provider').textContent = data.proveedor || '-';
