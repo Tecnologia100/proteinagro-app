@@ -11,7 +11,7 @@ const firebaseConfig = {
 };
 
 // URL del Webhook de Google Apps Script para sincronización directa con Google Sheets
-let GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby5L1az5QJOu8IlX7JUfmg6g2AjlBd3niqpiyJaMX7WogVRCWxCAcTr5CUUB23i8uxftw/exec"; 
+let GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxtZzQ4qibm-I5C_abeUOIY17Au-ZjMnCeQthBWUovO9oX1Y5aYm52MwVe7bhjbNIzzjQ/exec"; 
 
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
