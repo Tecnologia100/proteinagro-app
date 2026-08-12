@@ -184,8 +184,21 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     
     var lastRowData = sheet.getLastRow();
     var searchRange = [];
+    var existingRecordsMap = {};
+
     if (lastRowData > 1) {
       searchRange = sheet.getRange(2, 5, lastRowData - 1, 7).getValues(); 
+
+      var startCheckRow = Math.max(2, lastRowData - 200);
+      var numRowsToCheck = lastRowData - startCheckRow + 1;
+      var existingData = sheet.getRange(startCheckRow, 1, numRowsToCheck, 7).getValues();
+      for (var ex = 0; ex < existingData.length; ex++) {
+        var exId = String(existingData[ex][0] || '').trim();
+        var exProd = String(existingData[ex][6] || '').trim();
+        if (exId && exProd) {
+          existingRecordsMap[exId + '|' + exProd.toLowerCase()] = true;
+        }
+      }
     }
     
     for (var p = 0; p < productos.length; p++) {
@@ -193,6 +206,11 @@ function guardarRecoleccionSheet(ss, rawPayload) {
       var prodNombre = (typeof prodItem === 'object' && prodItem.producto) ? prodItem.producto : String(prodItem);
       var prodKilos = (typeof prodItem === 'object' && prodItem.kilos !== undefined) ? prodItem.kilos : (data.totalKilos || 0);
       
+      // Evitar duplicados por ID + Producto
+      if (id && prodNombre && existingRecordsMap[id + '|' + String(prodNombre).trim().toLowerCase()]) {
+        continue;
+      }
+
       var precio = '';
       var valor = '';
       

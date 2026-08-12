@@ -892,7 +892,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
 });
 
 
-// === ENVIAR A GOOGLE SHEETS (Triple Canal: GET Directo + POST Fetch + Formulario Iframe) ===
+// === ENVIAR A GOOGLE SHEETS (Envío Único en Segundo Plano) ===
 async function enviarAGoogleSheets(data) {
     if (!GOOGLE_SHEETS_WEBHOOK_URL) return;
 
@@ -902,57 +902,13 @@ async function enviarAGoogleSheets(data) {
         dataLight.firma = "Firma Registrada";
     }
 
-    // 1. Canal 1: GET Petición Directa (Garantizado sin bloqueos CORS / Auth)
     try {
         const payloadParam = encodeURIComponent(JSON.stringify(dataLight));
         const getUrl = GOOGLE_SHEETS_WEBHOOK_URL + '?action=saveRecoleccion&payload=' + payloadParam;
-        fetch(getUrl, { method: 'GET', mode: 'no-cors' });
-        console.log("✅ Datos de recolección enviados a Google Sheets vía GET.");
+        await fetch(getUrl, { method: 'GET', mode: 'no-cors' });
+        console.log("✅ Datos de recolección enviados a Google Sheets correctamente.");
     } catch (e) {
-        console.warn("⚠️ GET save a Sheets falló:", e);
-    }
-
-    // 2. Canal 2: POST Fetch
-    try {
-        fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify(dataLight)
-        });
-    } catch (e) {}
-
-    // 3. Canal 3: Formulario Iframe de respaldo
-    try {
-        let iframe = document.getElementById('sheets-iframe');
-        if (!iframe) {
-            iframe = document.createElement('iframe');
-            iframe.id = 'sheets-iframe';
-            iframe.name = 'sheets-iframe';
-            iframe.style.display = 'none';
-            document.body.appendChild(iframe);
-        }
-
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = GOOGLE_SHEETS_WEBHOOK_URL;
-        form.target = 'sheets-iframe';
-        form.style.display = 'none';
-
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'payload';
-        input.value = JSON.stringify(dataLight);
-        form.appendChild(input);
-
-        document.body.appendChild(form);
-        form.submit();
-
-        setTimeout(() => {
-            if (form && form.parentNode) form.parentNode.removeChild(form);
-        }, 2500);
-    } catch (err) {
-        console.warn("⚠️ Error enviando formulario a Sheets:", err);
+        console.warn("⚠️ Error enviando a Google Sheets:", e);
     }
 }
 
