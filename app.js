@@ -307,6 +307,7 @@ function procesarPuntosRutasDinamicos(puntosArray) {
 
     const activeRuta = document.getElementById('ruta')?.value || '';
     populardropdownSucursalesPorRuta(activeRuta);
+    populardropdownProveedoresPorRuta(activeRuta);
 }
 
 async function cargarCatalogosDinamicos() {
@@ -1014,8 +1015,9 @@ function initRutasYProveedores() {
     rutaSelect.dataset.listenersAttached = 'true';
 
     // Inicializar proveedores y puntos por defecto activados desde el inicio
-    populardropdownProveedores(TODOS_LOS_PROVEEDORES, true);
-    populardropdownSucursalesPorRuta('');
+    const initialRuta = rutaSelect.value || '';
+    populardropdownProveedoresPorRuta(initialRuta);
+    populardropdownSucursalesPorRuta(initialRuta);
 
     // Event listener al cambiar la Ruta
     rutaSelect.addEventListener('change', () => {
@@ -1030,8 +1032,8 @@ function initRutasYProveedores() {
         document.getElementById('custom-ruta').required = false;
         document.getElementById('custom-proveedor').required = false;
 
-        // Poblar proveedores completo por defecto
-        populardropdownProveedores(TODOS_LOS_PROVEEDORES, true);
+        // Poblar proveedores correspondientes a la ruta seleccionada
+        populardropdownProveedoresPorRuta(selectedRuta);
 
         if (selectedRuta === 'OTRA' || selectedRuta.includes('Pendiente por definir')) {
             if (selectedRuta === 'OTRA') {
@@ -1082,6 +1084,12 @@ function initRutasYProveedores() {
     proveedorSelect.addEventListener('change', () => {
         const selectedProv = proveedorSelect.value;
         if (autofillBadge) autofillBadge.style.display = 'none';
+
+        if (selectedProv === 'TODOS') {
+            const currentRuta = rutaSelect.value || '';
+            populardropdownProveedoresPorRuta(currentRuta, true);
+            return;
+        }
 
         if (selectedProv === 'OTRO') {
             customProveedorGroup.style.display = 'block';
@@ -1155,6 +1163,59 @@ function getPuntosParaRuta(rutaSeleccionada) {
     return Object.keys(PUNTO_TO_PROVEEDOR_MAP);
 }
 
+function getTodosLosProveedores() {
+    const provsSet = new Set(TODOS_LOS_PROVEEDORES);
+    Object.values(PUNTO_TO_PROVEEDOR_MAP).forEach(prov => {
+        if (prov && prov !== 'PROVEEDOR GENERAL') provsSet.add(prov);
+    });
+    for (const rt in PROVEEDORES_POR_RUTA) {
+        (PROVEEDORES_POR_RUTA[rt] || []).forEach(prov => {
+            if (prov && prov !== 'PROVEEDOR GENERAL') provsSet.add(prov);
+        });
+    }
+    return Array.from(provsSet).filter(p => p && p.trim() !== '').sort((a, b) => a.localeCompare(b));
+}
+
+function getProveedoresParaRuta(rutaSeleccionada) {
+    if (!rutaSeleccionada || rutaSeleccionada === 'OTRA' || rutaSeleccionada.includes('Pendiente por definir')) {
+        return getTodosLosProveedores();
+    }
+
+    const puntosRuta = getPuntosParaRuta(rutaSeleccionada);
+    const provsSet = new Set();
+
+    // 1. Extraer proveedores de los puntos de la ruta seleccionada
+    puntosRuta.forEach(pt => {
+        const prov = PUNTO_TO_PROVEEDOR_MAP[pt];
+        if (prov && prov !== 'PROVEEDOR GENERAL') {
+            provsSet.add(prov);
+        }
+    });
+
+    // 2. Extraer proveedores del mapa directo PROVEEDORES_POR_RUTA con búsqueda flexible
+    if (PROVEEDORES_POR_RUTA[rutaSeleccionada]) {
+        PROVEEDORES_POR_RUTA[rutaSeleccionada].forEach(pr => provsSet.add(pr));
+    }
+
+    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const normSelected = cleanStr(rutaSeleccionada);
+    const matchNum = rutaSeleccionada.match(/RUTA\s*(\d+)/i);
+    const num = matchNum ? matchNum[1] : null;
+
+    for (const key in PROVEEDORES_POR_RUTA) {
+        const normKey = cleanStr(key);
+        const keyNumMatch = key.match(/RUTA\s*(\d+)/i);
+        const keyNum = keyNumMatch ? keyNumMatch[1] : null;
+
+        if (normKey === normSelected || (num && keyNum === num) || normKey.includes(normSelected) || normSelected.includes(normKey)) {
+            (PROVEEDORES_POR_RUTA[key] || []).forEach(pr => provsSet.add(pr));
+        }
+    }
+
+    const resultado = Array.from(provsSet).filter(p => p && p.trim() !== '').sort((a, b) => a.localeCompare(b));
+    return resultado.length > 0 ? resultado : getTodosLosProveedores();
+}
+
 function populardropdownSucursalesPorRuta(rutaSeleccionada) {
     const sucursalSelect = document.getElementById('sucursal');
     const proveedorSelect = document.getElementById('proveedor');
@@ -1210,23 +1271,26 @@ function actualizarItinerarioDelDia() {
 
 function populardropdownSucursales(proveedorSeleccionado) {
     const sucursalSelect = document.getElementById('sucursal');
-    const customSucursalGroup = document.getElementById('custom-sucursal-group');
     if (!sucursalSelect) return;
 
     sucursalSelect.disabled = false;
 
-    if (!proveedorSeleccionado) {
-        sucursalSelect.innerHTML = '<option value="" selected>Sede Principal / General</option>';
+    if (!proveedorSeleccionado || proveedorSeleccionado === 'TODOS') {
+        const rutaSel = document.getElementById('ruta')?.value || '';
+        populardropdownSucursalesPorRuta(rutaSel);
         return;
     }
 
-    const normProv = proveedorSeleccionado.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const normProv = cleanStr(proveedorSeleccionado);
+    const rutaSel = document.getElementById('ruta')?.value || '';
+    const puntosBase = (rutaSel && rutaSel !== 'OTRA') ? getPuntosParaRuta(rutaSel) : Object.keys(PUNTO_TO_PROVEEDOR_MAP);
 
-    const listaSucursales = Object.keys(PUNTO_TO_PROVEEDOR_MAP).filter(punto => {
-        const target = (PUNTO_TO_PROVEEDOR_MAP[punto] || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const listaSucursales = puntosBase.filter(punto => {
+        const target = cleanStr(PUNTO_TO_PROVEEDOR_MAP[punto] || '');
         return target === normProv || target.includes(normProv) || normProv.includes(target);
     });
-    
+
     if (listaSucursales.length > 0) {
         sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
         listaSucursales.forEach(suc => {
@@ -1243,14 +1307,6 @@ function populardropdownSucursales(proveedorSeleccionado) {
     optOtra.value = 'OTRA_SUCURSAL';
     optOtra.textContent = '➕ Otro Punto / Sucursal...';
     sucursalSelect.appendChild(optOtra);
-
-    sucursalSelect.onchange = () => {
-        if (sucursalSelect.value === 'OTRA_SUCURSAL') {
-            if (customSucursalGroup) customSucursalGroup.style.display = 'block';
-        } else {
-            if (customSucursalGroup) customSucursalGroup.style.display = 'none';
-        }
-    };
 }
 
 // Cronograma de Rutas (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
@@ -1324,19 +1380,23 @@ function renderizarCronogramaRuta(rutaSeleccionada) {
     });
 }
 
-function populardropdownProveedores(proveedoresList, mostrandoTodos) {
+function populardropdownProveedoresPorRuta(rutaSeleccionada, mostrandoTodos = false) {
     const proveedorSelect = document.getElementById('proveedor');
+    if (!proveedorSelect) return;
+
     proveedorSelect.disabled = false;
     proveedorSelect.innerHTML = '<option value="" disabled selected>Seleccione el proveedor</option>';
 
-    proveedoresList.forEach(prov => {
+    const listaProveedores = mostrandoTodos ? getTodosLosProveedores() : getProveedoresParaRuta(rutaSeleccionada);
+
+    listaProveedores.forEach(prov => {
         const opt = document.createElement('option');
         opt.value = prov;
         opt.textContent = prov;
         proveedorSelect.appendChild(opt);
     });
 
-    if (!mostrandoTodos) {
+    if (!mostrandoTodos && rutaSeleccionada && rutaSeleccionada !== 'OTRA') {
         const optTodos = document.createElement('option');
         optTodos.value = 'TODOS';
         optTodos.textContent = '📋 -- Mostrar todos los proveedores --';
@@ -1347,6 +1407,12 @@ function populardropdownProveedores(proveedoresList, mostrandoTodos) {
     optOtro.value = 'OTRO';
     optOtro.textContent = '➕ Otro Proveedor...';
     proveedorSelect.appendChild(optOtro);
+}
+
+// Alias de compatibilidad
+function populardropdownProveedores(proveedoresList, mostrandoTodos) {
+    const rutaActual = document.getElementById('ruta')?.value || '';
+    populardropdownProveedoresPorRuta(rutaActual, mostrandoTodos);
 }
 
 // Carga en segundo plano desde el backend si hay actualización de rutas
