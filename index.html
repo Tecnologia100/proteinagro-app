@@ -19,7 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.2.3" defer></script>
+    <script src="app.js?v=1.2.4" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -173,21 +173,7 @@
                         <input type="text" id="custom-ruta" class="premium-input" placeholder="Escriba la nueva ruta...">
                     </div>
 
-                    <!-- Selección de Sucursal / Punto de Recolección (Prioritaria) -->
-                    <div class="form-group" id="sucursal-group">
-                        <label for="sucursal">📍 Punto / Lugar de Recolección</label>
-                        <select id="sucursal" class="premium-input">
-                            <option value="" disabled selected>Seleccione el punto de recolección</option>
-                        </select>
-                    </div>
-
-                    <!-- Campo Sucursal Personalizada (Oculto por defecto) -->
-                    <div class="form-group" id="custom-sucursal-group" style="display: none;">
-                        <label for="custom-sucursal">Nombre de la Sucursal / Punto Nuevo</label>
-                        <input type="text" id="custom-sucursal" class="premium-input" placeholder="Escriba el nombre del punto o municipio...">
-                    </div>
-
-                    <!-- Selección de Proveedor (Autocompletado automáticamente) -->
+                    <!-- Selección de Proveedor / Razón Social (1. Proveedor) -->
                     <div class="form-group">
                         <label for="proveedor">🏬 Proveedor / Razon Social <span id="autofill-badge" style="display:none; font-size:0.75rem; background:#10b981; color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">✨ Asignado automáticamente</span></label>
                         <select id="proveedor" required class="premium-input">
@@ -199,6 +185,20 @@
                     <div class="form-group" id="custom-proveedor-group" style="display: none;">
                         <label for="custom-proveedor">Nombre del Nuevo Proveedor</label>
                         <input type="text" id="custom-proveedor" class="premium-input" placeholder="Escriba el nombre del proveedor...">
+                    </div>
+
+                    <!-- Selección de Sucursal / Punto de Recolección (2. Punto recolección) -->
+                    <div class="form-group" id="sucursal-group">
+                        <label for="sucursal">📍 Punto / Lugar de Recolección</label>
+                        <select id="sucursal" class="premium-input">
+                            <option value="" disabled selected>Seleccione el punto de recolección</option>
+                        </select>
+                    </div>
+
+                    <!-- Campo Sucursal Personalizada (Oculto por defecto) -->
+                    <div class="form-group" id="custom-sucursal-group" style="display: none;">
+                        <label for="custom-sucursal">Nombre de la Sucursal / Punto Nuevo</label>
+                        <input type="text" id="custom-sucursal" class="premium-input" placeholder="Escriba el nombre del punto o municipio...">
                     </div>
 
                     <!-- Selección de Productos (Botones Grandes) -->
