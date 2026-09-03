@@ -17,6 +17,14 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+html, body {
+    touch-action: manipulation;
+}
+
+button, select, input, textarea, .product-btn {
+    touch-action: manipulation;
+}
+
 body {
     background-color: var(--bg-color);
     color: var(--text-main);

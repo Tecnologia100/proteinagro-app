@@ -1708,4 +1708,13 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDynamicDrivers(DEFAULT_CONDUCTORES);
     initRutasYProveedores();
     cargarCatalogosDinamicos();
+
+    // Registrar Service Worker para PWA instalable
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('✅ Service Worker activo (PWA instalable):', reg.scope))
+                .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));
+        });
+    }
 });

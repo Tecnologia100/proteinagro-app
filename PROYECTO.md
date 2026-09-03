@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.2.6`  
+> **Versión Actual:** `v=1.2.7`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -206,7 +206,17 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.2.6` (Septiembre 2026) - Versión Actual
+### `v=1.2.7` (Septiembre 2026) - Versión Actual
+- **PWA Real Instalable (Punto 1):**
+  - Implementación de `manifest.json` oficial con configuración standalone, orientación portrait, color temático `#10b981` y branding ProteinAgro.
+  - Generación de paquete de íconos oficiales PWA (`icons/icon-192.png`, `icons/icon-512.png`, `icons/icon.svg`, `icons/favicon.png`).
+  - Creación y registro de Service Worker (`sw.js`) con estrategia *Network-First con fallback a Cache* para App Shell offline (excluyendo llamadas en tiempo real de Firebase y Google Sheets).
+  - Incorporación de meta tags PWA para iOS (`apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style`, `apple-touch-icon`).
+- **Accesibilidad y Zoom Móvil WCAG (Punto 3):**
+  - Eliminación de `user-scalable=no` y `maximum-scale=1.0` en el viewport para permitir zoom manual a conductores con dificultades visuales.
+  - Incorporación de `touch-action: manipulation;` en CSS para controles táctiles, eliminando retardos de toque (300ms delay) y evitando saltos indeseados.
+
+### `v=1.2.6` (Septiembre 2026)
 - **Validación Estricta de Punto de Recolección:**
   - Se bloquea la selección de cualquier producto o ingreso de kilos si el conductor no ha seleccionado previamente el Punto / Lugar de recolección.
   - Alerta visual inmediata con borde rojo pulsante (`.input-error`) y scroll automático al campo faltante.
