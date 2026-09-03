@@ -19,7 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.2.5" defer></script>
+    <script src="app.js?v=1.2.6" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -138,7 +138,7 @@
                     <span id="day-schedule-text">📅 <strong>Programación para Hoy:</strong> Cargando itinerario...</span>
                 </div>
 
-                <form id="recoleccion-form">
+                <form id="recoleccion-form" novalidate>
                     
                     <!-- Selección de Conductor -->
                     <div class="form-group">
@@ -193,12 +193,14 @@
                         <select id="sucursal" required class="premium-input">
                             <option value="" disabled selected>Seleccione el punto de recolección</option>
                         </select>
+                        <small id="sucursal-error" style="color: #ef4444; display: none; font-size: 0.85rem; font-weight: 600; margin-top: 6px;">⚠️ Debe seleccionar o registrar este punto obligatoriamente para continuar.</small>
                     </div>
 
                     <!-- Campo Sucursal Personalizada (Oculto por defecto) -->
                     <div class="form-group" id="custom-sucursal-group" style="display: none;">
                         <label for="custom-sucursal">Nombre de la Sucursal / Punto Nuevo <span style="color: #ef4444;">*</span></label>
                         <input type="text" id="custom-sucursal" class="premium-input" placeholder="Escriba el nombre del punto o municipio...">
+                        <small id="custom-sucursal-error" style="color: #ef4444; display: none; font-size: 0.85rem; font-weight: 600; margin-top: 6px;">⚠️ Ingrese el nombre del nuevo punto / sucursal.</small>
                     </div>
 
                     <!-- Selección de Productos (Botones Grandes) -->

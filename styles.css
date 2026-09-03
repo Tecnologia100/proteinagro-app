@@ -407,3 +407,18 @@ label {
         display: none !important;
     }
 }
+
+/* Validation Error Styles */
+.input-error {
+    border-color: #ef4444 !important;
+    background-color: rgba(239, 68, 68, 0.08) !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25) !important;
+    animation: pulse-error 0.4s ease-in-out;
+}
+
+@keyframes pulse-error {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+}
+

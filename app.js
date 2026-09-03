@@ -206,6 +206,62 @@ function getEmojiForProduct(name) {
     return '📦';
 }
 
+function obtenerPuntoSeleccionado() {
+    const sucursalSel = document.getElementById('sucursal');
+    if (!sucursalSel) return '';
+    const val = (sucursalSel.value || '').trim();
+    if (!val) return '';
+    if (val === 'OTRA_SUCURSAL') {
+        const customInput = document.getElementById('custom-sucursal');
+        return customInput ? customInput.value.trim() : '';
+    }
+    return sucursalSel.options[sucursalSel.selectedIndex]?.text || val;
+}
+
+function validarPuntoObligatorio(mostrarAlerta = true) {
+    const sucursalSel = document.getElementById('sucursal');
+    const customSuc = document.getElementById('custom-sucursal');
+    const errorMsg = document.getElementById('sucursal-error');
+    const customErrorMsg = document.getElementById('custom-sucursal-error');
+
+    // Limpiar errores previos
+    if (sucursalSel) sucursalSel.classList.remove('input-error');
+    if (customSuc) customSuc.classList.remove('input-error');
+    if (errorMsg) errorMsg.style.display = 'none';
+    if (customErrorMsg) customErrorMsg.style.display = 'none';
+
+    if (!sucursalSel || !sucursalSel.value || sucursalSel.value === '') {
+        if (sucursalSel) {
+            sucursalSel.classList.add('input-error');
+            sucursalSel.focus();
+            sucursalSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (errorMsg) errorMsg.style.display = 'block';
+        if (mostrarAlerta) {
+            alert('⚠️ Campo Obligatorio: Debe registrar o seleccionar el Punto / Lugar de Recolección antes de continuar.');
+        }
+        return false;
+    }
+
+    if (sucursalSel.value === 'OTRA_SUCURSAL') {
+        const customVal = customSuc ? customSuc.value.trim() : '';
+        if (!customVal) {
+            if (customSuc) {
+                customSuc.classList.add('input-error');
+                customSuc.focus();
+                customSuc.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            if (customErrorMsg) customErrorMsg.style.display = 'block';
+            if (mostrarAlerta) {
+                alert('⚠️ Campo Obligatorio: Por favor escriba el nombre del nuevo Punto / Sucursal.');
+            }
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function renderDynamicProducts(prods) {
     const grid = document.getElementById('product-grid');
     if (!grid) return;
@@ -217,13 +273,63 @@ function renderDynamicProducts(prods) {
         btn.dataset.value = pName;
         btn.innerHTML = `${getEmojiForProduct(pName)} ${pName}`;
         btn.addEventListener('click', () => {
+            // 1. Validar que Conductor esté seleccionado
+            const conductorSel = document.getElementById('conductor');
+            if (!conductorSel || !conductorSel.value) {
+                if (conductorSel) {
+                    conductorSel.classList.add('input-error');
+                    conductorSel.focus();
+                    conductorSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                alert("⚠️ Por favor seleccione primero el Conductor.");
+                return;
+            } else {
+                conductorSel.classList.remove('input-error');
+            }
+
+            // 2. Validar que Ruta esté seleccionada
+            const rutaSel = document.getElementById('ruta');
+            if (!rutaSel || !rutaSel.value) {
+                if (rutaSel) {
+                    rutaSel.classList.add('input-error');
+                    rutaSel.focus();
+                    rutaSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                alert("⚠️ Por favor seleccione primero la Ruta de Recolección.");
+                return;
+            } else {
+                rutaSel.classList.remove('input-error');
+            }
+
+            // 3. Validar que Proveedor esté seleccionado
+            const provSel = document.getElementById('proveedor');
+            if (!provSel || !provSel.value) {
+                if (provSel) {
+                    provSel.classList.add('input-error');
+                    provSel.focus();
+                    provSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                alert("⚠️ Por favor seleccione primero el Proveedor / Razón Social.");
+                return;
+            } else {
+                provSel.classList.remove('input-error');
+            }
+
+            // 4. Validar que Punto / Lugar de Recolección esté seleccionado
+            if (!validarPuntoObligatorio(true)) {
+                return;
+            }
+
             document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentProduct = pName;
             const selInput = document.getElementById('producto-seleccionado');
             if (selInput) selInput.value = currentProduct;
             if (kilosGroup) kilosGroup.style.display = 'block';
-            if (kilosInput) kilosInput.focus();
+            if (kilosInput) {
+                kilosInput.focus();
+                kilosInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         });
         grid.appendChild(btn);
     });
@@ -346,12 +452,16 @@ async function cargarCatalogosDinamicos() {
 }
 
 btnRegistrarProducto.addEventListener('click', () => {
+    // Validar Punto / Lugar de Recolección antes de registrar producto
+    if (!validarPuntoObligatorio(true)) {
+        return;
+    }
     if (!currentProduct) {
         alert("Primero selecciona un producto.");
         return;
     }
-    if (!kilosInput.value || kilosInput.value <= 0) {
-        alert("Ingresa la cantidad en kilos.");
+    if (!kilosInput.value || parseFloat(kilosInput.value) <= 0) {
+        alert("Ingresa la cantidad en kilos (debe ser mayor a 0).");
         kilosInput.focus();
         return;
     }
@@ -462,48 +572,80 @@ document.getElementById('btn-clear-signature').addEventListener('click', () => {
 
 
 // === GUARDAR EN FIREBASE ===
+document.getElementById('btn-submit')?.addEventListener('click', (e) => {
+    if (!validarPuntoObligatorio(true)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
+});
+
 document.getElementById('recoleccion-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    // 1. Validar Conductor
     const conductorSel = document.getElementById('conductor');
     const conductorName = conductorSel.options[conductorSel.selectedIndex]?.text || conductorSel.value;
-    
+    if (!conductorSel.value) {
+        conductorSel.classList.add('input-error');
+        conductorSel.focus();
+        conductorSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        alert("⚠️ Por favor seleccione el Conductor.");
+        return;
+    }
+    conductorSel.classList.remove('input-error');
+
+    // 2. Validar Ruta
     const rutaSel = document.getElementById('ruta');
     let rutaName = rutaSel.value;
+    if (!rutaSel.value) {
+        rutaSel.classList.add('input-error');
+        rutaSel.focus();
+        rutaSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        alert("⚠️ Por favor seleccione la Ruta de Recolección.");
+        return;
+    }
+    rutaSel.classList.remove('input-error');
     if (rutaSel.value === 'OTRA') {
-        rutaName = document.getElementById('custom-ruta')?.value.trim() || 'Ruta Personalizada';
+        rutaName = document.getElementById('custom-ruta')?.value.trim();
+        if (!rutaName) {
+            document.getElementById('custom-ruta')?.classList.add('input-error');
+            document.getElementById('custom-ruta')?.focus();
+            alert("⚠️ Por favor escriba el nombre de la nueva ruta.");
+            return;
+        }
     } else if (rutaSel.selectedIndex >= 0) {
         rutaName = rutaSel.options[rutaSel.selectedIndex].text;
     }
     
+    // 3. Validar Proveedor
     const proveedorSel = document.getElementById('proveedor');
     let proveedorName = proveedorSel.value;
+    if (!proveedorSel.value) {
+        proveedorSel.classList.add('input-error');
+        proveedorSel.focus();
+        proveedorSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        alert("⚠️ Por favor seleccione el Proveedor / Razón Social.");
+        return;
+    }
+    proveedorSel.classList.remove('input-error');
     if (proveedorSel.value === 'OTRO') {
-        proveedorName = document.getElementById('custom-proveedor')?.value.trim() || 'Proveedor Personalizado';
+        proveedorName = document.getElementById('custom-proveedor')?.value.trim();
+        if (!proveedorName) {
+            document.getElementById('custom-proveedor')?.classList.add('input-error');
+            document.getElementById('custom-proveedor')?.focus();
+            alert("⚠️ Por favor escriba el nombre del nuevo proveedor.");
+            return;
+        }
     } else if (proveedorSel.selectedIndex >= 0) {
         proveedorName = proveedorSel.options[proveedorSel.selectedIndex].text;
     }
 
-    const sucursalSel = document.getElementById('sucursal');
-    let sucursalName = '';
-    if (sucursalSel && sucursalSel.value) {
-        if (sucursalSel.value === 'OTRA_SUCURSAL') {
-            sucursalName = document.getElementById('custom-sucursal')?.value.trim() || '';
-            if (!sucursalName) {
-                alert("Por favor ingrese el nombre del Punto / Lugar de Recolección.");
-                document.getElementById('custom-sucursal')?.focus();
-                return;
-            }
-        } else if (sucursalSel.selectedIndex >= 0) {
-            sucursalName = sucursalSel.options[sucursalSel.selectedIndex].text;
-        }
-    }
-    
-    if (!sucursalName) {
-        alert("Debe seleccionar o registrar el Punto / Lugar de Recolección obligatoriamente.");
-        sucursalSel?.focus();
+    // 4. Validar Punto / Lugar de Recolección
+    if (!validarPuntoObligatorio(true)) {
         return;
     }
+    const sucursalName = obtenerPuntoSeleccionado();
     
     // Auto-registrar cualquier producto que el usuario haya seleccionado y colocado kilos pero no haya hecho clic en +
     if (currentProduct && kilosInput && kilosInput.value && parseFloat(kilosInput.value) > 0) {
@@ -1063,10 +1205,17 @@ function initRutasYProveedores() {
 
     // Event listener al cambiar Punto / Sucursal (AUTOCOMPLETA EL PROVEEDOR)
     sucursalSelect.addEventListener('change', () => {
+        sucursalSelect.classList.remove('input-error');
+        const errorMsg = document.getElementById('sucursal-error');
+        if (errorMsg) errorMsg.style.display = 'none';
+
         const selectedPunto = sucursalSelect.value;
         const customSucInput = document.getElementById('custom-sucursal');
         if (customSucursalGroup) customSucursalGroup.style.display = 'none';
-        if (customSucInput) customSucInput.required = false;
+        if (customSucInput) {
+            customSucInput.required = false;
+            customSucInput.classList.remove('input-error');
+        }
 
         if (selectedPunto === 'OTRA_SUCURSAL') {
             if (customSucursalGroup) customSucursalGroup.style.display = 'block';
@@ -1097,6 +1246,12 @@ function initRutasYProveedores() {
                 autofillBadge.style.display = 'inline-block';
             }
         }
+    });
+
+    document.getElementById('custom-sucursal')?.addEventListener('input', () => {
+        document.getElementById('custom-sucursal')?.classList.remove('input-error');
+        const customErrorMsg = document.getElementById('custom-sucursal-error');
+        if (customErrorMsg) customErrorMsg.style.display = 'none';
     });
 
     // Event listener al cambiar Proveedor manualmente
