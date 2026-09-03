@@ -485,13 +485,24 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     }
 
     const sucursalSel = document.getElementById('sucursal');
-    let sucursalName = 'General';
+    let sucursalName = '';
     if (sucursalSel && sucursalSel.value) {
         if (sucursalSel.value === 'OTRA_SUCURSAL') {
-            sucursalName = document.getElementById('custom-sucursal')?.value.trim() || 'Sucursal Personalizada';
+            sucursalName = document.getElementById('custom-sucursal')?.value.trim() || '';
+            if (!sucursalName) {
+                alert("Por favor ingrese el nombre del Punto / Lugar de Recolección.");
+                document.getElementById('custom-sucursal')?.focus();
+                return;
+            }
         } else if (sucursalSel.selectedIndex >= 0) {
             sucursalName = sucursalSel.options[sucursalSel.selectedIndex].text;
         }
+    }
+    
+    if (!sucursalName) {
+        alert("Debe seleccionar o registrar el Punto / Lugar de Recolección obligatoriamente.");
+        sucursalSel?.focus();
+        return;
     }
     
     // Auto-registrar cualquier producto que el usuario haya seleccionado y colocado kilos pero no haya hecho clic en +
@@ -598,6 +609,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         if (document.getElementById('custom-ruta-group')) document.getElementById('custom-ruta-group').style.display = 'none';
         if (document.getElementById('custom-proveedor-group')) document.getElementById('custom-proveedor-group').style.display = 'none';
         if (document.getElementById('custom-sucursal-group')) document.getElementById('custom-sucursal-group').style.display = 'none';
+        if (document.getElementById('custom-sucursal')) document.getElementById('custom-sucursal').required = false;
         
         collectedProducts = [];
         renderAddedProducts();
@@ -1031,6 +1043,7 @@ function initRutasYProveedores() {
 
         document.getElementById('custom-ruta').required = false;
         document.getElementById('custom-proveedor').required = false;
+        if (document.getElementById('custom-sucursal')) document.getElementById('custom-sucursal').required = false;
 
         // Poblar proveedores correspondientes a la ruta seleccionada
         populardropdownProveedoresPorRuta(selectedRuta);
@@ -1051,10 +1064,16 @@ function initRutasYProveedores() {
     // Event listener al cambiar Punto / Sucursal (AUTOCOMPLETA EL PROVEEDOR)
     sucursalSelect.addEventListener('change', () => {
         const selectedPunto = sucursalSelect.value;
+        const customSucInput = document.getElementById('custom-sucursal');
         if (customSucursalGroup) customSucursalGroup.style.display = 'none';
+        if (customSucInput) customSucInput.required = false;
 
         if (selectedPunto === 'OTRA_SUCURSAL') {
             if (customSucursalGroup) customSucursalGroup.style.display = 'block';
+            if (customSucInput) {
+                customSucInput.required = true;
+                customSucInput.focus();
+            }
             if (autofillBadge) autofillBadge.style.display = 'none';
         } else if (PUNTO_TO_PROVEEDOR_MAP[selectedPunto]) {
             const targetProv = PUNTO_TO_PROVEEDOR_MAP[selectedPunto];
@@ -1094,6 +1113,7 @@ function initRutasYProveedores() {
         if (selectedProv === 'OTRO') {
             customProveedorGroup.style.display = 'block';
             document.getElementById('custom-proveedor').required = true;
+            populardropdownSucursales('');
         } else {
             customProveedorGroup.style.display = 'none';
             document.getElementById('custom-proveedor').required = false;
@@ -1300,7 +1320,7 @@ function populardropdownSucursales(proveedorSeleccionado) {
             sucursalSelect.appendChild(opt);
         });
     } else {
-        sucursalSelect.innerHTML = '<option value="" selected>Sede Principal / General</option>';
+        sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option><option value="Sede Principal / General">Sede Principal / General</option>';
     }
 
     const optOtra = document.createElement('option');

@@ -19,7 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.2.4" defer></script>
+    <script src="app.js?v=1.2.5" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -189,15 +189,15 @@
 
                     <!-- Selección de Sucursal / Punto de Recolección (2. Punto recolección) -->
                     <div class="form-group" id="sucursal-group">
-                        <label for="sucursal">📍 Punto / Lugar de Recolección</label>
-                        <select id="sucursal" class="premium-input">
+                        <label for="sucursal">📍 Punto / Lugar de Recolección <span style="color: #ef4444;">*</span></label>
+                        <select id="sucursal" required class="premium-input">
                             <option value="" disabled selected>Seleccione el punto de recolección</option>
                         </select>
                     </div>
 
                     <!-- Campo Sucursal Personalizada (Oculto por defecto) -->
                     <div class="form-group" id="custom-sucursal-group" style="display: none;">
-                        <label for="custom-sucursal">Nombre de la Sucursal / Punto Nuevo</label>
+                        <label for="custom-sucursal">Nombre de la Sucursal / Punto Nuevo <span style="color: #ef4444;">*</span></label>
                         <input type="text" id="custom-sucursal" class="premium-input" placeholder="Escriba el nombre del punto o municipio...">
                     </div>
 
