@@ -1680,3 +1680,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ==============================================================================
+// GESTOR DE INSTALACIÓN PWA (Botón "📲 Instalar Aplicación")
+// ==============================================================================
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const loginInstallBtn = document.getElementById('btn-pwa-install');
+    const headerInstallBtn = document.getElementById('btn-pwa-install-header');
+    if (loginInstallBtn) loginInstallBtn.style.display = 'flex';
+    if (headerInstallBtn) headerInstallBtn.style.display = 'inline-flex';
+    console.log('📲 PWA lista para ser instalada');
+});
+
+function handlePwaInstall() {
+    if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.then(({ outcome }) => {
+            if (outcome === 'accepted') {
+                console.log('✅ El usuario aceptó instalar ProteinAgro');
+            }
+            deferredInstallPrompt = null;
+            document.querySelectorAll('#btn-pwa-install, #btn-pwa-install-header').forEach(b => b.style.display = 'none');
+        });
+    } else {
+        alert('📲 Para instalar ProteinAgro en tu dispositivo:\n\n• En Android (Chrome): Toca los tres puntos (⋮) arriba a la derecha y selecciona "Instalar aplicación" o "Agregar a la pantalla principal".\n\n• En iPhone / iPad (Safari): Toca el botón Compartir (el cuadrado con la flecha hacia arriba 📤) y selecciona "Agregar a la pantalla de inicio".\n\n• En PC / Mac (Chrome / Edge): Haz clic en el ícono de instalar en la barra de direcciones (arriba a la derecha).');
+    }
+}
+
+document.getElementById('btn-pwa-install')?.addEventListener('click', handlePwaInstall);
+document.getElementById('btn-pwa-install-header')?.addEventListener('click', handlePwaInstall);
+
+window.addEventListener('appinstalled', () => {
+    console.log('🎉 ProteinAgro instalada con éxito como PWA nativa');
+    document.querySelectorAll('#btn-pwa-install, #btn-pwa-install-header').forEach(b => b.style.display = 'none');
+});

@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.2.8`  
+> **Versión Actual:** `v=1.2.9`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -206,7 +206,13 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.2.8` (Septiembre 2026) - Versión Actual
+### `v=1.2.9` (Septiembre 2026) - Versión Actual
+- **Gestor Visual de Instalación PWA:**
+  - Se añadieron botones visibles de instalación (`#btn-pwa-install` en la tarjeta de login y `#btn-pwa-install-header` en la barra del conductor).
+  - Captura del evento `beforeinstallprompt` para activar la instalación nativa con un solo clic en Android / Chrome / Edge.
+  - Mensaje guiado con instrucciones paso a paso para dispositivos iOS (iPhone / Safari) al pulsar el botón de instalación.
+
+### `v=1.2.8` (Septiembre 2026)
 - **Seguridad Inmediata de Datos (Punto 1):**
   - Eliminación definitiva del botón `#btn-clear-all` ("🗑️ Borrar Pruebas") en producción y neutralización de su listener en `app.js`, erradicando el riesgo de borrado masivo accidental de la base de datos de Firestore.
 - **Limpieza y Rendimiento (Punto 3):**

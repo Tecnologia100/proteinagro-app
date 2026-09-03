@@ -1,5 +1,5 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
-> **Versión Actual:** `v=1.2.8` | **Despliegue Vercel:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
+> **Versión Actual:** `v=1.2.9` | **Despliegue Vercel:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > *Para consultar la documentación técnica y funcional completa, ver [PROYECTO.md](PROYECTO.md).*
 
 Este proyecto es una solución web de recolección de materia prima diseñada para eliminar el diligenciamiento físico de planillas y la digitación manual en oficinas.

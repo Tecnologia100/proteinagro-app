@@ -40,7 +40,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.2.8" defer></script>
+    <script src="app.js?v=1.2.9" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -64,6 +64,10 @@
             
             <button type="submit" id="btn-login" class="btn-primary" style="width: 100%;">
                 <span class="btn-text-content">Ingresar</span>
+            </button>
+
+            <button type="button" id="btn-pwa-install" class="btn-secondary" style="width: 100%; margin-top: 15px; display: none; align-items: center; justify-content: center; gap: 8px; border-color: #10b981; color: #10b981; font-weight: 600;">
+                📲 Instalar App en el Celular
             </button>
         </form>
     </div>
@@ -139,6 +143,7 @@
                 <h1>ProteinAgro</h1>
             </div>
             <div class="app-header-right">
+                <button id="btn-pwa-install-header" class="btn-text" style="display: none; color: #10b981; font-weight: 600; font-size: 0.85rem; align-items: center; gap: 4px;">📲 Instalar</button>
                 <div class="status-indicator offline" id="network-status">
                     <span class="dot"></span>
                     <span class="text">Sin conexión</span>
