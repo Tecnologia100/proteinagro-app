@@ -20,23 +20,27 @@
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
     <link rel="alternate icon" type="image/png" href="icons/favicon.png">
 
+    <!-- Preconnect a CDNs de Firebase y Chart.js -->
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 
-    <!-- Firebase (Versión de compatibilidad para CDN sencilla) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+    <!-- Firebase (Carga no bloqueante con defer para acelerar FCP) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js" defer></script>
     
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.2.7" defer></script>
+    <script src="app.js?v=1.2.8" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -92,14 +96,13 @@
             </div>
 
             <div class="card" style="padding: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                    <h2 class="section-title" style="margin:0;">Recolecciones en Vivo</h2>
-                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <a href="https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing" target="_blank" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 10px 16px; font-weight: 600; background: #10b981; color: white; border: none; border-radius: 8px; font-size: 0.9rem;">
+                <div class="admin-card-header">
+                    <h2 class="section-title">Recolecciones en Vivo</h2>
+                    <div class="admin-actions-group">
+                        <a href="https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing" target="_blank" class="btn-sheets">
                             📊 Abrir Google Sheets
                         </a>
-                        <button id="btn-export" class="btn-primary" style="width: auto; padding: 10px 16px;">📥 Exportar CSV</button>
-                        <button id="btn-clear-all" class="btn-secondary" style="width: auto; padding: 10px 16px; background: #ef4444; color: white; border: none; font-weight: 600; border-radius: 8px;">🗑️ Borrar Pruebas</button>
+                        <button id="btn-export" class="btn-primary btn-export-csv">📥 Exportar CSV</button>
                     </div>
                 </div>
                 <div class="table-responsive">
@@ -135,12 +138,12 @@
                 <div class="logo-icon">🌿</div>
                 <h1>ProteinAgro</h1>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="app-header-right">
                 <div class="status-indicator offline" id="network-status">
                     <span class="dot"></span>
                     <span class="text">Sin conexión</span>
                 </div>
-                <button id="btn-logout-driver" class="btn-text" style="color: #ef4444; font-weight: 600;">Salir</button>
+                <button id="btn-logout-driver" class="btn-text btn-logout">Salir</button>
             </div>
         </header>
 
@@ -151,7 +154,7 @@
                 <p class="section-subtitle">Registre los datos de la materia prima recolectada.</p>
 
                 <!-- Banner de Programación para Hoy -->
-                <div id="day-schedule-banner" style="background: rgba(46, 204, 113, 0.15); border-left: 4px solid #2ecc71; padding: 12px 15px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; color: var(--text-color);">
+                <div id="day-schedule-banner" class="day-schedule-banner">
                     <span id="day-schedule-text">📅 <strong>Programación para Hoy:</strong> Cargando itinerario...</span>
                 </div>
 
@@ -174,12 +177,12 @@
                     </div>
 
                     <!-- Horario e Itinerario Cronológico de la Ruta (6:00 AM - 3:30 PM) -->
-                    <div id="route-schedule-container" style="display: none; background: var(--card-bg, #1e293b); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-                        <h4 style="margin-top:0; font-size: 0.95rem; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+                    <div id="route-schedule-container" class="route-schedule-card">
+                        <h4 class="route-schedule-title">
                             ⏰ <span>Horario y Orden de Recolección (6:00 AM - 3:30 PM)</span>
                         </h4>
-                        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">Respete el orden de paradas por hora. Haga clic en una parada para autocompletar proveedor y punto:</p>
-                        <div id="schedule-timeline-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px;">
+                        <p class="route-schedule-hint">Respete el orden de paradas por hora. Haga clic en una parada para autocompletar proveedor y punto:</p>
+                        <div id="schedule-timeline-list" class="schedule-timeline-list">
                             <!-- Paradas dinámicas aquí -->
                         </div>
                     </div>
@@ -192,7 +195,7 @@
 
                     <!-- Selección de Proveedor / Razón Social (1. Proveedor) -->
                     <div class="form-group">
-                        <label for="proveedor">🏬 Proveedor / Razon Social <span id="autofill-badge" style="display:none; font-size:0.75rem; background:#10b981; color:white; padding:2px 8px; border-radius:10px; font-weight:normal;">✨ Asignado automáticamente</span></label>
+                        <label for="proveedor">🏬 Proveedor / Razon Social <span id="autofill-badge" class="autofill-badge">✨ Asignado automáticamente</span></label>
                         <select id="proveedor" required class="premium-input">
                             <option value="" disabled selected>Seleccione el proveedor</option>
                         </select>
@@ -210,14 +213,14 @@
                         <select id="sucursal" required class="premium-input">
                             <option value="" disabled selected>Seleccione el punto de recolección</option>
                         </select>
-                        <small id="sucursal-error" style="color: #ef4444; display: none; font-size: 0.85rem; font-weight: 600; margin-top: 6px;">⚠️ Debe seleccionar o registrar este punto obligatoriamente para continuar.</small>
+                        <small id="sucursal-error" class="form-error-hint">⚠️ Debe seleccionar o registrar este punto obligatoriamente para continuar.</small>
                     </div>
 
                     <!-- Campo Sucursal Personalizada (Oculto por defecto) -->
                     <div class="form-group" id="custom-sucursal-group" style="display: none;">
                         <label for="custom-sucursal">Nombre de la Sucursal / Punto Nuevo <span style="color: #ef4444;">*</span></label>
                         <input type="text" id="custom-sucursal" class="premium-input" placeholder="Escriba el nombre del punto o municipio...">
-                        <small id="custom-sucursal-error" style="color: #ef4444; display: none; font-size: 0.85rem; font-weight: 600; margin-top: 6px;">⚠️ Ingrese el nombre del nuevo punto / sucursal.</small>
+                        <small id="custom-sucursal-error" class="form-error-hint">⚠️ Ingrese el nombre del nuevo punto / sucursal.</small>
                     </div>
 
                     <!-- Selección de Productos (Botones Grandes) -->
@@ -251,12 +254,12 @@
                             <input type="number" id="kilos" inputmode="decimal" step="0.1" min="0.1" placeholder="0.0" class="premium-input huge-input">
                             <span class="unit">KG</span>
                         </div>
-                        <button type="button" id="btn-registrar-producto" class="btn-secondary" style="background-color: #e2e8f0; border-color: #cbd5e1; color: #0f172a;">➕ Registrar producto</button>
+                        <button type="button" id="btn-registrar-producto" class="btn-secondary btn-add-product">➕ Registrar producto</button>
                     </div>
 
                     <!-- Lista de Productos Agregados -->
-                    <div class="added-products" id="added-products" style="display: none; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
-                        <h3 style="margin-bottom: 10px; font-size: 1.1rem; color: #334155;">Lista de Registros:</h3>
+                    <div class="added-products-card" id="added-products">
+                        <h3 class="added-products-title">Lista de Registros:</h3>
                         <ul id="products-list"></ul>
                     </div>
 
@@ -289,36 +292,36 @@
     </div>
 
     <!-- Modal de Comprobante / Soporte de Recolección (Voucher Digital) -->
-    <div id="receipt-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; padding: 15px; overflow-y: auto;">
-        <div class="card" id="receipt-card" style="max-width: 480px; width: 100%; background: #ffffff; color: #1e293b; border-radius: 16px; padding: 25px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); font-family: system-ui, -apple-system, sans-serif; margin: auto;">
+    <div id="receipt-modal" class="voucher-modal-overlay">
+        <div class="voucher-card" id="receipt-card">
             
             <!-- Header Voucher -->
-            <div style="text-align: center; border-bottom: 2px dashed #cbd5e1; padding-bottom: 15px; margin-bottom: 15px;">
-                <div style="font-size: 2rem; margin-bottom: 5px;">🌿</div>
-                <h2 style="margin: 0; font-size: 1.4rem; color: #0f172a; font-weight: 800;">ProteinAgro</h2>
-                <p style="margin: 3px 0 0 0; font-size: 0.85rem; color: #64748b; font-weight: 600;">Soporte Oficial de Recolección</p>
-                <div id="receipt-number" style="display: inline-block; background: #e0f2fe; color: #0284c7; font-size: 0.8rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; margin-top: 8px;">
+            <div class="voucher-header">
+                <div class="voucher-logo-icon">🌿</div>
+                <h2 class="voucher-title">ProteinAgro</h2>
+                <p class="voucher-subtitle">Soporte Oficial de Recolección</p>
+                <div id="receipt-number" class="voucher-number-badge">
                     N° REC-0000000
                 </div>
             </div>
 
             <!-- Meta Info -->
-            <div style="font-size: 0.85rem; color: #334155; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px;">
+            <div class="voucher-meta-grid">
                 <div><strong>📅 Fecha:</strong> <span id="receipt-date">--</span></div>
                 <div><strong>⏰ Hora:</strong> <span id="receipt-time">--</span></div>
                 <div><strong>🚛 Conductor:</strong> <span id="receipt-driver">--</span></div>
                 <div><strong>🗺️ Ruta:</strong> <span id="receipt-route">--</span></div>
-                <div style="grid-column: span 2;"><strong>🏬 Proveedor:</strong> <span id="receipt-provider">--</span></div>
-                <div style="grid-column: span 2;"><strong>📍 Sucursal / Punto:</strong> <span id="receipt-branch">--</span></div>
+                <div class="voucher-meta-full"><strong>🏬 Proveedor:</strong> <span id="receipt-provider">--</span></div>
+                <div class="voucher-meta-full"><strong>📍 Sucursal / Punto:</strong> <span id="receipt-branch">--</span></div>
             </div>
 
             <!-- Tabla Productos -->
-            <div style="border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 10px 0; margin-bottom: 15px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+            <div class="voucher-table-box">
+                <table class="voucher-table">
                     <thead>
-                        <tr style="border-bottom: 1px solid #cbd5e1; color: #64748b; text-align: left;">
-                            <th style="padding: 6px 0;">Producto</th>
-                            <th style="padding: 6px 0; text-align: right;">Cantidad (KG)</th>
+                        <tr class="voucher-table-header">
+                            <th class="voucher-table-col-prod">Producto</th>
+                            <th class="voucher-table-col-kg">Cantidad (KG)</th>
                         </tr>
                     </thead>
                     <tbody id="receipt-items-body">
@@ -328,32 +331,32 @@
             </div>
 
             <!-- Total Kilos -->
-            <div style="display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 15px; border-radius: 10px; margin-bottom: 15px;">
-                <span style="font-size: 1rem; font-weight: 700; color: #0f172a;">TOTAL RECOLECTADO:</span>
-                <span id="receipt-total-kilos" style="font-size: 1.3rem; font-weight: 800; color: #16a34a;">0.0 KG</span>
+            <div class="voucher-total-box">
+                <span class="voucher-total-label">TOTAL RECOLECTADO:</span>
+                <span id="receipt-total-kilos" class="voucher-total-kilos">0.0 KG</span>
             </div>
 
             <!-- Observaciones si hay -->
-            <div id="receipt-obs-container" style="display: none; font-size: 0.8rem; color: #475569; background: #fffbebf9; border-left: 3px solid #f59e0b; padding: 8px 12px; margin-bottom: 15px; border-radius: 4px;">
+            <div id="receipt-obs-container" class="voucher-obs-box">
                 <strong>Observaciones:</strong> <span id="receipt-obs">--</span>
             </div>
 
             <!-- Firma Preview -->
-            <div style="text-align: center; margin-bottom: 20px;">
-                <span style="font-size: 0.75rem; color: #64748b; display: block; margin-bottom: 5px;">Firma del Recibido / Conformidad Punto:</span>
-                <img id="receipt-signature-img" src="" style="max-height: 50px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px; background: #fff;" alt="Firma">
+            <div class="voucher-signature-box">
+                <span class="voucher-signature-label">Firma del Recibido / Conformidad Punto:</span>
+                <img id="receipt-signature-img" src="" class="voucher-signature-img" alt="Firma">
             </div>
 
             <!-- Acciones Botones -->
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                <button id="btn-share-whatsapp" style="background: #25D366; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <div class="voucher-actions">
+                <button id="btn-share-whatsapp" class="btn-whatsapp">
                     📲 Compartir por WhatsApp
                 </button>
-                <div style="display: flex; gap: 10px;">
-                    <button id="btn-print-receipt" style="flex: 1; background: #0284c7; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+                <div class="voucher-action-row">
+                    <button id="btn-print-receipt" class="btn-print-voucher">
                         📄 Imprimir / PDF
                     </button>
-                    <button id="btn-close-receipt" style="flex: 1; background: #64748b; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+                    <button id="btn-close-receipt" class="btn-close-voucher">
                         ❌ Cerrar
                     </button>
                 </div>

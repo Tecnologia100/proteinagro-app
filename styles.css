@@ -430,3 +430,379 @@ label {
     40%, 80% { transform: translateX(6px); }
 }
 
+/* ==========================================================================
+   Componentes & Reemplazo de CSS Inline (v1.2.8)
+   ========================================================================== */
+
+/* Admin Header & Botones */
+.admin-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.admin-card-header .section-title {
+    margin: 0;
+}
+
+.admin-actions-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.btn-sheets {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    padding: 10px 16px;
+    font-weight: 600;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.btn-sheets:hover {
+    background: #059669;
+}
+
+.btn-export-csv {
+    width: auto;
+    padding: 10px 16px;
+    font-weight: 600;
+}
+
+.btn-logout {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+/* Header del Conductor */
+.app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Banner de Itinerario Programado */
+.day-schedule-banner {
+    background: rgba(46, 204, 113, 0.15);
+    border-left: 4px solid #2ecc71;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+/* Cronograma de Ruta */
+.route-schedule-card {
+    display: none;
+    background: var(--card-bg, #1e293b);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.route-schedule-title {
+    margin-top: 0;
+    font-size: 0.95rem;
+    color: #38bdf8;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.route-schedule-hint {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-bottom: 10px;
+}
+
+.schedule-timeline-list {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 5px;
+}
+
+/* Badges y Avisos de Validación */
+.autofill-badge {
+    display: none;
+    font-size: 0.75rem;
+    background: #10b981;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: normal;
+}
+
+.form-error-hint {
+    color: #ef4444;
+    display: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 6px;
+}
+
+.btn-add-product {
+    background-color: #e2e8f0;
+    border-color: #cbd5e1;
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.btn-add-product:hover {
+    background-color: #cbd5e1;
+}
+
+.added-products-card {
+    display: none;
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+}
+
+.added-products-title {
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    color: #334155;
+}
+
+/* Modal de Comprobante / Voucher */
+.voucher-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.voucher-card {
+    max-width: 480px;
+    width: 100%;
+    background: #ffffff;
+    color: #1e293b;
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    margin: auto;
+}
+
+.voucher-header {
+    text-align: center;
+    border-bottom: 2px dashed #cbd5e1;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+
+.voucher-logo-icon {
+    font-size: 2rem;
+    margin-bottom: 5px;
+}
+
+.voucher-title {
+    margin: 0;
+    font-size: 1.4rem;
+    color: #0f172a;
+    font-weight: 800;
+}
+
+.voucher-subtitle {
+    margin: 3px 0 0 0;
+    font-size: 0.85rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.voucher-number-badge {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0284c7;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-top: 8px;
+}
+
+.voucher-meta-grid {
+    font-size: 0.85rem;
+    color: #334155;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.voucher-meta-full {
+    grid-column: span 2;
+}
+
+.voucher-table-box {
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 10px 0;
+    margin-bottom: 15px;
+}
+
+.voucher-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.voucher-table-header {
+    border-bottom: 1px solid #cbd5e1;
+    color: #64748b;
+    text-align: left;
+}
+
+.voucher-table-col-prod {
+    padding: 6px 0;
+}
+
+.voucher-table-col-kg {
+    padding: 6px 0;
+    text-align: right;
+}
+
+.voucher-total-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f1f5f9;
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.voucher-total-label {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.voucher-total-kilos {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #16a34a;
+}
+
+.voucher-obs-box {
+    display: none;
+    font-size: 0.8rem;
+    color: #475569;
+    background: #fffbebf9;
+    border-left: 3px solid #f59e0b;
+    padding: 8px 12px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+.voucher-signature-box {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.voucher-signature-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.voucher-signature-img {
+    max-height: 50px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 2px;
+    background: #fff;
+}
+
+.voucher-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.btn-whatsapp {
+    background: #25D366;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.2s;
+}
+
+.btn-whatsapp:hover {
+    background: #1eb855;
+}
+
+.voucher-action-row {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-print-voucher {
+    flex: 1;
+    background: #0284c7;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-print-voucher:hover {
+    background: #0369a1;
+}
+
+.btn-close-voucher {
+    flex: 1;
+    background: #64748b;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-close-voucher:hover {
+    background: #475569;
+}
+
+

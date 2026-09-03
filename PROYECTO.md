@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.2.7`  
+> **Versión Actual:** `v=1.2.8`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -206,7 +206,14 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.2.7` (Septiembre 2026) - Versión Actual
+### `v=1.2.8` (Septiembre 2026) - Versión Actual
+- **Seguridad Inmediata de Datos (Punto 1):**
+  - Eliminación definitiva del botón `#btn-clear-all` ("🗑️ Borrar Pruebas") en producción y neutralización de su listener en `app.js`, erradicando el riesgo de borrado masivo accidental de la base de datos de Firestore.
+- **Limpieza y Rendimiento (Punto 3):**
+  - Optimización en la carga de scripts externos de Firebase y Chart.js mediante atributos `defer` y directivas `<link rel="preconnect">`, evitando bloqueos en el hilo principal y mejorando el *First Contentful Paint* (FCP).
+  - Migración exhaustiva de estilos inline (`style="..."`) desde `index.html` hacia clases semánticas estructuradas en `styles.css` (panel administrativo, banner de programación, modal del voucher digital y botones).
+
+### `v=1.2.7` (Septiembre 2026)
 - **PWA Real Instalable (Punto 1):**
   - Implementación de `manifest.json` oficial con configuración standalone, orientación portrait, color temático `#10b981` y branding ProteinAgro.
   - Generación de paquete de íconos oficiales PWA (`icons/icon-192.png`, `icons/icon-512.png`, `icons/icon.svg`, `icons/favicon.png`).
