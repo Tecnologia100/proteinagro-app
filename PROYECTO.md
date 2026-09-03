@@ -283,6 +283,11 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 4. Hacer clic en **Implementar** > **Gestionar implementaciones** > **Editar** > **Nueva versión** > **Implementar**.
 5. Si la URL cambia, actualizar la constante `GOOGLE_SHEETS_WEBHOOK_URL` en la línea 14 de `app.js`.
 
+### 8.3 Ciclo de Actualizaciones en Dispositivos Móviles (PWA)
+- **Actualizaciones de Catálogos (Conductores, Rutas, Puntos):** 100% inmediatas al consultar Google Sheets en vivo con parámetro anti-caché. No requieren compilación ni descarga.
+- **Actualizaciones de Código (Lógica y Diseño):** Se gestionan mediante la estrategia **Network-First** del Service Worker (`sw.js`). Al detectar una nueva versión en Vercel, el teléfono descarga los archivos modificados en segundo plano y los reemplaza automáticamente sin requerir intervención manual del conductor ni aprobaciones de tiendas de aplicaciones.
+- **Modo Offline:** Si el dispositivo se encuentra sin cobertura en el momento de una actualización, continúa operando normalmente con la versión en caché hasta recuperar señal de red.
+
 ---
 
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
