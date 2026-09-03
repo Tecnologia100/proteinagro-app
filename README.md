@@ -1,4 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
+> **Versión Actual:** `v=1.2.6` | **Despliegue Vercel:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
+> *Para consultar la documentación técnica y funcional completa, ver [PROYECTO.md](PROYECTO.md).*
 
 Este proyecto es una solución web de recolección de materia prima diseñada para eliminar el diligenciamiento físico de planillas y la digitación manual en oficinas.
 
@@ -6,19 +8,21 @@ Este proyecto es una solución web de recolección de materia prima diseñada pa
 
 ## 🏗️ Arquitectura del Sistema
 
-El sistema utiliza una arquitectura **Serverless & Cloud Dual-Persistence**:
+El sistema utiliza una arquitectura **Serverless & Cloud Tri-Persistence**:
 
 1. **Frontend Web App (HTML5 / Vanilla CSS / JS):**
    - Publicada en **Vercel** (`https://proteinagro-app.vercel.app`).
    - Accesible desde cualquier navegador móvil/desktop sin instalar aplicaciones (PWA-ready).
    - UX optimizada para conductores: "cero tipeo", botones táctiles grandes para selección de productos e ingreso de kilos.
+   - **Validación obligatoria de Punto / Lugar de Recolección (v1.2.6)**: Bloquea selección de productos o kilos si el punto no ha sido seleccionado.
    - Catálogo de 16 materias primas: ACEITE, CABEZAS, DESPERDICIO, EMPELLA, GORDANA, HARINA DE CARNE, HARINA DE HUESO VAPORIZADA, HUESO BLANCO, HUESO CALCINADO, HUESO DE CERDO, HUESO SECO, MANTECA, MARGARINA, PIEL DE POLLO, SEBO, SEBO EN RAMA.
    - Canvas interactivo para captura de firma digital del proveedor.
    - Campo para ingreso de **Observaciones** (novedades de la recolección).
+   - Comprobante digital inmediato con soporte para compartir por WhatsApp o imprimir.
    - Retención del nombre del conductor seleccionado tras cada guardado para agilizar recolecciones continuas.
 
 2. **Capa de Persistencia Nube (Firebase Firestore + Firebase Storage):**
-   - Proyecto Firebase: `inventario-la15`.
+   - Proyecto Firebase: `proteinagro-cd5fe`.
    - Persistencia **Offline** habilitada y manejo de fallbacks/timeouts para garantizar la disponibilidad del servicio.
    - **Firmas digitales almacenadas en Firebase Storage** (ruta `firmas/REC-XXXXX.png`) con URL pública guardada en Firestore/Sheets.
    - Mecanismo de fallback offline: si no hay conexión, la firma se guarda en base64 local hasta que se recupere la señal.
