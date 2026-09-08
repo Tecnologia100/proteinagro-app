@@ -695,18 +695,23 @@ label {
     padding: 12px 15px;
     border-radius: 10px;
     margin-bottom: 15px;
+    gap: 12px;
 }
 
 .voucher-total-label {
     font-size: 1rem;
     font-weight: 700;
     color: #0f172a;
+    flex-shrink: 0;
 }
 
 .voucher-total-kilos {
     font-size: 1.3rem;
     font-weight: 800;
     color: #16a34a;
+    white-space: nowrap;
+    text-align: right;
+    word-break: keep-all;
 }
 
 .voucher-obs-box {

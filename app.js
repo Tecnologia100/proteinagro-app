@@ -466,10 +466,10 @@ btnRegistrarProducto.addEventListener('click', () => {
         return;
     }
     
-    // Guardar en la lista
+    // Guardar en la lista (redondeado a 2 decimales para evitar imprecisión de punto flotante)
     collectedProducts.push({
         producto: currentProduct,
-        kilos: parseFloat(kilosInput.value)
+        kilos: Math.round(parseFloat(kilosInput.value) * 100) / 100
     });
 
     renderAddedProducts();
@@ -651,7 +651,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     if (currentProduct && kilosInput && kilosInput.value && parseFloat(kilosInput.value) > 0) {
         collectedProducts.push({
             producto: currentProduct,
-            kilos: parseFloat(kilosInput.value)
+            kilos: Math.round(parseFloat(kilosInput.value) * 100) / 100
         });
         currentProduct = null;
         kilosInput.value = '';
@@ -666,9 +666,10 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         return;
     }
 
-    // Calcular totales
+    // Calcular totales redondeando a 2 decimales para evitar problemas de precisión en coma flotante (IEEE 754)
     let totalKilos = 0;
-    collectedProducts.forEach(p => totalKilos += p.kilos);
+    collectedProducts.forEach(p => totalKilos += (Number(p.kilos) || 0));
+    totalKilos = Math.round(totalKilos * 100) / 100;
 
     const btnSubmit = document.getElementById('btn-submit');
     const spinner = btnSubmit.querySelector('.spinner');
@@ -786,13 +787,13 @@ function renderCharts(records) {
     records.forEach(r => {
         // Agrupar por proveedor
         const prov = (r.proveedor || 'Desconocido').replace('_', ' ');
-        kilosPorProveedor[prov] = (kilosPorProveedor[prov] || 0) + r.totalKilos;
+        kilosPorProveedor[prov] = Math.round(((kilosPorProveedor[prov] || 0) + (Number(r.totalKilos) || 0)) * 100) / 100;
 
         // Agrupar por producto
         if (r.productos && Array.isArray(r.productos)) {
             r.productos.forEach(p => {
                 const prodName = p.producto || p.nombre || 'Otros';
-                kilosPorProducto[prodName] = (kilosPorProducto[prodName] || 0) + p.kilos;
+                kilosPorProducto[prodName] = Math.round(((kilosPorProducto[prodName] || 0) + (Number(p.kilos) || 0)) * 100) / 100;
             });
         }
     });
@@ -858,6 +859,8 @@ function loadAdminData() {
               const docId = doc.id;
               const recordLocalId = data.id || '';
 
+              const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
+
               const tr = document.createElement('tr');
               tr.innerHTML = `
                   <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
@@ -865,7 +868,7 @@ function loadAdminData() {
                   <td style="text-transform: capitalize;">${ruta}</td>
                   <td style="text-transform: capitalize;">${provDisplay}</td>
                   <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
-                  <td style="font-weight: bold;">${data.totalKilos} kg</td>
+                  <td style="font-weight: bold;">${cleanTotalKg} kg</td>
                   <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
                   <td><span class="badge ${badgeClass}">${data.estado}</span></td>
                   <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
@@ -912,7 +915,7 @@ function renderRecordsInTable(records, tbody) {
 
         const provDisplay = data.proveedor || 'N/A';
         const sucDisplay = data.punto || data.sucursal || 'General';
-        const recordLocalId = data.id || '';
+        const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -921,7 +924,7 @@ function renderRecordsInTable(records, tbody) {
             <td style="text-transform: capitalize;">${ruta}</td>
             <td style="text-transform: capitalize;">${provDisplay}</td>
             <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
-            <td style="font-weight: bold;">${data.totalKilos} kg</td>
+            <td style="font-weight: bold;">${cleanTotalKg} kg</td>
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
             <td><span class="badge ${badgeClass}">${data.estado}</span></td>
             <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
@@ -1594,16 +1597,18 @@ function mostrarComprobanteDigital(data) {
     tbody.innerHTML = '';
     if (data.productos && Array.isArray(data.productos)) {
         data.productos.forEach(p => {
+            const cleanKg = Math.round((Number(p.kilos) || 0) * 100) / 100;
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #1e293b;">${p.producto}</td>
-                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #0284c7;">${p.kilos} KG</td>
+                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #0284c7;">${cleanKg} KG</td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    document.getElementById('receipt-total-kilos').textContent = `${data.totalKilos || 0} KG`;
+    const cleanReceiptTotal = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
+    document.getElementById('receipt-total-kilos').textContent = `${cleanReceiptTotal} KG`;
 
     const obsContainer = document.getElementById('receipt-obs-container');
     if (data.observaciones && data.observaciones.trim() !== '') {
@@ -1636,8 +1641,13 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
 
     let prodsTxt = '';
     if (d.productos && Array.isArray(d.productos)) {
-        prodsTxt = d.productos.map(p => `  • ${p.producto}: *${p.kilos} KG*`).join('\n');
+        prodsTxt = d.productos.map(p => {
+            const k = Math.round((Number(p.kilos) || 0) * 100) / 100;
+            return `  • ${p.producto}: *${k} KG*`;
+        }).join('\n');
     }
+
+    const cleanTotalKg = Math.round((Number(d.totalKilos) || 0) * 100) / 100;
 
     const msg = `🌿 *PROTEINAGRO - COMPROBANTE DE RECOLECCIÓN*\n` +
         `-----------------------------------------\n` +
@@ -1650,7 +1660,7 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
         `-----------------------------------------\n` +
         `📦 *PRODUCTOS RECOLECTADOS:*\n${prodsTxt}\n` +
         `-----------------------------------------\n` +
-        `⚖️ *TOTAL RECOLECTADO: ${d.totalKilos} KG*\n` +
+        `⚖️ *TOTAL RECOLECTADO: ${cleanTotalKg} KG*\n` +
         (d.observaciones ? `📝 *Observaciones:* ${d.observaciones}\n` : '') +
         `✍️ *Firma Registrada:* OK\n` +
         `-----------------------------------------\n` +
