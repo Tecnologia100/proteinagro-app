@@ -801,6 +801,8 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
             const ss = String(now.getSeconds()).padStart(2, '0');
             return d + '/' + m + '/' + y + ' ' + hh + ':' + mm + ':' + ss;
         })(),
+        timestamp: Date.now(),
+        fechaIso: new Date().toISOString(),
         estado: navigator.onLine ? 'Sincronizado' : 'Offline'
     };
 
@@ -932,44 +934,98 @@ function renderCharts(records) {
     });
 }
 
+// === PARSEO Y ORDENAMIENTO CRONOLÓGICO ROBUSTO ===
+function parsearFechaRegistro(fechaVal) {
+    if (!fechaVal) return new Date(0);
+    if (fechaVal instanceof Date) return isNaN(fechaVal.getTime()) ? new Date(0) : fechaVal;
+    if (typeof fechaVal.toDate === 'function') return fechaVal.toDate();
+    if (typeof fechaVal === 'number') return new Date(fechaVal);
+    
+    const fechaStr = String(fechaVal).trim();
+    
+    // Si viene en formato ISO (ej. 2026-09-10T...) o YYYY-MM-DD
+    if (fechaStr.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(fechaStr)) {
+        const d = new Date(fechaStr);
+        if (!isNaN(d.getTime())) return d;
+    }
+    
+    // Formato común en Colombia: D/M/YYYY o DD/MM/YYYY con o sin hora HH:MM:SS
+    const match = fechaStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    if (match) {
+        const day = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1;
+        const year = parseInt(match[3], 10);
+        const hour = match[4] ? parseInt(match[4], 10) : 0;
+        const min = match[5] ? parseInt(match[5], 10) : 0;
+        const sec = match[6] ? parseInt(match[6], 10) : 0;
+        return new Date(year, month, day, hour, min, sec);
+    }
+    
+    const fallback = new Date(fechaStr);
+    return isNaN(fallback.getTime()) ? new Date(0) : fallback;
+}
+
+function formatearFechaRegistro(fechaVal) {
+    const d = parsearFechaRegistro(fechaVal);
+    if (d.getTime() === 0) return fechaVal || '-';
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const anio = d.getFullYear();
+    const hora = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return `${dia}/${mes}/${anio} ${hora}`;
+}
+
 function loadAdminData() {
     const tbody = document.getElementById('admin-table-body');
+    if (!tbody) return;
     
-    db.collection('recolecciones').orderBy('fecha', 'desc').limit(100)
+    // Consultar recolecciones en Firestore sin limitador restrictivo alfabético
+    db.collection('recolecciones')
       .onSnapshot((querySnapshot) => {
           tbody.innerHTML = '';
-          const records = [];
+          const rawRecords = [];
           
           querySnapshot.forEach((doc) => {
               const data = doc.data();
-              records.push(data);
-              
-              const dateObj = new Date(data.fecha);
-              const badgeClass = data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
-              const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
+              rawRecords.push({
+                  ...data,
+                  _docId: doc.id
+              });
+          });
+          
+          // Ordenamiento cronológico estricto real (milisegundos) de más reciente a más antiguo
+          rawRecords.sort((a, b) => {
+              const timeA = a.timestamp || parsearFechaRegistro(a.fecha).getTime();
+              const timeB = b.timestamp || parsearFechaRegistro(b.fecha).getTime();
+              return timeB - timeA;
+          });
 
-              const obsText = data.observaciones ? data.observaciones : '-';
-              const provDisplay = data.proveedor || 'N/A';
-              const sucDisplay = data.punto || data.sucursal || 'General';
-              const docId = doc.id;
-              const recordLocalId = data.id || '';
+          window.adminRecordsMap = window.adminRecordsMap || {};
 
-              window.adminRecordsMap = window.adminRecordsMap || {};
-              window.adminRecordsMap[docId] = { ...data, id: data.id || ('REC-' + docId.slice(0, 8)) };
+          rawRecords.forEach((item) => {
+              const docId = item._docId;
+              const recordLocalId = item.id || '';
+              window.adminRecordsMap[docId] = { ...item, id: item.id || ('REC-' + docId.slice(0, 8)) };
 
-              const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
+              const fechaFormatted = formatearFechaRegistro(item.fecha);
+              const badgeClass = item.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
+              const ruta = item.ruta ? item.ruta.replace('_', ' ') : 'N/A';
+              const obsText = item.observaciones ? item.observaciones : '-';
+              const provDisplay = item.proveedor || 'N/A';
+              const sucDisplay = item.punto || item.sucursal || 'General';
+              const cleanTotalKg = Math.round((Number(item.totalKilos) || 0) * 100) / 100;
 
               const tr = document.createElement('tr');
               tr.innerHTML = `
-                  <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
-                  <td style="text-transform: capitalize;">${data.conductor}</td>
+                  <td style="white-space: nowrap; font-size: 0.85rem;">${fechaFormatted}</td>
+                  <td style="text-transform: capitalize;">${item.conductor || 'N/A'}</td>
                   <td style="text-transform: capitalize;">${ruta}</td>
-                  <td style="text-transform: capitalize;">${provDisplay}</td>
-                  <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
-                  <td style="font-weight: bold;">${cleanTotalKg} kg</td>
+                  <td style="text-transform: capitalize; font-weight: 500;">${provDisplay}</td>
+                  <td style="font-size: 0.85rem; color: #0284c7; font-weight: 600;">${sucDisplay}</td>
+                  <td style="font-weight: bold; color: #16a34a;">${cleanTotalKg} kg</td>
                   <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
-                  <td><span class="badge ${badgeClass}">${data.estado}</span></td>
-                  <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
+                  <td><span class="badge ${badgeClass}">${item.estado || 'Sincronizado'}</span></td>
+                  <td><img src="${item.firma || ''}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
                   <td style="white-space: nowrap;">
                       <button onclick="verSoporteAdminDirecto('${docId}')" title="Ver / Imprimir Soporte" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
                           📄 Soporte
@@ -982,7 +1038,7 @@ function loadAdminData() {
               tbody.appendChild(tr);
           });
           
-          if (records.length === 0) {
+          if (rawRecords.length === 0) {
               // Si Firebase está vacío, intentar cargar respaldo local
               let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
               if (savedBackup.length > 0) {
@@ -992,7 +1048,7 @@ function loadAdminData() {
               }
               tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
           } else {
-              renderCharts(records);
+              renderCharts(rawRecords);
           }
       }, (error) => {
           console.error("Error cargando recolecciones: ", error);
@@ -1008,8 +1064,19 @@ function loadAdminData() {
 
 function renderRecordsInTable(records, tbody) {
     tbody.innerHTML = '';
-    records.forEach(data => {
-        const dateObj = new Date(data.fecha);
+    const sorted = records.slice().sort((a, b) => {
+        const timeA = a.timestamp || parsearFechaRegistro(a.fecha).getTime();
+        const timeB = b.timestamp || parsearFechaRegistro(b.fecha).getTime();
+        return timeB - timeA;
+    });
+
+    sorted.forEach(data => {
+        const recordLocalId = data.id || '';
+        const recKey = recordLocalId || ('REC_LOCAL_' + Math.random().toString(36).substring(2, 9));
+        window.adminRecordsMap = window.adminRecordsMap || {};
+        window.adminRecordsMap[recKey] = { ...data, id: data.id || recKey };
+
+        const fechaFormatted = formatearFechaRegistro(data.fecha);
         const badgeClass = data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
         const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
         const obsText = data.observaciones ? data.observaciones : '-';
@@ -1018,21 +1085,17 @@ function renderRecordsInTable(records, tbody) {
         const sucDisplay = data.punto || data.sucursal || 'General';
         const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
 
-        const recKey = recordLocalId || ('REC_LOCAL_' + Math.random().toString(36).substring(2, 9));
-        window.adminRecordsMap = window.adminRecordsMap || {};
-        window.adminRecordsMap[recKey] = { ...data, id: data.id || recKey };
-
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
-            <td style="text-transform: capitalize;">${data.conductor}</td>
+            <td style="white-space: nowrap; font-size: 0.85rem;">${fechaFormatted}</td>
+            <td style="text-transform: capitalize;">${data.conductor || 'N/A'}</td>
             <td style="text-transform: capitalize;">${ruta}</td>
-            <td style="text-transform: capitalize;">${provDisplay}</td>
-            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
-            <td style="font-weight: bold;">${cleanTotalKg} kg</td>
+            <td style="text-transform: capitalize; font-weight: 500;">${provDisplay}</td>
+            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 600;">${sucDisplay}</td>
+            <td style="font-weight: bold; color: #16a34a;">${cleanTotalKg} kg</td>
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
-            <td><span class="badge ${badgeClass}">${data.estado}</span></td>
-            <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
+            <td><span class="badge ${badgeClass}">${data.estado || 'Offline'}</span></td>
+            <td><img src="${data.firma || ''}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
             <td style="white-space: nowrap;">
                 <button onclick="verSoporteAdminDirecto('${recKey}')" title="Ver / Imprimir Soporte" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
                     📄 Soporte
@@ -1084,23 +1147,29 @@ async function eliminarRecoleccion(firestoreDocId, localRecordId) {
 // === EXPORTAR A EXCEL / CSV ===
 document.getElementById('btn-export')?.addEventListener('click', async () => {
     try {
-        const snapshot = await db.collection('recolecciones').orderBy('fecha', 'desc').get();
+        const snapshot = await db.collection('recolecciones').get();
         if (snapshot.empty) {
             alert('No hay recolecciones para exportar.');
             return;
         }
 
+        const docs = [];
+        snapshot.forEach(doc => docs.push({ ...doc.data(), _docId: doc.id }));
+        docs.sort((a, b) => {
+            const timeA = a.timestamp || parsearFechaRegistro(a.fecha).getTime();
+            const timeB = b.timestamp || parsearFechaRegistro(b.fecha).getTime();
+            return timeB - timeA;
+        });
+
         let csvContent = "\uFEFF"; // UTF-8 BOM para abrir correctamente en Excel
         csvContent += "ID,Fecha,Conductor,Ruta,Proveedor,Sucursal/Punto,Productos,Total Kilos,Observaciones,Estado\n";
 
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const dateObj = new Date(data.fecha);
-            const fechaFormatted = `"${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}"`;
+        docs.forEach(data => {
+            const fechaFormatted = `"${formatearFechaRegistro(data.fecha)}"`;
             const conductor = `"${data.conductor || ''}"`;
             const ruta = `"${(data.ruta || '').replace('_', ' ')}"`;
             const proveedor = `"${(data.proveedor || '').replace('_', ' ')}"`;
-            const sucursal = `"${(data.sucursal || 'General')}"`;
+            const sucursal = `"${(data.sucursal || data.punto || 'General')}"`;
             
             let productosStr = '';
             if (data.productos && Array.isArray(data.productos)) {
@@ -1112,7 +1181,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
             const observaciones = `"${(data.observaciones || '').replace(/"/g, '""')}"`;
             const estado = `"${data.estado || ''}"`;
 
-            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${sucursal},${productosStr},${totalKilos},${observaciones},${estado}\n`;
+            csvContent += `${data._docId || data.id},${fechaFormatted},${conductor},${ruta},${proveedor},${sucursal},${productosStr},${totalKilos},${observaciones},${estado}\n`;
         });
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1792,21 +1861,17 @@ function mostrarComprobanteDigital(data) {
     let displayDate = '';
     let displayTime = '';
     if (data.fecha) {
-        if (typeof data.fecha === 'string' && data.fecha.includes('T')) {
-            const d = new Date(data.fecha);
-            displayDate = isNaN(d.getTime()) ? data.fecha : d.toLocaleDateString();
-            displayTime = data.hora || (isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-        } else if (typeof data.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.fecha)) {
-            const [y, m, d] = data.fecha.split('-');
-            displayDate = `${d}/${m}/${y}`;
-            displayTime = data.hora || '';
+        const d = parsearFechaRegistro(data.fecha);
+        if (d.getTime() > 0) {
+            displayDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            displayTime = data.hora || (typeof data.fecha === 'string' && data.fecha.includes(':') ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
         } else {
             displayDate = data.fecha;
             displayTime = data.hora || '';
         }
     } else {
         const now = new Date();
-        displayDate = now.toLocaleDateString();
+        displayDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
         displayTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
@@ -2218,7 +2283,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.5&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.6&t=' + Date.now();
 };
 
 // Inicializar selectores dinámicos y catálogos al cargar el DOM
@@ -2236,12 +2301,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Inicializar modal de Soporte Oficial para Administradores
     initAdminSoporteModal();
 
-    // 4. Registrar Service Worker v1.3.5 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.3.6 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.3.5')
+            navigator.serviceWorker.register('/sw.js?v=1.3.6')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.3.5 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.3.6 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.3.5`  
+> **Versión Actual:** `v=1.3.6`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -213,7 +213,14 @@ PROTEINAGRO/
 
 ## 🔄 7. Historial de Versiones (Changelog)
 
-### `v=1.3.5` (Septiembre 2026) - Versión Actual
+### `v=1.3.6` (Septiembre 2026) - Versión Actual
+- **Corrección Crítica de Ordenamiento y Visualización en Rol de Administración:**
+  - **Causa raíz identificada:** La consulta anterior en Firestore utilizaba `.orderBy('fecha', 'desc').limit(100)` sobre el campo de texto `fecha` (`"D/M/YYYY"`). En la comparación alfanumérica de Firestore, las fechas de septiembre que inician con `"9/"` (`9/9/2026`) se consideraban superiores a las fechas que inician con `"10/"` (`10/9/2026`). Al existir más de 100 recolecciones entre el 3 y el 9 de septiembre, el límite de 100 truncaba y excluía todas las recolecciones del 10 de septiembre en adelante.
+  - **Solución implementada:** Se eliminó el limitador restrictivo alfabético de Firestore y se implementó un motor de ordenamiento cronológico real en memoria JavaScript (`parsearFechaRegistro`) que calcula los milisegundos exactos sin importar el formato de origen.
+  - **Formateo de Fechas en Español:** Se normalizó la presentación de fechas en `DD/MM/YYYY HH:MM:SS` para evitar que el navegador interprete días mayores a 12 como fechas inválidas o invierta meses y días.
+  - **Persistencia con Timestamp:** Se añadió `timestamp` numérico y `fechaIso` a cada nuevo guardado de recolección para facilitar futuras indexaciones.
+
+### `v=1.3.5` (Septiembre 2026)
 - **Generador Administrativo de Soporte Oficial de Recolección (Opción 1 - Visual):**
   - Nuevo botón `📋 Generar Soporte Oficial` en el panel de administración.
   - Modal interactivo para seleccionar Fecha, Hora, Proveedor (+ nuevo proveedor libre), Sucursal/Punto (+ nueva sucursal libre), Conductor, Ruta y Observaciones.
