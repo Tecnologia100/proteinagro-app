@@ -28,7 +28,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.3.0">
+    <link rel="stylesheet" href="styles.css?v=1.3.1">
 
     <!-- Firebase (Carga no bloqueante con defer para acelerar FCP) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
@@ -40,7 +40,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.3.0" defer></script>
+    <script src="app.js?v=1.3.1" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -215,8 +215,8 @@
                     <!-- Selección de Sucursal / Punto de Recolección (2. Punto recolección) -->
                     <div class="form-group" id="sucursal-group">
                         <label for="sucursal">📍 Punto / Lugar de Recolección <span style="color: #ef4444;">*</span></label>
-                        <select id="sucursal" required class="premium-input">
-                            <option value="" disabled selected>Seleccione el punto de recolección</option>
+                        <select id="sucursal" required class="premium-input" disabled>
+                            <option value="" disabled selected>Primero seleccione un proveedor</option>
                         </select>
                         <small id="sucursal-error" class="form-error-hint">⚠️ Debe seleccionar o registrar este punto obligatoriamente para continuar.</small>
                     </div>

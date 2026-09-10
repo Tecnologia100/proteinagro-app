@@ -367,7 +367,12 @@ function renderDynamicRoutes(routes) {
     if (currentVal) {
         select.value = currentVal;
     }
-    populardropdownSucursalesPorRuta(select.value || '');
+    const activeProv = document.getElementById('proveedor')?.value || '';
+    if (activeProv && activeProv !== 'OTRO' && activeProv !== 'TODOS') {
+        populardropdownSucursales(activeProv);
+    } else {
+        resetearDropdownSucursal();
+    }
     if (select.value) {
         renderizarCronogramaRuta(select.value);
     }
@@ -376,17 +381,18 @@ function renderDynamicRoutes(routes) {
 function procesarPuntosRutasDinamicos(puntosArray) {
     if (!Array.isArray(puntosArray) || puntosArray.length === 0) return;
 
+    MATRIZ_PUNTOS_RUTAS = puntosArray.filter(item => item && item.punto && item.estado !== 'Inactivo');
+
     // Limpiar mapas dinámicos previos para evitar arrastrar datos obsoletos
     for (let k in PUNTO_TO_PROVEEDOR_MAP) delete PUNTO_TO_PROVEEDOR_MAP[k];
     for (let k in PUNTOS_POR_RUTA) delete PUNTOS_POR_RUTA[k];
     for (let k in PROVEEDORES_POR_RUTA) delete PROVEEDORES_POR_RUTA[k];
     for (let k in CRONOGRAMA_RUTAS) delete CRONOGRAMA_RUTAS[k];
 
-    puntosArray.forEach(item => {
-        if (!item || !item.punto || item.estado === 'Inactivo') return;
-        const punto = item.punto;
-        const prov = item.proveedor || 'PROVEEDOR GENERAL';
-        const ruta = item.ruta || 'Ruta General';
+    MATRIZ_PUNTOS_RUTAS.forEach(item => {
+        const punto = (item.punto || '').trim();
+        const prov = (item.proveedor || 'PROVEEDOR GENERAL').trim();
+        const ruta = (item.ruta || 'Ruta General').trim();
 
         PUNTO_TO_PROVEEDOR_MAP[punto] = prov;
 
@@ -412,8 +418,13 @@ function procesarPuntosRutasDinamicos(puntosArray) {
     });
 
     const activeRuta = document.getElementById('ruta')?.value || '';
-    populardropdownSucursalesPorRuta(activeRuta);
     populardropdownProveedoresPorRuta(activeRuta);
+    const activeProv = document.getElementById('proveedor')?.value || '';
+    if (activeProv && activeProv !== 'OTRO' && activeProv !== 'TODOS') {
+        populardropdownSucursales(activeProv);
+    } else {
+        resetearDropdownSucursal();
+    }
 }
 
 async function cargarCatalogosDinamicos() {
@@ -760,7 +771,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
         if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        populardropdownSucursalesPorRuta('');
+        resetearDropdownSucursal("Primero seleccione un proveedor");
 
         // Mostrar Comprobante Digital Modal al conductor e información del recibo
         mostrarComprobanteDigital({ ...data, firma: firmaURL, id: recordId });
@@ -1136,7 +1147,7 @@ function initRutasYProveedores() {
     // Inicializar proveedores y puntos por defecto activados desde el inicio
     const initialRuta = rutaSelect.value || '';
     populardropdownProveedoresPorRuta(initialRuta);
-    populardropdownSucursalesPorRuta(initialRuta);
+    resetearDropdownSucursal("Primero seleccione un proveedor");
 
     // Event listener al cambiar la Ruta
     rutaSelect.addEventListener('change', () => {
@@ -1155,17 +1166,14 @@ function initRutasYProveedores() {
         // Poblar proveedores correspondientes a la ruta seleccionada
         populardropdownProveedoresPorRuta(selectedRuta);
 
-        if (selectedRuta === 'OTRA' || selectedRuta.includes('Pendiente por definir')) {
-            if (selectedRuta === 'OTRA') {
-                customRutaGroup.style.display = 'block';
-                document.getElementById('custom-ruta').required = true;
-            }
-            populardropdownSucursalesPorRuta('');
-            renderizarCronogramaRuta(selectedRuta);
-        } else {
-            populardropdownSucursalesPorRuta(selectedRuta);
-            renderizarCronogramaRuta(selectedRuta);
+        // Resetear el selector de sucursal para que espere al proveedor
+        resetearDropdownSucursal("Primero seleccione un proveedor");
+
+        if (selectedRuta === 'OTRA') {
+            customRutaGroup.style.display = 'block';
+            document.getElementById('custom-ruta').required = true;
         }
+        renderizarCronogramaRuta(selectedRuta);
     });
 
     // Event listener al cambiar Punto / Sucursal (AUTOCOMPLETA EL PROVEEDOR)
@@ -1227,13 +1235,21 @@ function initRutasYProveedores() {
         if (selectedProv === 'TODOS') {
             const currentRuta = rutaSelect.value || '';
             populardropdownProveedoresPorRuta(currentRuta, true);
+            resetearDropdownSucursal("Seleccione un proveedor de la lista");
             return;
         }
 
         if (selectedProv === 'OTRO') {
             customProveedorGroup.style.display = 'block';
             document.getElementById('custom-proveedor').required = true;
-            populardropdownSucursales('');
+            sucursalSelect.disabled = false;
+            sucursalSelect.innerHTML = '<option value="OTRA_SUCURSAL" selected>➕ Otro Punto / Sucursal...</option>';
+            if (customSucursalGroup) customSucursalGroup.style.display = 'block';
+            const customSucInput = document.getElementById('custom-sucursal');
+            if (customSucInput) {
+                customSucInput.required = true;
+                customSucInput.focus();
+            }
         } else {
             customProveedorGroup.style.display = 'none';
             document.getElementById('custom-proveedor').required = false;
@@ -1248,6 +1264,9 @@ function initRutasYProveedores() {
     sincronizarRutasDesdeSheets();
 }
 
+// Matriz consolidada de Puntos_Rutas cargada desde Google Sheets
+let MATRIZ_PUNTOS_RUTAS = [];
+
 // Mapa Punto → Proveedor (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
 const PUNTO_TO_PROVEEDOR_MAP = {};
 
@@ -1256,6 +1275,88 @@ const PUNTOS_POR_RUTA = {};
 
 // Proveedores por Ruta (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
 const PROVEEDORES_POR_RUTA = {};
+
+function resetearDropdownSucursal(mensaje = "Primero seleccione un proveedor") {
+    const sucursalSelect = document.getElementById('sucursal');
+    if (!sucursalSelect) return;
+    sucursalSelect.disabled = true;
+    sucursalSelect.innerHTML = `<option value="" disabled selected>${mensaje}</option>`;
+    sucursalSelect.classList.remove('input-error');
+    const errorMsg = document.getElementById('sucursal-error');
+    if (errorMsg) errorMsg.style.display = 'none';
+}
+
+function getPuntosParaProveedor(rutaSeleccionada, proveedorSeleccionado) {
+    if (!proveedorSeleccionado || proveedorSeleccionado === 'TODOS' || proveedorSeleccionado === 'OTRO') {
+        return [];
+    }
+
+    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const normRuta = cleanStr(rutaSeleccionada);
+    const normProv = cleanStr(proveedorSeleccionado);
+    const matchNum = rutaSeleccionada ? rutaSeleccionada.match(/RUTA\s*(\d+)/i) : null;
+    const rutaNum = matchNum ? matchNum[1] : null;
+
+    const puntosEncontrados = [];
+
+    // 1. Buscar en la matriz completa de Google Sheets
+    if (Array.isArray(MATRIZ_PUNTOS_RUTAS) && MATRIZ_PUNTOS_RUTAS.length > 0) {
+        for (const it of MATRIZ_PUNTOS_RUTAS) {
+            if (it.estado === 'Inactivo') continue;
+            const itRuta = cleanStr(it.ruta);
+            const itProv = cleanStr(it.proveedor);
+            const itPunto = (it.punto || '').trim();
+
+            if (!itPunto) continue;
+
+            // Verificar si coincide la ruta
+            let rutaCoincide = (!normRuta || normRuta === 'otra') || (itRuta === normRuta) || normRuta.includes(itRuta) || itRuta.includes(normRuta);
+            if (!rutaCoincide && rutaNum) {
+                const itNumMatch = (it.ruta || '').match(/RUTA\s*(\d+)/i);
+                if (itNumMatch && itNumMatch[1] === rutaNum) {
+                    rutaCoincide = true;
+                }
+            }
+
+            if (rutaCoincide) {
+                // Verificar si coincide el proveedor
+                const provCoincide = (itProv === normProv) || (normProv.includes(itProv)) || (itProv.includes(normProv));
+                if (provCoincide && !puntosEncontrados.includes(itPunto)) {
+                    puntosEncontrados.push(itPunto);
+                }
+            }
+        }
+
+        if (puntosEncontrados.length > 0) {
+            return puntosEncontrados.sort((a, b) => a.localeCompare(b));
+        }
+
+        // Fallback: si no encontró en la ruta pero el proveedor existe en otra parte
+        for (const it of MATRIZ_PUNTOS_RUTAS) {
+            if (it.estado === 'Inactivo') continue;
+            const itProv = cleanStr(it.proveedor);
+            const itPunto = (it.punto || '').trim();
+            if (!itPunto) continue;
+            if (itProv === normProv || normProv.includes(itProv) || itProv.includes(normProv)) {
+                if (!puntosEncontrados.includes(itPunto)) {
+                    puntosEncontrados.push(itPunto);
+                }
+            }
+        }
+        if (puntosEncontrados.length > 0) {
+            return puntosEncontrados.sort((a, b) => a.localeCompare(b));
+        }
+    }
+
+    // 2. Fallback con mapas existentes (PUNTO_TO_PROVEEDOR_MAP y PUNTOS_POR_RUTA)
+    const puntosBase = (rutaSeleccionada && rutaSeleccionada !== 'OTRA') ? getPuntosParaRuta(rutaSeleccionada) : Object.keys(PUNTO_TO_PROVEEDOR_MAP);
+    const puntosMap = puntosBase.filter(punto => {
+        const target = cleanStr(PUNTO_TO_PROVEEDOR_MAP[punto] || '');
+        return target === normProv || target.includes(normProv) || normProv.includes(target);
+    });
+
+    return puntosMap.sort((a, b) => a.localeCompare(b));
+}
 
 function getPuntosParaRuta(rutaSeleccionada) {
     if (!rutaSeleccionada) return Object.keys(PUNTO_TO_PROVEEDOR_MAP);
@@ -1357,33 +1458,11 @@ function getProveedoresParaRuta(rutaSeleccionada) {
 }
 
 function populardropdownSucursalesPorRuta(rutaSeleccionada) {
-    const sucursalSelect = document.getElementById('sucursal');
-    const proveedorSelect = document.getElementById('proveedor');
-    if (!sucursalSelect) return;
-
-    sucursalSelect.disabled = false;
-    sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
-
-    let listaPuntos = getPuntosParaRuta(rutaSeleccionada);
-    if (listaPuntos.length === 0) {
-        // Mostrar todos si es ruta genérica o no definida
-        listaPuntos = Object.keys(PUNTO_TO_PROVEEDOR_MAP);
-    }
-
-    listaPuntos.forEach(pt => {
-        const opt = document.createElement('option');
-        opt.value = pt;
-        opt.textContent = pt;
-        sucursalSelect.appendChild(opt);
-    });
-
-    const optOtra = document.createElement('option');
-    optOtra.value = 'OTRA_SUCURSAL';
-    optOtra.textContent = '➕ Otro Punto / Sucursal...';
-    sucursalSelect.appendChild(optOtra);
-
-    if (proveedorSelect) {
-        proveedorSelect.disabled = false;
+    const provSel = document.getElementById('proveedor')?.value;
+    if (provSel && provSel !== 'TODOS' && provSel !== 'OTRO') {
+        populardropdownSucursales(provSel);
+    } else {
+        resetearDropdownSucursal("Primero seleccione un proveedor");
     }
 }
 
@@ -1413,34 +1492,38 @@ function populardropdownSucursales(proveedorSeleccionado) {
     const sucursalSelect = document.getElementById('sucursal');
     if (!sucursalSelect) return;
 
-    sucursalSelect.disabled = false;
-
     if (!proveedorSeleccionado || proveedorSeleccionado === 'TODOS') {
-        const rutaSel = document.getElementById('ruta')?.value || '';
-        populardropdownSucursalesPorRuta(rutaSel);
+        resetearDropdownSucursal("Primero seleccione un proveedor");
         return;
     }
 
-    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-    const normProv = cleanStr(proveedorSeleccionado);
+    sucursalSelect.disabled = false;
     const rutaSel = document.getElementById('ruta')?.value || '';
-    const puntosBase = (rutaSel && rutaSel !== 'OTRA') ? getPuntosParaRuta(rutaSel) : Object.keys(PUNTO_TO_PROVEEDOR_MAP);
+    const listaSucursales = getPuntosParaProveedor(rutaSel, proveedorSeleccionado);
 
-    const listaSucursales = puntosBase.filter(punto => {
-        const target = cleanStr(PUNTO_TO_PROVEEDOR_MAP[punto] || '');
-        return target === normProv || target.includes(normProv) || normProv.includes(target);
-    });
+    sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
 
     if (listaSucursales.length > 0) {
-        sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
         listaSucursales.forEach(suc => {
             const opt = document.createElement('option');
             opt.value = suc;
             opt.textContent = suc;
             sucursalSelect.appendChild(opt);
         });
+
+        // Si el proveedor tiene exactamente 1 punto registrado, preseleccionarlo automáticamente para ahorrar tiempo al conductor
+        if (listaSucursales.length === 1) {
+            sucursalSelect.value = listaSucursales[0];
+            sucursalSelect.classList.remove('input-error');
+            const errorMsg = document.getElementById('sucursal-error');
+            if (errorMsg) errorMsg.style.display = 'none';
+        }
     } else {
-        sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option><option value="Sede Principal / General">Sede Principal / General</option>';
+        const optGen = document.createElement('option');
+        optGen.value = 'Sede Principal / General';
+        optGen.textContent = 'Sede Principal / General';
+        sucursalSelect.appendChild(optGen);
+        sucursalSelect.value = 'Sede Principal / General';
     }
 
     const optOtra = document.createElement('option');

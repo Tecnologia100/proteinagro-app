@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.3.0`  
+> **Versión Actual:** `v=1.3.1`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -206,7 +206,18 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.2.9` (Septiembre 2026) - Versión Actual
+### `v=1.3.1` (Septiembre 2026) - Versión Actual
+- **Filtro Estricto en Cascada (Ruta ➔ Proveedor ➔ Puntos del Proveedor):**
+  - Al seleccionar una Ruta, se despliegan exclusivamente los proveedores asignados a esa ruta y el selector de Punto queda en espera (`disabled`) con la indicación *"Primero seleccione un proveedor"*, evitando la visualización desordenada de todos los puntos de la ruta.
+  - Al seleccionar un Proveedor, el selector de **Punto / Lugar de Recolección** se activa de inmediato y despliega **únicamente las sedes o puntos que le pertenecen a ese proveedor específico**.
+  - Si el proveedor cuenta con exactamente 1 solo punto registrado en esa ruta, el sistema lo preselecciona automáticamente para ahorrarle tiempo de digitación al conductor.
+  - Integración armónica con la línea de tiempo del cronograma de paradas (autocompleta proveedor y punto específico).
+
+### `v=1.3.0` (Septiembre 2026)
+- **Corrección de Precisión Numérica:**
+  - Redondeo estricto a 2 decimales en el pesaje de kilogramos para evitar desfases visuales de punto flotante.
+
+### `v=1.2.9` (Septiembre 2026)
 - **Gestor Visual de Instalación PWA:**
   - Se añadieron botones visibles de instalación (`#btn-pwa-install` en la tarjeta de login y `#btn-pwa-install-header` en la barra del conductor).
   - Captura del evento `beforeinstallprompt` para activar la instalación nativa con un solo clic en Android / Chrome / Edge.
