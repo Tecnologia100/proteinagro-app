@@ -181,7 +181,28 @@ const productsListUl = document.getElementById('products-list');
 let currentProduct = null;
 let collectedProducts = [];
 
-const DEFAULT_PRODUCTOS = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HUESO BLANCO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
+const DEFAULT_PRODUCTOS = [
+    "ACEITE",
+    "CABEZAS",
+    "CALAMBOMBO DE CERDO",
+    "CALAMBOMBO DE RES",
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "HUESO SECO",
+    "LEÑA",
+    "MANTECA",
+    "MANTEQUILLA",
+    "MARGARINA",
+    "OREJAS DE CERDO",
+    "PIEL POLLO",
+    "PULMON DE CERDO",
+    "SEBO EN RAMA",
+    "TRAQUEAS"
+];
 const DEFAULT_CONDUCTORES = [
     "Ricardo Sepulveda",
     "Hernando Prado",
@@ -205,13 +226,18 @@ function getEmojiForProduct(name) {
     const n = (name || '').toUpperCase();
     if (n.includes('ACEITE')) return '🛢️';
     if (n.includes('CABEZAS')) return '🐮';
+    if (n.includes('CALAMBOMBO')) return '🦴';
     if (n.includes('DESPERDICIO')) return '🗑️';
     if (n.includes('EMPELLA')) return '🐷';
     if (n.includes('GORDANA')) return '🥓';
     if (n.includes('HARINA')) return '🥩';
     if (n.includes('HUESO')) return '🦴';
-    if (n.includes('MANTECA') || n.includes('MARGARINA') || n.includes('SEBO')) return '🧈';
+    if (n.includes('LEÑA')) return '🪵';
+    if (n.includes('MANTECA') || n.includes('MARGARINA') || n.includes('MANTEQUILLA') || n.includes('SEBO')) return '🧈';
+    if (n.includes('OREJAS')) return '🐷';
     if (n.includes('POLLO') || n.includes('PIEL')) return '🐔';
+    if (n.includes('PULMON')) return '🫁';
+    if (n.includes('TRAQUEAS')) return '🥩';
     return '📦';
 }
 
@@ -275,7 +301,9 @@ function renderDynamicProducts(prods) {
     const grid = document.getElementById('product-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    prods.forEach(pName => {
+    // Ordenar siempre los productos alfabéticamente de la A a la Z
+    const prodsOrdenados = (Array.isArray(prods) ? prods.slice() : []).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    prodsOrdenados.forEach(pName => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'product-btn';
@@ -491,6 +519,9 @@ btnRegistrarProducto.addEventListener('click', () => {
         producto: currentProduct,
         kilos: Math.round(parseFloat(kilosInput.value) * 100) / 100
     });
+
+    // Mantener la lista de productos recolectados siempre organizada en orden alfabético
+    collectedProducts.sort((a, b) => a.producto.localeCompare(b.producto, 'es', { sensitivity: 'base' }));
 
     renderAddedProducts();
     
@@ -1699,11 +1730,12 @@ function mostrarComprobanteDigital(data) {
     document.getElementById('receipt-provider').textContent = data.proveedor || '-';
     document.getElementById('receipt-branch').textContent = data.punto || data.sucursal || 'General';
 
-    // Rellenar tabla de items
+    // Rellenar tabla de items ordenada alfabéticamente
     const tbody = document.getElementById('receipt-items-body');
     tbody.innerHTML = '';
     if (data.productos && Array.isArray(data.productos)) {
-        data.productos.forEach(p => {
+        const prodsSorted = data.productos.slice().sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
+        prodsSorted.forEach(p => {
             const cleanKg = Math.round((Number(p.kilos) || 0) * 100) / 100;
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -1748,7 +1780,8 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
 
     let prodsTxt = '';
     if (d.productos && Array.isArray(d.productos)) {
-        prodsTxt = d.productos.map(p => {
+        const prodsSorted = d.productos.slice().sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
+        prodsTxt = prodsSorted.map(p => {
             const k = Math.round((Number(p.kilos) || 0) * 100) / 100;
             return `  • ${p.producto}: *${k} KG*`;
         }).join('\n');
@@ -1799,7 +1832,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.2&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.3&t=' + Date.now();
 };
 
 // Inicializar selectores dinámicos y catálogos al cargar el DOM
@@ -1814,12 +1847,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
 
-    // 3. Registrar Service Worker v1.3.2 para PWA instalable con actualización automática inmediata
+    // 3. Registrar Service Worker v1.3.3 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.3.2')
+            navigator.serviceWorker.register('/sw.js?v=1.3.3')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.3.2 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.3.3 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

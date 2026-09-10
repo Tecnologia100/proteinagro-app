@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.3.2`  
+> **Versión Actual:** `v=1.3.3`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -206,7 +206,14 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.3.2` (Septiembre 2026) - Versión Actual
+### `v=1.3.3` (Septiembre 2026) - Versión Actual
+- **Ordenamiento Alfabético Estricto de Productos (A-Z):**
+  - Se ordenaron alfabéticamente los 20 productos oficiales en la cuadrícula táctil de botones del conductor, permitiendo ubicar rápidamente cualquier materia prima desde la **A** (*ACEITE*) hasta la **T** (*TRAQUEAS*).
+  - Incorporación de los nuevos productos de la hoja contable con sus emojis característicos: *Calambombo de Res*, *Calambombo de Cerdo*, *Pulmón de Cerdo*, *Orejas de Cerdo*, *Leña*, *Mantequilla*, *Hueso Promoción*, etc.
+  - La lista de materias primas recolectadas (`collectedProducts`) se clasifica y muestra en tiempo real en orden alfabético cada vez que se agrega un producto.
+  - El soporte digital (voucher en pantalla), el texto generado para compartir por WhatsApp y el registro en base de datos preservan la lista de materias primas recolectadas en estricto orden alfabético.
+
+### `v=1.3.2` (Septiembre 2026)
 - **Garantía Inmediata de Filtro en Cascada & Catálogo Embebido:**
   - Integración directa en el cliente del catálogo base oficial con los 122 puntos de recolección, las 6 rutas activas y los 8 conductores oficiales, eliminando esperas de latencia y garantizando operatividad instantánea al 100% incluso sin internet.
   - Priorización de coincidencia exacta por nombre de proveedor antes de coincidencias parciales, evitando que proveedores con nombres parecidos (ej. Supertienda Cañaveral y Frigorivalle) mezclen sus puntos.
