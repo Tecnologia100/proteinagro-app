@@ -954,6 +954,9 @@ function loadAdminData() {
               const docId = doc.id;
               const recordLocalId = data.id || '';
 
+              window.adminRecordsMap = window.adminRecordsMap || {};
+              window.adminRecordsMap[docId] = { ...data, id: data.id || ('REC-' + docId.slice(0, 8)) };
+
               const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
 
               const tr = document.createElement('tr');
@@ -967,7 +970,10 @@ function loadAdminData() {
                   <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
                   <td><span class="badge ${badgeClass}">${data.estado}</span></td>
                   <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
-                  <td>
+                  <td style="white-space: nowrap;">
+                      <button onclick="verSoporteAdminDirecto('${docId}')" title="Ver / Imprimir Soporte" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
+                          📄 Soporte
+                      </button>
                       <button onclick="eliminarRecoleccion('${docId}', '${recordLocalId}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
                           🗑️ Eliminar
                       </button>
@@ -1012,6 +1018,10 @@ function renderRecordsInTable(records, tbody) {
         const sucDisplay = data.punto || data.sucursal || 'General';
         const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
 
+        const recKey = recordLocalId || ('REC_LOCAL_' + Math.random().toString(36).substring(2, 9));
+        window.adminRecordsMap = window.adminRecordsMap || {};
+        window.adminRecordsMap[recKey] = { ...data, id: data.id || recKey };
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
@@ -1023,7 +1033,10 @@ function renderRecordsInTable(records, tbody) {
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
             <td><span class="badge ${badgeClass}">${data.estado}</span></td>
             <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
-            <td>
+            <td style="white-space: nowrap;">
+                <button onclick="verSoporteAdminDirecto('${recKey}')" title="Ver / Imprimir Soporte" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
+                    📄 Soporte
+                </button>
                 <button onclick="eliminarRecoleccion('', '${recordLocalId}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
                     🗑️ Eliminar
                 </button>
@@ -1032,6 +1045,16 @@ function renderRecordsInTable(records, tbody) {
         tbody.appendChild(tr);
     });
 }
+
+// Función global para abrir el Soporte Oficial desde la tabla de Administración
+window.verSoporteAdminDirecto = function(docId) {
+    const data = window.adminRecordsMap ? window.adminRecordsMap[docId] : null;
+    if (data) {
+        mostrarComprobanteDigital(data);
+    } else {
+        alert("No se encontraron los datos para generar este soporte.");
+    }
+};
 
 // Función global para eliminar un registro individual
 async function eliminarRecoleccion(firestoreDocId, localRecordId) {
@@ -1765,12 +1788,33 @@ function mostrarComprobanteDigital(data) {
     const modal = document.getElementById('receipt-modal');
     if (!modal) return;
 
-    const now = new Date();
-    document.getElementById('receipt-number').textContent = `N° ${data.id || 'REC-' + Date.now()}`;
-    document.getElementById('receipt-date').textContent = now.toLocaleDateString();
-    document.getElementById('receipt-time').textContent = now.toLocaleTimeString();
-    document.getElementById('receipt-driver').textContent = data.conductor || '-';
-    document.getElementById('receipt-route').textContent = data.ruta || '-';
+    // Parseo inteligente de fecha y hora
+    let displayDate = '';
+    let displayTime = '';
+    if (data.fecha) {
+        if (typeof data.fecha === 'string' && data.fecha.includes('T')) {
+            const d = new Date(data.fecha);
+            displayDate = isNaN(d.getTime()) ? data.fecha : d.toLocaleDateString();
+            displayTime = data.hora || (isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        } else if (typeof data.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.fecha)) {
+            const [y, m, d] = data.fecha.split('-');
+            displayDate = `${d}/${m}/${y}`;
+            displayTime = data.hora || '';
+        } else {
+            displayDate = data.fecha;
+            displayTime = data.hora || '';
+        }
+    } else {
+        const now = new Date();
+        displayDate = now.toLocaleDateString();
+        displayTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    document.getElementById('receipt-number').textContent = `N° ${data.id || 'REC-' + Date.now().toString().slice(-6)}`;
+    document.getElementById('receipt-date').textContent = displayDate;
+    document.getElementById('receipt-time').textContent = displayTime || '--';
+    document.getElementById('receipt-driver').textContent = data.conductor || 'Oficina / Administración';
+    document.getElementById('receipt-route').textContent = data.ruta || 'Sede Administrativa / Planta';
     document.getElementById('receipt-provider').textContent = data.proveedor || '-';
     document.getElementById('receipt-branch').textContent = data.punto || data.sucursal || 'General';
 
@@ -1802,11 +1846,14 @@ function mostrarComprobanteDigital(data) {
     }
 
     const sigImg = document.getElementById('receipt-signature-img');
-    if (data.firma) {
+    const adminBadge = document.getElementById('receipt-admin-badge');
+    if (data.firma && typeof data.firma === 'string' && data.firma.startsWith('data:image')) {
         sigImg.src = data.firma;
         sigImg.style.display = 'inline-block';
+        if (adminBadge) adminBadge.style.display = 'none';
     } else {
         sigImg.style.display = 'none';
+        if (adminBadge) adminBadge.style.display = 'block';
     }
 
     modal.style.display = 'flex';
@@ -1817,10 +1864,19 @@ document.getElementById('btn-close-receipt')?.addEventListener('click', () => {
     if (modal) modal.style.display = 'none';
 });
 
+// Cerrar modal al hacer clic en el backdrop
+document.getElementById('receipt-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'receipt-modal') {
+        e.currentTarget.style.display = 'none';
+    }
+});
+
 document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
     if (!currentReceiptData) return;
     const d = currentReceiptData;
-    const dateObj = new Date(d.fecha || Date.now());
+    const dateText = document.getElementById('receipt-date')?.textContent || '';
+    const timeText = document.getElementById('receipt-time')?.textContent || '';
+    const dateDisplay = (dateText + (timeText && timeText !== '--' ? ' ' + timeText : '')).trim() || new Date().toLocaleString();
 
     let prodsTxt = '';
     if (d.productos && Array.isArray(d.productos)) {
@@ -1832,23 +1888,26 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
     }
 
     const cleanTotalKg = Math.round((Number(d.totalKilos) || 0) * 100) / 100;
+    const firmaStatus = (d.firma && typeof d.firma === 'string' && d.firma.startsWith('data:image'))
+        ? '✍️ *Firma Registrada:* OK (Firma en ruta)'
+        : '🛡️ *Aprobación:* Emisión Oficial Administración';
 
     const msg = `🌿 *PROTEINAGRO - COMPROBANTE DE RECOLECCIÓN*\n` +
         `-----------------------------------------\n` +
         `📄 *N° Recibo:* ${d.id || 'N/A'}\n` +
-        `📅 *Fecha:* ${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}\n` +
-        `🚛 *Conductor:* ${d.conductor}\n` +
-        `🗺️ *Ruta:* ${d.ruta}\n` +
-        `🏬 *Proveedor:* ${d.proveedor}\n` +
+        `📅 *Fecha:* ${dateDisplay}\n` +
+        `🚛 *Conductor:* ${d.conductor || 'Oficina / Administración'}\n` +
+        `🗺️ *Ruta:* ${d.ruta || 'Sede Administrativa / Planta'}\n` +
+        `🏬 *Proveedor:* ${d.proveedor || '-'}\n` +
         `📍 *Sucursal/Punto:* ${d.punto || d.sucursal || 'General'}\n` +
         `-----------------------------------------\n` +
         `📦 *PRODUCTOS RECOLECTADOS:*\n${prodsTxt}\n` +
         `-----------------------------------------\n` +
         `⚖️ *TOTAL RECOLECTADO: ${cleanTotalKg} KG*\n` +
         (d.observaciones ? `📝 *Observaciones:* ${d.observaciones}\n` : '') +
-        `✍️ *Firma Registrada:* OK\n` +
+        `${firmaStatus}\n` +
         `-----------------------------------------\n` +
-        `_Certificado digital emitido en punto por ProteinAgro_`;
+        `_Certificado digital emitido por ProteinAgro_`;
 
     const encoded = encodeURIComponent(msg);
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
@@ -1857,6 +1916,289 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
 document.getElementById('btn-print-receipt')?.addEventListener('click', () => {
     window.print();
 });
+
+// === GESTOR DE EMISIÓN DE SOPORTE OFICIAL EN ADMINISTRACIÓN ===
+let adminAddedProducts = [];
+
+function initAdminSoporteModal() {
+    const btnOpen = document.getElementById('btn-admin-nuevo-soporte');
+    const btnClose = document.getElementById('btn-cerrar-admin-soporte');
+    const modal = document.getElementById('admin-soporte-modal');
+    const form = document.getElementById('admin-soporte-form');
+    const provSelect = document.getElementById('admin-soporte-proveedor');
+    const customProvGroup = document.getElementById('admin-soporte-custom-prov-group');
+    const customProvInput = document.getElementById('admin-soporte-custom-prov');
+    const sucSelect = document.getElementById('admin-soporte-sucursal');
+    const customSucGroup = document.getElementById('admin-soporte-custom-suc-group');
+    const customSucInput = document.getElementById('admin-soporte-custom-suc');
+    const prodSelect = document.getElementById('admin-soporte-producto');
+    const kilosInput = document.getElementById('admin-soporte-kilos');
+    const btnAddProd = document.getElementById('btn-admin-add-prod');
+    const driverSelect = document.getElementById('admin-soporte-conductor');
+    const routeSelect = document.getElementById('admin-soporte-ruta');
+
+    if (!btnOpen || !modal || !form) return;
+
+    function renderAdminProductsList() {
+        const box = document.getElementById('admin-added-products-box');
+        const list = document.getElementById('admin-products-list');
+        const totalSpan = document.getElementById('admin-total-kilos-preview');
+        if (!box || !list || !totalSpan) return;
+
+        list.innerHTML = '';
+        if (adminAddedProducts.length === 0) {
+            box.style.display = 'none';
+            totalSpan.textContent = '0 KG';
+            return;
+        }
+
+        box.style.display = 'block';
+        let total = 0;
+        adminAddedProducts.forEach((item, index) => {
+            const kg = Math.round((Number(item.kilos) || 0) * 100) / 100;
+            total += kg;
+            const li = document.createElement('li');
+            li.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed #e2e8f0;';
+            li.innerHTML = `
+                <span>${getEmojiForProduct(item.producto)} <strong>${item.producto}</strong></span>
+                <span style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: 700; color: #0284c7;">${kg} KG</span>
+                    <button type="button" data-index="${index}" style="background: none; border: none; cursor: pointer; color: #ef4444; font-size: 0.85rem; padding: 2px 4px;" title="Eliminar">❌</button>
+                </span>
+            `;
+            li.querySelector('button').addEventListener('click', (e) => {
+                const idx = parseInt(e.currentTarget.getAttribute('data-index'), 10);
+                adminAddedProducts.splice(idx, 1);
+                renderAdminProductsList();
+            });
+            list.appendChild(li);
+        });
+        totalSpan.textContent = `${Math.round(total * 100) / 100} KG`;
+    }
+
+    function populateAdminSelects() {
+        // 1. Proveedores
+        const provs = getTodosLosProveedores();
+        provSelect.innerHTML = '<option value="" disabled selected>Seleccione el proveedor...</option>';
+        provs.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            provSelect.appendChild(opt);
+        });
+        const optOtroProv = document.createElement('option');
+        optOtroProv.value = 'OTRO';
+        optOtroProv.textContent = '➕ OTRO (Escribir Proveedor Nuevo)...';
+        provSelect.appendChild(optOtroProv);
+
+        // 2. Sucursales reset
+        sucSelect.innerHTML = `
+            <option value="Sede Principal / General">Sede Principal / General</option>
+            <option value="OTRO">➕ OTRA (Escribir Punto Nuevo)...</option>
+        `;
+
+        // 3. Conductores
+        driverSelect.innerHTML = '<option value="Oficina / Administración">🏢 Oficina / Administración</option>';
+        DEFAULT_CONDUCTORES.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = `🚛 ${c}`;
+            driverSelect.appendChild(opt);
+        });
+
+        // 4. Rutas
+        routeSelect.innerHTML = '<option value="Sede Administrativa / Planta">🏢 Sede Administrativa / Planta</option>';
+        DEFAULT_RUTAS.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r;
+            opt.textContent = `🗺️ ${r}`;
+            routeSelect.appendChild(opt);
+        });
+
+        // 5. Productos
+        prodSelect.innerHTML = '';
+        const sortedProds = DEFAULT_PRODUCTOS.slice().sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+        sortedProds.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = `${getEmojiForProduct(p)} ${p}`;
+            prodSelect.appendChild(opt);
+        });
+    }
+
+    btnOpen.addEventListener('click', () => {
+        populateAdminSelects();
+        adminAddedProducts = [];
+        renderAdminProductsList();
+
+        // Fechas por defecto: hoy y hora actual
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        document.getElementById('admin-soporte-fecha').value = `${yyyy}-${mm}-${dd}`;
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('admin-soporte-hora').value = `${hh}:${min}`;
+
+        customProvGroup.style.display = 'none';
+        customProvInput.value = '';
+        customProvInput.required = false;
+        customSucGroup.style.display = 'none';
+        customSucInput.value = '';
+        customSucInput.required = false;
+        document.getElementById('admin-soporte-obs').value = '';
+        kilosInput.value = '';
+
+        modal.style.display = 'flex';
+    });
+
+    btnClose?.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target.id === 'admin-soporte-modal') {
+            modal.style.display = 'none';
+        }
+    });
+
+    // Delegación cuando cambia el proveedor
+    provSelect.addEventListener('change', () => {
+        const val = provSelect.value;
+        if (val === 'OTRO') {
+            customProvGroup.style.display = 'block';
+            customProvInput.required = true;
+            sucSelect.innerHTML = `
+                <option value="Sede Principal / General">Sede Principal / General</option>
+                <option value="OTRO">➕ OTRA (Escribir Punto Nuevo)...</option>
+            `;
+        } else {
+            customProvGroup.style.display = 'none';
+            customProvInput.required = false;
+
+            const puntos = getPuntosParaProveedor('', val);
+            sucSelect.innerHTML = '<option value="Sede Principal / General">Sede Principal / General</option>';
+            puntos.forEach(pt => {
+                if (pt !== 'Sede Principal / General') {
+                    const opt = document.createElement('option');
+                    opt.value = pt;
+                    opt.textContent = pt;
+                    sucSelect.appendChild(opt);
+                }
+            });
+            const optOtraSuc = document.createElement('option');
+            optOtraSuc.value = 'OTRO';
+            optOtraSuc.textContent = '➕ OTRA (Escribir Punto Nuevo)...';
+            sucSelect.appendChild(optOtraSuc);
+        }
+        customSucGroup.style.display = 'none';
+        customSucInput.value = '';
+        customSucInput.required = false;
+    });
+
+    // Delegación cuando cambia la sucursal
+    sucSelect.addEventListener('change', () => {
+        if (sucSelect.value === 'OTRO') {
+            customSucGroup.style.display = 'block';
+            customSucInput.required = true;
+        } else {
+            customSucGroup.style.display = 'none';
+            customSucInput.required = false;
+        }
+    });
+
+    // Añadir producto
+    btnAddProd.addEventListener('click', () => {
+        const prod = prodSelect.value;
+        const kg = parseFloat(kilosInput.value);
+
+        if (!prod) {
+            alert('Por favor seleccione un producto.');
+            return;
+        }
+        if (isNaN(kg) || kg <= 0) {
+            alert('Por favor ingrese una cantidad válida en kilos (mayor a 0).');
+            kilosInput.focus();
+            return;
+        }
+
+        const cleanKg = Math.round(kg * 100) / 100;
+        const existing = adminAddedProducts.find(p => p.producto === prod);
+        if (existing) {
+            existing.kilos = Math.round((existing.kilos + cleanKg) * 100) / 100;
+        } else {
+            adminAddedProducts.push({ producto: prod, kilos: cleanKg });
+        }
+
+        kilosInput.value = '';
+        kilosInput.focus();
+        renderAdminProductsList();
+    });
+
+    // Submit del formulario
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        if (adminAddedProducts.length === 0) {
+            alert('⚠️ Debe añadir al menos una materia prima con su peso en kilos antes de generar el soporte.');
+            kilosInput.focus();
+            return;
+        }
+
+        let prov = provSelect.value;
+        if (!prov) {
+            alert('Por favor seleccione el proveedor.');
+            provSelect.focus();
+            return;
+        }
+        if (prov === 'OTRO') {
+            prov = customProvInput.value.trim();
+            if (!prov) {
+                alert('Por favor escriba el nombre del nuevo proveedor.');
+                customProvInput.focus();
+                return;
+            }
+        }
+
+        let suc = sucSelect.value;
+        if (suc === 'OTRO') {
+            suc = customSucInput.value.trim();
+            if (!suc) {
+                alert('Por favor escriba el nombre de la sucursal / punto.');
+                customSucInput.focus();
+                return;
+            }
+        }
+
+        const fecha = document.getElementById('admin-soporte-fecha').value;
+        const hora = document.getElementById('admin-soporte-hora').value;
+        const conductor = driverSelect.value;
+        const ruta = routeSelect.value;
+        const obs = document.getElementById('admin-soporte-obs').value.trim();
+        const totalKg = Math.round(adminAddedProducts.reduce((sum, p) => sum + (Number(p.kilos) || 0), 0) * 100) / 100;
+
+        // Visual only: Genera ID oficial de emisión y muestra en pantalla (NO se guarda en DB ni Sheets)
+        const receiptData = {
+            id: 'ADM-' + Math.floor(100000 + Math.random() * 900000),
+            fecha: fecha,
+            hora: hora,
+            conductor: conductor,
+            ruta: ruta,
+            proveedor: prov,
+            punto: suc,
+            sucursal: suc,
+            productos: [...adminAddedProducts],
+            totalKilos: totalKg,
+            observaciones: obs,
+            firma: null,
+            esAdminEmision: true
+        };
+
+        modal.style.display = 'none';
+        mostrarComprobanteDigital(receiptData);
+    });
+}
 
 // Función global para forzar recarga y limpiar cachés en cualquier celular o PC
 window.forzarActualizacionApp = async function() {
@@ -1876,7 +2218,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.4&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.5&t=' + Date.now();
 };
 
 // Inicializar selectores dinámicos y catálogos al cargar el DOM
@@ -1891,12 +2233,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
 
-    // 3. Registrar Service Worker v1.3.4 para PWA instalable con actualización automática inmediata
+    // 3. Inicializar modal de Soporte Oficial para Administradores
+    initAdminSoporteModal();
+
+    // 4. Registrar Service Worker v1.3.5 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.3.4')
+            navigator.serviceWorker.register('/sw.js?v=1.3.5')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.3.4 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.3.5 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

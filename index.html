@@ -40,7 +40,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.3.4" defer></script>
+    <script src="app.js?v=1.3.5" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -105,6 +105,9 @@
                 <div class="admin-card-header">
                     <h2 class="section-title">Recolecciones en Vivo</h2>
                     <div class="admin-actions-group">
+                        <button type="button" id="btn-admin-nuevo-soporte" class="btn-primary" style="background: #0284c7; border-color: #0284c7; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 0.85rem;">
+                            📋 Generar Soporte Oficial
+                        </button>
                         <a href="https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing" target="_blank" class="btn-sheets">
                             📊 Abrir Google Sheets
                         </a>
@@ -312,6 +315,120 @@
         <div id="toast" class="toast">✅ Recolección guardada exitosamente</div>
     </div>
 
+    <!-- Modal de Generación Manual de Soporte (Admin) -->
+    <div id="admin-soporte-modal" class="voucher-modal-overlay" style="display: none;">
+        <div class="voucher-card" style="max-width: 520px; text-align: left; padding: 22px; max-height: 90vh; overflow-y: auto;">
+            
+            <div class="voucher-header" style="margin-bottom: 15px;">
+                <div class="voucher-logo-icon" style="font-size: 2.2rem;">📋</div>
+                <h2 class="voucher-title" style="font-size: 1.35rem;">Generar Soporte Oficial</h2>
+                <p class="voucher-subtitle">Emisión administrativa de comprobante digital</p>
+            </div>
+
+            <form id="admin-soporte-form">
+                <!-- Fecha y Hora -->
+                <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="admin-soporte-fecha" style="font-size: 0.85rem; font-weight: 600;">📅 Fecha <span style="color: #ef4444;">*</span></label>
+                        <input type="date" id="admin-soporte-fecha" class="premium-input" required style="padding: 8px 10px; font-size: 0.9rem;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="admin-soporte-hora" style="font-size: 0.85rem; font-weight: 600;">⏰ Hora <span style="color: #ef4444;">*</span></label>
+                        <input type="time" id="admin-soporte-hora" class="premium-input" required style="padding: 8px 10px; font-size: 0.9rem;">
+                    </div>
+                </div>
+
+                <!-- Proveedor -->
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="admin-soporte-proveedor" style="font-size: 0.85rem; font-weight: 600;">🏬 Proveedor / Razón Social <span style="color: #ef4444;">*</span></label>
+                    <select id="admin-soporte-proveedor" class="premium-input" required style="padding: 8px 10px; font-size: 0.9rem;">
+                        <option value="" disabled selected>Seleccione el proveedor...</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="admin-soporte-custom-prov-group" style="display: none; margin-bottom: 12px;">
+                    <label for="admin-soporte-custom-prov" style="font-size: 0.85rem;">Nombre del Proveedor Nuevo</label>
+                    <input type="text" id="admin-soporte-custom-prov" class="premium-input" placeholder="Escriba el nombre del proveedor...">
+                </div>
+
+                <!-- Sucursal / Punto -->
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="admin-soporte-sucursal" style="font-size: 0.85rem; font-weight: 600;">📍 Punto / Sucursal</label>
+                    <select id="admin-soporte-sucursal" class="premium-input" style="padding: 8px 10px; font-size: 0.9rem;">
+                        <option value="Sede Principal / General">Sede Principal / General</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="admin-soporte-custom-suc-group" style="display: none; margin-bottom: 12px;">
+                    <label for="admin-soporte-custom-suc" style="font-size: 0.85rem;">Nombre de la Sucursal / Punto Nuevo</label>
+                    <input type="text" id="admin-soporte-custom-suc" class="premium-input" placeholder="Escriba el nombre del punto...">
+                </div>
+
+                <!-- Conductor y Ruta (Opcionales) -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="admin-soporte-conductor" style="font-size: 0.8rem; font-weight: 600;">🚛 Conductor</label>
+                        <select id="admin-soporte-conductor" class="premium-input" style="padding: 8px 10px; font-size: 0.85rem;">
+                            <option value="Oficina / Administración">Oficina / Administración</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="admin-soporte-ruta" style="font-size: 0.8rem; font-weight: 600;">🗺️ Ruta</label>
+                        <select id="admin-soporte-ruta" class="premium-input" style="padding: 8px 10px; font-size: 0.85rem;">
+                            <option value="Sede Administrativa / Planta">Sede Administrativa / Planta</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Sección Productos y Kilos -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+                    <label style="font-size: 0.85rem; font-weight: 700; color: #1e293b; display: block; margin-bottom: 8px;">📦 Agregar Materias Primas</label>
+                    <div style="display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 8px; align-items: flex-end;">
+                        <div>
+                            <label for="admin-soporte-producto" style="font-size: 0.72rem; color: #64748b;">Producto</label>
+                            <select id="admin-soporte-producto" class="premium-input" style="padding: 7px 8px; font-size: 0.82rem;">
+                                <!-- Se llena dinámicamente -->
+                            </select>
+                        </div>
+                        <div>
+                            <label for="admin-soporte-kilos" style="font-size: 0.72rem; color: #64748b;">Kilos</label>
+                            <input type="number" id="admin-soporte-kilos" class="premium-input" placeholder="0.0" step="0.1" min="0.1" inputmode="decimal" style="padding: 7px 8px; font-size: 0.82rem;">
+                        </div>
+                        <div>
+                            <button type="button" id="btn-admin-add-prod" class="btn-primary" style="padding: 7px 12px; font-size: 0.82rem; height: 35px; display: inline-flex; align-items: center; gap: 4px; background: #0284c7; border-color: #0284c7;">
+                                ➕ Añadir
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lista de productos añadidos en admin -->
+                    <div id="admin-added-products-box" style="margin-top: 10px; display: none; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
+                        <ul id="admin-products-list" style="list-style: none; padding: 0; margin: 0; font-size: 0.85rem;"></ul>
+                        <div style="text-align: right; margin-top: 6px; font-weight: 700; color: #16a34a; font-size: 0.95rem;">
+                            Total: <span id="admin-total-kilos-preview">0 KG</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Observaciones -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="admin-soporte-obs" style="font-size: 0.82rem; font-weight: 600;">📝 Observaciones (Opcional)</label>
+                    <textarea id="admin-soporte-obs" class="premium-input" rows="2" placeholder="Notas o detalles del servicio..." style="padding: 8px; font-size: 0.85rem;"></textarea>
+                </div>
+
+                <!-- Botones Acción -->
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" id="btn-cerrar-admin-soporte" class="btn-secondary" style="padding: 8px 16px; font-size: 0.9rem;">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-confirmar-admin-soporte" class="btn-primary" style="background: #0284c7; border-color: #0284c7; padding: 8px 18px; font-size: 0.9rem; font-weight: 700;">
+                        📄 Generar Soporte Oficial
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal de Comprobante / Soporte de Recolección (Voucher Digital) -->
     <div id="receipt-modal" class="voucher-modal-overlay">
         <div class="voucher-card" id="receipt-card">
@@ -366,6 +483,9 @@
             <div class="voucher-signature-box">
                 <span class="voucher-signature-label">Firma del Recibido / Conformidad Punto:</span>
                 <img id="receipt-signature-img" src="" class="voucher-signature-img" alt="Firma">
+                <div id="receipt-admin-badge" style="display: none; margin: 10px auto; padding: 8px 16px; background: #e0f2fe; color: #0284c7; border: 1px dashed #0284c7; border-radius: 8px; font-weight: 700; font-size: 0.9rem; text-align: center; max-width: 280px;">
+                    🛡️ Emisión Oficial - Aprobado Administración
+                </div>
             </div>
 
             <!-- Acciones Botones -->

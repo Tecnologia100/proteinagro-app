@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.3.4`  
+> **Versión Actual:** `v=1.3.5`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -140,6 +140,13 @@ Panel de control para supervisión y auditoría en tiempo real:
    - Descarga inmediata de reportes consolidados en formato **CSV** compatible con Microsoft Excel y Google Sheets.
 4. **Filtros Avanzados:**
    - Filtrado por rango de fechas, conductor específico o proveedor.
+5. **Generador Administrativo de Soporte Oficial (Voucher Visual - v1.3.5):**
+   - Emisión directa de soportes oficiales para cualquier fecha pasada o actual y cualquier proveedor con sus materias primas y kilos.
+   - Sello de certificación: *"🛡️ Emisión Oficial - Aprobado Administración"*.
+   - Compartir por WhatsApp o Imprimir / exportar a PDF con el diseño oficial idéntico al de campo.
+   - Operación puramente visual (no genera duplicidad de filas contables en Google Sheets ni Firestore).
+6. **Soporte Inmediato por Registro:**
+   - Botón `📄 Soporte` en cada fila de la tabla de auditoría para consultar, imprimir o compartir el comprobante de cualquier recolección histórica con 1 solo clic.
 
 ---
 
@@ -204,9 +211,25 @@ PROTEINAGRO/
 
 ---
 
-## 📜 7. Historial de Versiones y Changelog
+## 🔄 7. Historial de Versiones (Changelog)
 
-### `v=1.3.4` (Septiembre 2026) - Versión Actual
+### `v=1.3.5` (Septiembre 2026) - Versión Actual
+- **Generador Administrativo de Soporte Oficial de Recolección (Opción 1 - Visual):**
+  - Nuevo botón `📋 Generar Soporte Oficial` en el panel de administración.
+  - Modal interactivo para seleccionar Fecha, Hora, Proveedor (+ nuevo proveedor libre), Sucursal/Punto (+ nueva sucursal libre), Conductor, Ruta y Observaciones.
+  - Agregador dinámico de materias primas con cálculo en tiempo real de kilos totales y botones individuales para eliminar items.
+  - Generación instantánea del comprobante digital (Voucher oficial) idéntico al de campo, con sello *"🛡️ Emisión Oficial - Aprobado Administración"*.
+  - Compartir por WhatsApp con texto formateado e impresión / PDF.
+  - **Cero alteración de bases de datos:** El soporte emitido en este módulo es puramente visual para auditorías, reimpresiones o solicitudes especiales del cliente, sin escribir filas en Firestore ni Google Sheets.
+- **Acceso Directo a Soportes desde Tabla Administrativa:**
+  - Botón `📄 Soporte` en cada fila de recolección para abrir de inmediato el comprobante digital de cualquier viaje registrado.
+
+### `v=1.3.4` (Septiembre 2026)
+- **Sincronización Integral de Iconografía y Ordenamiento A-Z:**
+  - Catálogo de 20 materias primas alineado con iconografía representativa (🛢️ Aceite, 🐮 Cabezas, 🦴 Calambombo res/cerdo, 🗑️ Desperdicio, 🐷 Empella, 🥓 Gordana, 🦴 Hueso blanco/cerdo/promoción/seco, 🪵 Leña, 🧈 Manteca/mantequilla/margarina/sebo, 🐷 Orejas cerdo, 🐔 Piel pollo, 🫁 Pulmón cerdo, 🥩 Tráqueas).
+  - Ordenamiento alfabético estricto en la cuadrícula de botones de conductores, modal de recibo y mensajes de WhatsApp.
+
+### `v=1.2.9` (Septiembre 2026)
 - **Iconografía Oficial en Productos Recolectados y Botones Táctiles:**
   - Implementación del mapa maestro de visualización `PRODUCT_DISPLAY_MAP` en JavaScript, vinculando de forma unívoca cada producto con su icono oficial exacto y etiqueta optimizada para móviles (ej. `🐷 HUESO CERDO`, `🫁 PULMON CERDO`, `🦴 CALAMBOMBO CERDO`, `🪵 LEÑA`).
   - Despliegue de los iconos oficiales en la lista en vivo de productos recolectados en pantalla (`#products-list`).
