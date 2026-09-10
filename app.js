@@ -779,8 +779,12 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
 
     // Obtener firma base64
     const firmaDataUrl = canvas.toDataURL();
+    const recordId = 'REC-' + Date.now();
+    const tsNow = Date.now();
 
     const data = {
+        id: recordId,
+        timestamp: tsNow,
         conductor: conductorName,
         ruta: rutaName,
         proveedor: proveedorName,
@@ -805,9 +809,6 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     };
 
     try {
-        // 0. Generar ID único de recolección
-        const recordId = 'REC-' + Date.now();
-
         // 0.1 Intentar subir firma a Firebase Storage (o mantener base64 offline)
         let firmaURL = firmaDataUrl;
         if (navigator.onLine) {
@@ -932,10 +933,69 @@ function renderCharts(records) {
     });
 }
 
+// ==============================================================================
+// GESTIÓN DE FECHAS Y DATOS ADMINISTRATIVOS
+// ==============================================================================
+let adminRecordsCache = [];
+
+function parseFechaRecoleccion(fechaStr) {
+    if (!fechaStr) return new Date(0);
+    if (fechaStr instanceof Date) return fechaStr;
+    if (typeof fechaStr.toDate === 'function') return fechaStr.toDate();
+    if (typeof fechaStr === 'number') return new Date(fechaStr);
+    
+    const str = String(fechaStr).trim();
+    // Prioridad 1: Formato latino DD/MM/YYYY HH:MM:SS
+    const match = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    if (match) {
+        const dia = parseInt(match[1], 10);
+        const mes = parseInt(match[2], 10) - 1;
+        const anio = parseInt(match[3], 10);
+        const hora = match[4] ? parseInt(match[4], 10) : 0;
+        const min = match[5] ? parseInt(match[5], 10) : 0;
+        const seg = match[6] ? parseInt(match[6], 10) : 0;
+        return new Date(anio, mes, dia, hora, min, seg);
+    }
+    
+    // Prioridad 2: Formato ISO YYYY-MM-DD
+    const isoMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (isoMatch) {
+        const anio = parseInt(isoMatch[1], 10);
+        const mes = parseInt(isoMatch[2], 10) - 1;
+        const dia = parseInt(isoMatch[3], 10);
+        return new Date(anio, mes, dia);
+    }
+    
+    const fallback = new Date(str);
+    return isNaN(fallback.getTime()) ? new Date(0) : fallback;
+}
+
+function formatFechaParaMostrar(fechaVal) {
+    if (!fechaVal) return '-';
+    const d = parseFechaRecoleccion(fechaVal);
+    if (isNaN(d.getTime()) || d.getTime() === 0) return String(fechaVal);
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const anio = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${dia}/${mes}/${anio} ${hh}:${mm}:${ss}`;
+}
+
+function coincideFechaRecoleccion(fechaRegistro, fechaBuscadaIso) {
+    if (!fechaRegistro || !fechaBuscadaIso) return false;
+    const [bYear, bMonth, bDay] = fechaBuscadaIso.split('-').map(Number);
+    const d = parseFechaRecoleccion(fechaRegistro);
+    if (isNaN(d.getTime()) || d.getTime() === 0) return false;
+    return d.getFullYear() === bYear && (d.getMonth() + 1) === bMonth && d.getDate() === bDay;
+}
+
 function loadAdminData() {
     const tbody = document.getElementById('admin-table-body');
+    if (!tbody) return;
     
-    db.collection('recolecciones').orderBy('fecha', 'desc').limit(100)
+    db.collection('recolecciones').orderBy('timestamp', 'desc').limit(200)
       .onSnapshot((querySnapshot) => {
           tbody.innerHTML = '';
           const records = [];
@@ -944,40 +1004,13 @@ function loadAdminData() {
               const data = doc.data();
               data._docId = doc.id;
               records.push(data);
-              
-              const dateObj = new Date(data.fecha);
-              const badgeClass = data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
-              const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
-
-              const obsText = data.observaciones ? data.observaciones : '-';
-              const provDisplay = data.proveedor || 'N/A';
-              const sucDisplay = data.punto || data.sucursal || 'General';
-              const docId = doc.id;
-              const recordLocalId = data.id || '';
-
-              const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
-
-              const tr = document.createElement('tr');
-              tr.innerHTML = `
-                  <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
-                  <td style="text-transform: capitalize;">${data.conductor}</td>
-                  <td style="text-transform: capitalize;">${ruta}</td>
-                  <td style="text-transform: capitalize;">${provDisplay}</td>
-                  <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
-                  <td style="font-weight: bold;">${cleanTotalKg} kg</td>
-                  <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
-                  <td><span class="badge ${badgeClass}">${data.estado}</span></td>
-                  <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
-                  <td style="white-space: nowrap;">
-                      <button onclick="verSoporteDesdeTabla('${docId}', '${recordLocalId}')" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
-                          📄 Soporte
-                      </button>
-                      <button onclick="eliminarRecoleccion('${docId}', '${recordLocalId}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
-                          🗑️ Eliminar
-                      </button>
-                  </td>
-              `;
-              tbody.appendChild(tr);
+          });
+          
+          // Ordenar cronológicamente descendente asegurando que registros de hoy siempre estén arriba
+          records.sort((a, b) => {
+              const tA = (a.timestamp && typeof a.timestamp === 'number') ? a.timestamp : parseFechaRecoleccion(a.fecha).getTime();
+              const tB = (b.timestamp && typeof b.timestamp === 'number') ? b.timestamp : parseFechaRecoleccion(b.fecha).getTime();
+              return tB - tA;
           });
           
           adminRecordsCache = records;
@@ -986,20 +1019,29 @@ function loadAdminData() {
               // Si Firebase está vacío, intentar cargar respaldo local
               let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
               if (savedBackup.length > 0) {
-                  adminRecordsCache = savedBackup;
+                  savedBackup.sort((a, b) => {
+                      const tA = (a.timestamp && typeof a.timestamp === 'number') ? a.timestamp : parseFechaRecoleccion(a.fecha).getTime();
+                      const tB = (b.timestamp && typeof b.timestamp === 'number') ? b.timestamp : parseFechaRecoleccion(b.fecha).getTime();
+                      return tB - tA;
+                  });
                   renderRecordsInTable(savedBackup, tbody);
                   renderCharts(savedBackup);
                   return;
               }
               tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
           } else {
+              renderRecordsInTable(records, tbody);
               renderCharts(records);
           }
       }, (error) => {
           console.error("Error cargando recolecciones: ", error);
           let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
           if (savedBackup.length > 0) {
-              adminRecordsCache = savedBackup;
+              savedBackup.sort((a, b) => {
+                  const tA = (a.timestamp && typeof a.timestamp === 'number') ? a.timestamp : parseFechaRecoleccion(a.fecha).getTime();
+                  const tB = (b.timestamp && typeof b.timestamp === 'number') ? b.timestamp : parseFechaRecoleccion(b.fecha).getTime();
+                  return tB - tA;
+              });
               renderRecordsInTable(savedBackup, tbody);
               renderCharts(savedBackup);
           } else {
@@ -1009,10 +1051,11 @@ function loadAdminData() {
 }
 
 function renderRecordsInTable(records, tbody) {
+    if (!tbody) return;
     tbody.innerHTML = '';
     adminRecordsCache = records;
     records.forEach(data => {
-        const dateObj = new Date(data.fecha);
+        const fechaTexto = formatFechaParaMostrar(data.fecha || data.timestamp);
         const badgeClass = data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
         const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
         const obsText = data.observaciones ? data.observaciones : '-';
@@ -1025,15 +1068,15 @@ function renderRecordsInTable(records, tbody) {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
-            <td style="text-transform: capitalize;">${data.conductor}</td>
+            <td style="font-weight: 500; white-space: nowrap;">${fechaTexto}</td>
+            <td style="text-transform: capitalize;">${data.conductor || '-'}</td>
             <td style="text-transform: capitalize;">${ruta}</td>
             <td style="text-transform: capitalize;">${provDisplay}</td>
             <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
             <td style="font-weight: bold;">${cleanTotalKg} kg</td>
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
-            <td><span class="badge ${badgeClass}">${data.estado}</span></td>
-            <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
+            <td><span class="badge ${badgeClass}">${data.estado || 'Sincronizado'}</span></td>
+            <td><img src="${data.firma || ''}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
             <td style="white-space: nowrap;">
                 <button onclick="verSoporteDesdeTabla('${docId}', '${recordLocalId}')" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
                     📄 Soporte
@@ -1075,7 +1118,7 @@ async function eliminarRecoleccion(firestoreDocId, localRecordId) {
 // === EXPORTAR A EXCEL / CSV ===
 document.getElementById('btn-export')?.addEventListener('click', async () => {
     try {
-        const snapshot = await db.collection('recolecciones').orderBy('fecha', 'desc').get();
+        const snapshot = await db.collection('recolecciones').orderBy('timestamp', 'desc').get();
         if (snapshot.empty) {
             alert('No hay recolecciones para exportar.');
             return;
@@ -1086,16 +1129,19 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
 
         snapshot.forEach(doc => {
             const data = doc.data();
-            const dateObj = new Date(data.fecha);
-            const fechaFormatted = `"${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}"`;
+            const fechaFormatted = `"${formatFechaParaMostrar(data.fecha || data.timestamp)}"`;
             const conductor = `"${data.conductor || ''}"`;
             const ruta = `"${(data.ruta || '').replace('_', ' ')}"`;
             const proveedor = `"${(data.proveedor || '').replace('_', ' ')}"`;
-            const sucursal = `"${(data.sucursal || 'General')}"`;
+            const sucursal = `"${(data.punto || data.sucursal || 'General')}"`;
             
             let productosStr = '';
             if (data.productos && Array.isArray(data.productos)) {
-                productosStr = data.productos.map(p => p.producto).join(', ');
+                productosStr = data.productos.map(p => {
+                    const nom = p.producto || p.nombre || '';
+                    const kg = p.kilos ? ` (${p.kilos} kg)` : '';
+                    return nom + kg;
+                }).join(', ');
             }
             productosStr = `"${productosStr}"`;
 
@@ -1778,24 +1824,16 @@ function mostrarComprobanteDigital(data) {
     currentReceiptData = data;
     const modal = document.getElementById('receipt-modal');
     if (!modal) return;
-
-    let receiptDateStr = now.toLocaleDateString();
-    let receiptTimeStr = now.toLocaleTimeString();
-    if (data.fecha) {
-        if (typeof data.fecha === 'string' && data.fecha.includes(' ')) {
-            const parts = data.fecha.trim().split(' ');
-            receiptDateStr = parts[0];
-            receiptTimeStr = parts.slice(1).join(' ');
-        } else {
-            const dObj = new Date(data.fecha);
-            if (!isNaN(dObj.getTime())) {
-                receiptDateStr = dObj.toLocaleDateString();
-                receiptTimeStr = dObj.toLocaleTimeString();
-            } else {
-                receiptDateStr = String(data.fecha);
-            }
-        }
-    }
+    const parsedDate = parseFechaRecoleccion(data.fecha || data.timestamp);
+    const d = (isNaN(parsedDate.getTime()) || parsedDate.getTime() === 0) ? new Date() : parsedDate;
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const anio = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    const receiptDateStr = `${dia}/${mes}/${anio}`;
+    const receiptTimeStr = `${hh}:${mm}:${ss}`;
 
     document.getElementById('receipt-number').textContent = `N° ${data.id || (data._docId ? data._docId : 'REC-' + Date.now())}`;
     document.getElementById('receipt-date').textContent = receiptDateStr;
@@ -1911,37 +1949,13 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.5&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.6&t=' + Date.now();
 };
 
 // ==============================================================================
 // SISTEMA DE EMISIÓN DE SOPORTE OFICIAL PARA ROL ADMINISTRADOR (100% VISUAL)
 // ==============================================================================
-let adminRecordsCache = [];
 let currentAdminFoundRecord = null;
-
-function coincideFechaRecoleccion(fechaRegistro, fechaBuscadaIso) {
-    if (!fechaRegistro || !fechaBuscadaIso) return false;
-    const [bYear, bMonth, bDay] = fechaBuscadaIso.split('-').map(Number);
-    
-    const d = new Date(fechaRegistro);
-    if (!isNaN(d.getTime())) {
-        if (d.getFullYear() === bYear && (d.getMonth() + 1) === bMonth && d.getDate() === bDay) {
-            return true;
-        }
-    }
-    
-    const match = String(fechaRegistro).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-    if (match) {
-        const rDay = Number(match[1]);
-        const rMonth = Number(match[2]);
-        const rYear = Number(match[3]);
-        if (rDay === bDay && rMonth === bMonth && rYear === bYear) {
-            return true;
-        }
-    }
-    return false;
-}
 
 window.verSoporteDesdeTabla = function(docId, recordLocalId) {
     let match = adminRecordsCache.find(r => (docId && r._docId === docId) || (recordLocalId && (r.id === recordLocalId || r._docId === recordLocalId)));
@@ -2125,6 +2139,12 @@ function initAdminSupportModal() {
 
         loadingBox.style.display = 'none';
 
+        matches.sort((a, b) => {
+            const tA = (a.timestamp && typeof a.timestamp === 'number') ? a.timestamp : parseFechaRecoleccion(a.fecha).getTime();
+            const tB = (b.timestamp && typeof b.timestamp === 'number') ? b.timestamp : parseFechaRecoleccion(b.fecha).getTime();
+            return tB - tA;
+        });
+
         if (matches.length === 0) {
             emptyBox.style.display = 'block';
             currentAdminFoundRecord = null;
@@ -2212,12 +2232,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
 
-    // 3. Registrar Service Worker v1.3.5 para PWA instalable con actualización automática inmediata
+    // 3. Registrar Service Worker v1.3.6 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.3.5')
+            navigator.serviceWorker.register('/sw.js?v=1.3.6')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.3.5 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.3.6 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

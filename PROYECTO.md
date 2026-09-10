@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.3.5`  
+> **Versión Actual:** `v=1.3.6`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -206,7 +206,14 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.3.5` (Septiembre 2026) - Versión Actual
+### `v=1.3.6` (Septiembre 2026) - Versión Actual
+- **Corrección de Ordenamiento Cronológico y Visualización de Recolecciones del Día:**
+  - **Diagnóstico y Corrección de Consulta Firestore:** Se identificó que la consulta anterior ordenaba por el campo de texto `fecha` de forma lexicográfica/alfabética descendente (`"9/9/2026"` > `"10/9/2026"`), lo cual provocaba que al superar los 100 registros en la base de datos, las recolecciones del día 10 de septiembre (`10/9/2026`) quedaran relegadas y excluidas del límite de la consulta.
+  - **Incorporación de Campo `timestamp` y Migración Retroactiva:** Se incorporó el campo numérico `timestamp: Date.now()` en cada nuevo registro y se ejecutó un script de backfill que actualizó el 100% de los documentos históricos (157 registros) con su marca de tiempo exacta en milisegundos.
+  - **Ordenamiento Multicriterio Cronológico Real:** La consulta administrativa en tiempo real ordena por `timestamp desc` e implementa en memoria la función `parseFechaRecoleccion()`, garantizando que todas las recolecciones del día actual se ubiquen de forma inmediata en las primeras posiciones de la tabla y del caché.
+  - **Formateo de Fecha Confiable sin Inversión de Mes/Día:** Se eliminó la ambigüedad de `new Date(data.fecha)` que interpretaba fechas latinas `DD/MM/YYYY` como meses anglosajones (ej. 10 de septiembre como 9 de octubre), desplegando ahora en pantalla y en exportación CSV el formato legible exacto `DD/MM/YYYY HH:MM:SS`.
+
+### `v=1.3.5` (Septiembre 2026)
 - **Generador de Soporte Oficial de Recolección en Rol Administrador:**
   - Incorporación del botón `📄 Emitir Soporte Oficial` en la barra de acciones del Panel Administrativo (`#admin-support-modal`).
   - **Autollenado Inteligente por Filtros (Opción 1):** Al ingresar **Fecha** (calendario nativo), **Proveedor** y **Punto / Sucursal**, el sistema busca de forma automática en el historial existente y autocompleta todos los datos de la recolección: Conductor, Ruta, lista de productos recolectados con sus iconos oficiales, total de kilos y observaciones.
