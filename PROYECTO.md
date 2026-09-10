@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.3.3`  
+> **Versión Actual:** `v=1.3.4`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -206,7 +206,14 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.3.3` (Septiembre 2026) - Versión Actual
+### `v=1.3.4` (Septiembre 2026) - Versión Actual
+- **Iconografía Oficial en Productos Recolectados y Botones Táctiles:**
+  - Implementación del mapa maestro de visualización `PRODUCT_DISPLAY_MAP` en JavaScript, vinculando de forma unívoca cada producto con su icono oficial exacto y etiqueta optimizada para móviles (ej. `🐷 HUESO CERDO`, `🫁 PULMON CERDO`, `🦴 CALAMBOMBO CERDO`, `🪵 LEÑA`).
+  - Despliegue de los iconos oficiales en la lista en vivo de productos recolectados en pantalla (`#products-list`).
+  - Inclusión de los iconos oficiales en la tabla del comprobante digital (voucher) y en el mensaje generado para compartir vía WhatsApp.
+  - Sincronización idéntica entre renderizado estático HTML y dinámico JavaScript al actualizar catálogos.
+
+### `v=1.3.3` (Septiembre 2026)
 - **Ordenamiento Alfabético Estricto de Productos (A-Z):**
   - Se ordenaron alfabéticamente los 20 productos oficiales en la cuadrícula táctil de botones del conductor, permitiendo ubicar rápidamente cualquier materia prima desde la **A** (*ACEITE*) hasta la **T** (*TRAQUEAS*).
   - Incorporación de los nuevos productos de la hoja contable con sus emojis característicos: *Calambombo de Res*, *Calambombo de Cerdo*, *Pulmón de Cerdo*, *Orejas de Cerdo*, *Leña*, *Mantequilla*, *Hueso Promoción*, etc.

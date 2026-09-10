@@ -222,23 +222,64 @@ const DEFAULT_RUTAS = [
     "PLANTA SAN JOAQUIN"
 ];
 
+const PRODUCT_DISPLAY_MAP = {
+    "ACEITE": { emoji: "🛢️", label: "ACEITE" },
+    "CABEZAS": { emoji: "🐮", label: "CABEZAS" },
+    "CALAMBOMBO DE CERDO": { emoji: "🦴", label: "CALAMBOMBO CERDO" },
+    "CALAMBOMBO CERDO": { emoji: "🦴", label: "CALAMBOMBO CERDO" },
+    "CALAMBOMBO DE RES": { emoji: "🦴", label: "CALAMBOMBO RES" },
+    "CALAMBOMBO RES": { emoji: "🦴", label: "CALAMBOMBO RES" },
+    "DESPERDICIO": { emoji: "🗑️", label: "DESPERDICIO" },
+    "EMPELLA": { emoji: "🐷", label: "EMPELLA" },
+    "GORDANA": { emoji: "🥓", label: "GORDANA" },
+    "HARINA CARNE": { emoji: "🥩", label: "HARINA CARNE" },
+    "HARINA DE HUESO VAPORIZADA": { emoji: "🦴", label: "H. VAPORIZADO" },
+    "HUESO BLANCO": { emoji: "🦴", label: "HUESO BLANCO" },
+    "HUESO CALCINADO": { emoji: "🦴", label: "HUESO CALCINADO" },
+    "HUESO DE CERDO": { emoji: "🐷", label: "HUESO CERDO" },
+    "HUESO CERDO": { emoji: "🐷", label: "HUESO CERDO" },
+    "HUESO PROMOCION": { emoji: "🦴", label: "H. PROMOCION" },
+    "HUESO SECO": { emoji: "🦴", label: "HUESO SECO" },
+    "LEÑA": { emoji: "🪵", label: "LEÑA" },
+    "MANTECA": { emoji: "🧈", label: "MANTECA" },
+    "MANTEQUILLA": { emoji: "🧈", label: "MANTEQUILLA" },
+    "MARGARINA": { emoji: "🧈", label: "MARGARINA" },
+    "OREJAS DE CERDO": { emoji: "🐷", label: "OREJAS CERDO" },
+    "OREJAS CERDO": { emoji: "🐷", label: "OREJAS CERDO" },
+    "PIEL POLLO": { emoji: "🐔", label: "PIEL POLLO" },
+    "PULMON DE CERDO": { emoji: "🫁", label: "PULMON CERDO" },
+    "PULMON CERDO": { emoji: "🫁", label: "PULMON CERDO" },
+    "SEBO": { emoji: "🧈", label: "SEBO" },
+    "SEBO EN RAMA": { emoji: "🧈", label: "SEBO EN RAMA" },
+    "TRAQUEAS": { emoji: "🥩", label: "TRAQUEAS" }
+};
+
 function getEmojiForProduct(name) {
-    const n = (name || '').toUpperCase();
-    if (n.includes('ACEITE')) return '🛢️';
-    if (n.includes('CABEZAS')) return '🐮';
-    if (n.includes('CALAMBOMBO')) return '🦴';
-    if (n.includes('DESPERDICIO')) return '🗑️';
-    if (n.includes('EMPELLA')) return '🐷';
-    if (n.includes('GORDANA')) return '🥓';
-    if (n.includes('HARINA')) return '🥩';
-    if (n.includes('HUESO')) return '🦴';
-    if (n.includes('LEÑA')) return '🪵';
-    if (n.includes('MANTECA') || n.includes('MARGARINA') || n.includes('MANTEQUILLA') || n.includes('SEBO')) return '🧈';
-    if (n.includes('OREJAS')) return '🐷';
-    if (n.includes('POLLO') || n.includes('PIEL')) return '🐔';
-    if (n.includes('PULMON')) return '🫁';
-    if (n.includes('TRAQUEAS')) return '🥩';
+    const key = (name || '').trim().toUpperCase();
+    if (PRODUCT_DISPLAY_MAP[key]) return PRODUCT_DISPLAY_MAP[key].emoji;
+
+    if (key.includes('ACEITE')) return '🛢️';
+    if (key.includes('CABEZAS')) return '🐮';
+    if (key.includes('CALAMBOMBO')) return '🦴';
+    if (key.includes('DESPERDICIO')) return '🗑️';
+    if (key.includes('OREJAS')) return '🐷';
+    if (key.includes('EMPELLA')) return '🐷';
+    if (key.includes('HUESO') && (key.includes('CERDO') || key.includes('PUERCO') || key.includes('COCHINO'))) return '🐷';
+    if (key.includes('HUESO')) return '🦴';
+    if (key.includes('GORDANA')) return '🥓';
+    if (key.includes('HARINA')) return '🥩';
+    if (key.includes('LEÑA') || key.includes('LENA')) return '🪵';
+    if (key.includes('MANTECA') || key.includes('MARGARINA') || key.includes('MANTEQUILLA') || key.includes('SEBO')) return '🧈';
+    if (key.includes('POLLO') || key.includes('PIEL')) return '🐔';
+    if (key.includes('PULMON')) return '🫁';
+    if (key.includes('TRAQUEAS') || key.includes('CARNE')) return '🥩';
     return '📦';
+}
+
+function getDisplayLabelForProduct(name) {
+    const key = (name || '').trim().toUpperCase();
+    if (PRODUCT_DISPLAY_MAP[key]) return PRODUCT_DISPLAY_MAP[key].label;
+    return name;
 }
 
 function obtenerPuntoSeleccionado() {
@@ -308,7 +349,7 @@ function renderDynamicProducts(prods) {
         btn.type = 'button';
         btn.className = 'product-btn';
         btn.dataset.value = pName;
-        btn.innerHTML = `${getEmojiForProduct(pName)} ${pName}`;
+        btn.innerHTML = `${getEmojiForProduct(pName)} ${getDisplayLabelForProduct(pName)}`;
         btn.addEventListener('click', () => {
             // 1. Validar que Conductor esté seleccionado
             const conductorSel = document.getElementById('conductor');
@@ -538,10 +579,13 @@ function renderAddedProducts() {
         productsListUl.innerHTML = '';
         collectedProducts.forEach((p, index) => {
             productsListUl.innerHTML += `
-                <li style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 600;">${p.producto}</span>
+                <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 1.1rem;">${getEmojiForProduct(p.producto)}</span>
+                        <span>${p.producto}</span>
+                    </span>
                     <span style="display: flex; align-items: center; gap: 10px;">
-                        <strong>${p.kilos} kg</strong>
+                        <strong style="color: #0284c7;">${p.kilos} kg</strong>
                         <button type="button" onclick="eliminarProductoRegistrado(${index})" title="Borrar este producto" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; cursor: pointer;">✕ Borrar</button>
                     </span>
                 </li>
@@ -1739,7 +1783,7 @@ function mostrarComprobanteDigital(data) {
             const cleanKg = Math.round((Number(p.kilos) || 0) * 100) / 100;
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #1e293b;">${p.producto}</td>
+                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #1e293b;">${getEmojiForProduct(p.producto)} ${p.producto}</td>
                 <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #0284c7;">${cleanKg} KG</td>
             `;
             tbody.appendChild(tr);
@@ -1783,7 +1827,7 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
         const prodsSorted = d.productos.slice().sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
         prodsTxt = prodsSorted.map(p => {
             const k = Math.round((Number(p.kilos) || 0) * 100) / 100;
-            return `  • ${p.producto}: *${k} KG*`;
+            return `  • ${getEmojiForProduct(p.producto)} ${p.producto}: *${k} KG*`;
         }).join('\n');
     }
 
@@ -1832,7 +1876,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.3&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.4&t=' + Date.now();
 };
 
 // Inicializar selectores dinámicos y catálogos al cargar el DOM
@@ -1847,12 +1891,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
 
-    // 3. Registrar Service Worker v1.3.3 para PWA instalable con actualización automática inmediata
+    // 3. Registrar Service Worker v1.3.4 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.3.3')
+            navigator.serviceWorker.register('/sw.js?v=1.3.4')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.3.3 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.3.4 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));
