@@ -3,7 +3,7 @@
 // Cache del App Shell con estrategia Network-First y Fallback a Cache Offline
 // ==============================================================================
 
-const CACHE_NAME = 'proteinagro-v1.3.1';
+const CACHE_NAME = 'proteinagro-v1.3.2';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -20,7 +20,7 @@ const APP_SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-cacheando App Shell de ProteinAgro');
+      console.log('[SW] Pre-cacheando App Shell de ProteinAgro v1.3.2');
       return cache.addAll(APP_SHELL).catch((err) => {
         console.warn('[SW] Advertencia pre-cacheando recursos:', err);
       });
@@ -29,7 +29,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activación: Limpieza de cachés antiguas
+// Activación: Limpieza de cachés antiguas y control inmediato de clientes
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keyList) => {
@@ -41,9 +41,17 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
+    }).then(() => {
+      return self.clients.claim();
+    }).then(() => {
+      // Notificar a las ventanas activas para que se actualicen inmediatamente
+      return self.clients.matchAll({ type: 'window' }).then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ action: 'RELOAD_PAGE', version: CACHE_NAME });
+        });
+      });
     })
   );
-  self.clients.claim();
 });
 
 // Intercepción de Peticiones: Network-First con Fallback a Cache

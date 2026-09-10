@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.3.1`  
+> **Versión Actual:** `v=1.3.2`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -206,7 +206,17 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.3.1` (Septiembre 2026) - Versión Actual
+### `v=1.3.2` (Septiembre 2026) - Versión Actual
+- **Garantía Inmediata de Filtro en Cascada & Catálogo Embebido:**
+  - Integración directa en el cliente del catálogo base oficial con los 122 puntos de recolección, las 6 rutas activas y los 8 conductores oficiales, eliminando esperas de latencia y garantizando operatividad instantánea al 100% incluso sin internet.
+  - Priorización de coincidencia exacta por nombre de proveedor antes de coincidencias parciales, evitando que proveedores con nombres parecidos (ej. Supertienda Cañaveral y Frigorivalle) mezclen sus puntos.
+  - Extracción limpia de proveedores por ruta directamente desde la matriz, eliminando apariciones erróneas de proveedores de otras rutas.
+- **Solución Definitiva de Caché PWA & Auto-Recarga:**
+  - Mecanismo de actualización forzada mediante escucha de `controllerchange` y mensajes `RELOAD_PAGE` desde el Service Worker para que los dispositivos móviles apliquen la nueva versión automáticamente.
+  - Indicadores visuales claros de versión (`v1.3.2`) en el encabezado y tarjeta de acceso.
+  - Botón de soporte rápido `🔄 ¿No ves los cambios? Toca aquí para actualizar` (`forzarActualizacionApp()`) para limpiar Service Workers, Caché Storage y LocalStorage con un solo toque.
+
+### `v=1.3.1` (Septiembre 2026)
 - **Filtro Estricto en Cascada (Ruta ➔ Proveedor ➔ Puntos del Proveedor):**
   - Al seleccionar una Ruta, se despliegan exclusivamente los proveedores asignados a esa ruta y el selector de Punto queda en espera (`disabled`) con la indicación *"Primero seleccione un proveedor"*, evitando la visualización desordenada de todos los puntos de la ruta.
   - Al seleccionar un Proveedor, el selector de **Punto / Lugar de Recolección** se activa de inmediato y despliega **únicamente las sedes o puntos que le pertenecen a ese proveedor específico**.

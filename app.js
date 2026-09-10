@@ -182,14 +182,23 @@ let currentProduct = null;
 let collectedProducts = [];
 
 const DEFAULT_PRODUCTOS = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HUESO BLANCO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
-const DEFAULT_CONDUCTORES = ["Elvis reyes", "Hernando Prado", "Emer Rodriguez", "Jairo Peña"];
+const DEFAULT_CONDUCTORES = [
+    "Ricardo Sepulveda",
+    "Hernando Prado",
+    "Emer Rodriguez",
+    "Jairo Peña",
+    "Diego Castellanos",
+    "Carolina Becerra",
+    "Luz Elena",
+    "Daniela"
+];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
-    "RUTA 2: Cali (Norte / Centro)",
-    "RUTA 2: Cali (Sur / Oriente)",
+    "RUTA 2: Cali (Norte / Centro / Sur / Oriente)",
     "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance",
-    "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá",
-    "RUTA 5: Palmira / Villagorgona / Carmelo"
+    "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo",
+    "RUTA 5: Palmira / Villagorgona / Carmelo",
+    "PLANTA SAN JOAQUIN"
 ];
 
 function getEmojiForProduct(name) {
@@ -1264,8 +1273,9 @@ function initRutasYProveedores() {
     sincronizarRutasDesdeSheets();
 }
 
-// Matriz consolidada de Puntos_Rutas cargada desde Google Sheets
-let MATRIZ_PUNTOS_RUTAS = [];
+// Matriz consolidada de Puntos_Rutas pre-cargada con los 122 puntos oficiales de Google Sheets (0ms de latencia, 100% offline-ready)
+const CATALOGO_PUNTOS_RUTAS_DEFAULT = [{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"Santa Elena","punto":"BODEGA SANTA ELENA","direccion":"Santa Elena","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"Santa Elena","punto":"GARAY SANTA ELENA","direccion":"Santa Elena","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"CAVASA","punto":"BARBARA GOMEZ","direccion":"BARBARA GOMEZ","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"CAVASA","punto":"DIEGO BUITRAGO","direccion":"DIEGO BUITRAGO","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"CAVASA","punto":"CARIBE","direccion":"CARIBE","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"CAVASA","punto":"SEVILLANA","direccion":"SEVILLANA","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"CAVASA","punto":"MIGAN CAPITAL","direccion":"MIGAN CAPITAL","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"CAVASA","punto":"FREDDY HERNANDEZ","direccion":"FREDDY HERNANDEZ","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"CAVASA","punto":"EDINSON AGUIRRE","direccion":"EDINSON AGUIRRE","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"CAVASA","punto":"LA RESERVA","direccion":"LA RESERVA","telefono":"","horario":"","frecuencia":"Lunes a Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"Santa Elena","punto":"SEVILLANA SANTA ELENA","direccion":"Santa Elena","telefono":"","horario":"","frecuencia":"Lunes / Miércoles / Viernes","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"Santa Elena","punto":"CIUDAD DEL CAMPO GRANAHORRAR","direccion":"Ciudad del Campo","telefono":"","horario":"","frecuencia":"Lunes / Miércoles / Viernes","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"Santa Elena","punto":"CIUDAD DEL CAMPO PUNTO ROJO","direccion":"Ciudad del Campo","telefono":"","horario":"","frecuencia":"Lunes / Miércoles / Viernes","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"Santa Elena","punto":"CIUDAD DEL CAMPO SURTIMERCAR","direccion":"Ciudad del Campo","telefono":"","horario":"","frecuencia":"Lunes / Miércoles / Viernes","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"Santa Elena","punto":"ORLANDO MARTINEZ","direccion":"Carniceria la paz","telefono":"","horario":"","frecuencia":"Miércoles / Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"Santa Elena","punto":"LA ESPERANZA","direccion":"La Esperanza","telefono":"","horario":"","frecuencia":"Sábado","estado":"Activo"},{"ruta":"RUTA 1: Santa Elena / Cavasa","proveedor":"Santa Elena","punto":"DISTRIBUIDORA DE CARNES MILLAN","direccion":"DISTRIBUIDORA DE CARNES MILLAN","telefono":"","horario":"","frecuencia":"Miercoles/sabado","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Punto 14","direccion":"Cra. 5 #14-37","telefono":"3244935167","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Centenario","direccion":"Av. 4 Norte #46-64","telefono":"3102022829","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"MIGAN CAPITAL","punto":"La Montaña Av. 6A","direccion":"Av. 6A N #30N-47","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Prados del Norte","direccion":"Av.2B Norte #34N-19","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"carnes maiale","punto":"Carnes Maiale","direccion":"Cra.1G #69-02 Esquina","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"Districarnes LG","punto":"Districarnes LG","direccion":"Cra.4C #65B-18","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Álamos","direccion":"Calle75C N #2 Bis-100","telefono":"3243192838","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Los Pinos","direccion":"Calle70 #7M Bis-64","telefono":"3243192839","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral La Primera","direccion":"Cra.1A #44-50","telefono":"3184277811","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"MIGAN CAPITAL","punto":"La Montaña Torres","direccion":"Cra.1 #56-20","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"Super Carnes Los Andes","punto":"Super Carnes Los Andes","direccion":"Cra.1D #52-05","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"La Cosecha de Mi Tierra","punto":"La Cosecha de Mi Tierra","direccion":"Cra.15 Calle54 Esquina","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"COMERCIALIZADORA R Y E","punto":"Carnes RYE","direccion":"Cra.17F #33A-45","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"Baratón Carnes Berlín","punto":"Baratón Carnes Berlín","direccion":"Calle44 #19-65","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"El Rebajón","punto":"El Rebajón","direccion":"Calle 44","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"MIGAN CAPITAL","punto":"La Montaña Calima","direccion":"","telefono":"","horario":"","frecuencia":"Viernes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Ingenio","direccion":"Ingenio","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Limonar","direccion":"Limonar","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Pasoancho","direccion":"Pasoancho","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SEVILLANA","punto":"Sevillana Pasoancho","direccion":"Pasoancho","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"MIGAN CAPITAL","punto":"La Montaña Pasoancho","direccion":"Calle 14C #25-16","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SEVILLANA","punto":"Sevillana Lourdes","direccion":"Transv. 29D #29-50","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"MIGAN CAPITAL","punto":"La Montaña Guadalupe","direccion":"Guadalupe","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"MIGAN CAPITAL","punto":"La Montaña Cosmocentro","direccion":"Cosmocentro","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"MIGAN CAPITAL","punto":"La Montaña Cristales","direccion":"Cristales","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Villanueva","direccion":"Calle 13 #75A-185","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Cootraemcali","direccion":"Cra.70 #13B-18","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"Mercaunión","punto":"Mercaunión","direccion":"Calle 25 #85B-100","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"Sevillana República de Israel","punto":"Sevillana República de Israel","direccion":"","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"Jaime Zuluaga","punto":"Jaime Zuluaga","direccion":"","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"Milton Muñoz","punto":"Milton Muñoz","direccion":"","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"MIGAN CAPITAL","punto":"La Montaña Decepaz","direccion":"","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"Ciudadela del Río","punto":"Ciudadela del Río","direccion":"","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"MIGAN CAPITAL","punto":"La Montaña Morichal","direccion":"","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 2: Cali (Norte / Centro / Sur / Oriente)","proveedor":"CARNICOS LA FAMA","punto":"CARNICOS LA FAMA","direccion":"juanchito","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Puerto Tejada Centro","direccion":"Cra.19 #17-45","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Puerto Tejada Punto 2","direccion":"Cl. 16 #20-60","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Villa Rica Caribe","direccion":"Cra. 3 #2-60","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Jamundí Terranova","direccion":"Cra. 51 Sur #16C-04","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Jamundí Farallones","direccion":"Cl. 12 Sur #10A-77","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Jamundí Surtimayorista","direccion":"Cra. 10 #11-66","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Jamundí Rosario","direccion":"Cra. 11 #3-93","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Jamundí Principal","direccion":"Cra. 7 #10-48","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Jamundí Centro","direccion":"Cl. 11 #9-58","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"CARIBE","punto":"Jamundí Panamericana","direccion":"Cra. 3D #11-145","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral pance","direccion":"","telefono":"","horario":"","frecuencia":"jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"SUPERTIENDA CAÑAVERAL- FRIGORIVALLE","punto":"cañaveral matadero","direccion":"","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"FRIGORIVALLE","punto":"frigorivalle matadero","direccion":"","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"JHONATAN MARTINEZ","punto":"frigorifico buga","direccion":"","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"YIMI SANCLEMENTE","punto":"frigorifico buga","direccion":"","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Tuluá","direccion":"tulua","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Buga albergue","direccion":"albergue","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Buga merino","direccion":"merino","telefono":"","horario":"","frecuencia":"miércoles","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"cañaveral zarzal","direccion":"zarzal","telefono":"","horario":"","frecuencia":"jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Roldanillo","direccion":"Roldanillo","telefono":"","horario":"","frecuencia":"Martes","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"SEVILLANA","punto":"Sevillana Guacarí","direccion":"Guacarí","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"CARIBE","punto":"Caribe Buga","direccion":"Buga","telefono":"","horario":"","frecuencia":"Miércoles","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"ALBERTO MILLAN","punto":"Alberto Millán","direccion":"Buga","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"ALBERTO MILLAN","punto":"Alberto Millán","direccion":"cerrito","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"HERNANDO HIDALGO","punto":"HERNANDO HIDALGO","direccion":"Buga","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"BELALCAZAR","punto":"B1-PRINCIPAL (Carrera 5 # 5-48)","direccion":"CARRERA 5 # 5-48","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"BELALCAZAR","punto":"B2- GALERIA (Calle 9 # 2-26)","direccion":"CALLE 9 # 2-26","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"BELALCAZAR","punto":"B3- PLANTA BELOMO (Carrera 4 # 14-66)","direccion":"CARRERA 4 # 14-66","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"BELALCAZAR","punto":"B5- GUACANDA (Transversal 6 # 13-194)","direccion":"TRANSVERSAL 6 # 13-194","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"BELALCAZAR","punto":"B6- ROZO (Calle 10 N # 14 A 211 Rozo- Palmira)","direccion":"CALLE 10 N # 14 A 211 ROZO- PALMIRA","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"BELALCAZAR","punto":"B8- BOLIVAR (Carrera 3 # 13-44)","direccion":"CARRERA 3 # 13-44","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"BELALCAZAR","punto":"B9- URIBE (Carrera 12 # 11-03)","direccion":"CARRERA 12 # 11-03","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo","proveedor":"BELALCAZAR","punto":"B11- GUABINAS (Calle 8 #19 B 55)","direccion":"CALLE 8 #19 B 55","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"MERCAMIO","punto":"Mercamio Palmira","direccion":"Palmira","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Palmitex (Palmira)","direccion":"Palmira","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Palmicentro (Palmira)","direccion":"Palmira","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"SEVILLANA","punto":"Sevillana Palmira / Villagorgona","direccion":"Palmira / Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"MIGAN CAPITAL","punto":"La Montaña Palmira","direccion":"Palmira","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Villagorgona 1","direccion":"Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"SUPERTIENDA CAÑAVERAL","punto":"Cañaveral Villagorgona 2","direccion":"Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"Nutrialimentos Valdez (Villagorgona)","punto":"Nutrialimentos Valdez (Villagorgona)","direccion":"Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"Yénifer Díaz (Villagorgona)","punto":"Yénifer Díaz (Villagorgona)","direccion":"Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"Jorge Adrián Rodas (Villagorgona)","punto":"Jorge Adrián Rodas (Villagorgona)","direccion":"Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"RICARDO GIL","punto":"RICARDO GIL","direccion":"Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"CENTRAL HENRY MARTINEZ","punto":"CENTRAL HENRY MARTINEZ","direccion":"Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"CARLOS REBOLLEDO","punto":"CARLOS REBOLLEDO","direccion":"Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"ORLANDO GIRALDO","punto":"ORLANDO GIRALDO","direccion":"Villagorgona","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"RUTA 5: Palmira / Villagorgona / Carmelo","proveedor":"Carnicería Fabián López (Águila Roja)","punto":"Carnicería Fabián López (Águila Roja)","direccion":"Águila Roja","telefono":"","horario":"","frecuencia":"Jueves","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"HEBER GAMBOA","punto":"HEBER GAMBOA","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"MILSON GONSALEZ","punto":"MILSON GONSALEZ","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"MIRIAM CUARAN","punto":"MIRIAM CUARAN","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"CARLOS CAICEDO","punto":"CARLOS CAICEDO","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"FREDDY FERNANDEZ","punto":"FREDDY FERNANDEZ","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"CARLOS MARTINEZ","punto":"CARLOS MARTINEZ","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"CRHISTIAN CEDEÑO","punto":"CRHISTIAN CEDEÑO","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"GILDARDO TEJADA","punto":"GILDARDO TEJADA","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"MIGUEL ANGEL OTERO","punto":"MIGUEL ANGEL OTERO","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"MARIA ELSI ALEGRIA","punto":"MARIA ELSI ALEGRIA","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"WILMER BUSTAMANTE","punto":"WILMER BUSTAMANTE","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"JAIRO MOSQUERA","punto":"JAIRO MOSQUERA","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"MARTIN PEREZ","punto":"MARTIN PEREZ","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"OSCAR LARA","punto":"OSCAR LARA","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"JULIAN LUNA","punto":"JULIAN LUNA","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"DIEGO BUITRAGO","punto":"DIEGO BUITRAGO","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"FREDDY HERNANDEZ","punto":"FREDDY HERNANDEZ","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"BARBARA GOMEZ","punto":"BARBARA GOMEZ","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"HERNANDO HIDALGO","punto":"HERNANDO HIDALGO","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"GRAXPRO","punto":"GRAXPRO","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"AUGUSTO MUÑOZ","punto":"AUGUSTO MUÑOZ","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"},{"ruta":"PLANTA SAN JOAQUIN","proveedor":"FABIAN LOPEZ","punto":"FABIAN LOPEZ","direccion":"PLANTA SAN JOAUIN","telefono":"","horario":"","frecuencia":"Lunes / Martes / Miércoles / Jueves / Viernes / Sábado","estado":"Activo"}];
+let MATRIZ_PUNTOS_RUTAS = CATALOGO_PUNTOS_RUTAS_DEFAULT.slice();
 
 // Mapa Punto → Proveedor (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
 const PUNTO_TO_PROVEEDOR_MAP = {};
@@ -1291,7 +1301,7 @@ function getPuntosParaProveedor(rutaSeleccionada, proveedorSeleccionado) {
         return [];
     }
 
-    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
     const normRuta = cleanStr(rutaSeleccionada);
     const normProv = cleanStr(proveedorSeleccionado);
     const matchNum = rutaSeleccionada ? rutaSeleccionada.match(/RUTA\s*(\d+)/i) : null;
@@ -1299,50 +1309,59 @@ function getPuntosParaProveedor(rutaSeleccionada, proveedorSeleccionado) {
 
     const puntosEncontrados = [];
 
-    // 1. Buscar en la matriz completa de Google Sheets
+    const rutaCoincide = (itRutaStr) => {
+        if (!normRuta || normRuta === 'otra') return true;
+        const itRuta = cleanStr(itRutaStr);
+        if (itRuta === normRuta || normRuta.includes(itRuta) || itRuta.includes(normRuta)) return true;
+        if (rutaNum) {
+            const itNumMatch = (itRutaStr || '').match(/RUTA\s*(\d+)/i);
+            if (itNumMatch && itNumMatch[1] === rutaNum) return true;
+        }
+        return false;
+    };
+
+    // 1. Buscar en la matriz consolidada de Google Sheets
     if (Array.isArray(MATRIZ_PUNTOS_RUTAS) && MATRIZ_PUNTOS_RUTAS.length > 0) {
-        for (const it of MATRIZ_PUNTOS_RUTAS) {
-            if (it.estado === 'Inactivo') continue;
-            const itRuta = cleanStr(it.ruta);
-            const itProv = cleanStr(it.proveedor);
-            const itPunto = (it.punto || '').trim();
-
-            if (!itPunto) continue;
-
-            // Verificar si coincide la ruta
-            let rutaCoincide = (!normRuta || normRuta === 'otra') || (itRuta === normRuta) || normRuta.includes(itRuta) || itRuta.includes(normRuta);
-            if (!rutaCoincide && rutaNum) {
-                const itNumMatch = (it.ruta || '').match(/RUTA\s*(\d+)/i);
-                if (itNumMatch && itNumMatch[1] === rutaNum) {
-                    rutaCoincide = true;
-                }
-            }
-
-            if (rutaCoincide) {
-                // Verificar si coincide el proveedor
-                const provCoincide = (itProv === normProv) || (normProv.includes(itProv)) || (itProv.includes(normProv));
-                if (provCoincide && !puntosEncontrados.includes(itPunto)) {
-                    puntosEncontrados.push(itPunto);
-                }
-            }
-        }
-
-        if (puntosEncontrados.length > 0) {
-            return puntosEncontrados.sort((a, b) => a.localeCompare(b));
-        }
-
-        // Fallback: si no encontró en la ruta pero el proveedor existe en otra parte
+        // Pase 1: Coincidencia EXACTA del nombre del proveedor en la ruta seleccionada
         for (const it of MATRIZ_PUNTOS_RUTAS) {
             if (it.estado === 'Inactivo') continue;
             const itProv = cleanStr(it.proveedor);
             const itPunto = (it.punto || '').trim();
             if (!itPunto) continue;
-            if (itProv === normProv || normProv.includes(itProv) || itProv.includes(normProv)) {
-                if (!puntosEncontrados.includes(itPunto)) {
-                    puntosEncontrados.push(itPunto);
+
+            if (rutaCoincide(it.ruta) && itProv === normProv) {
+                if (!puntosEncontrados.includes(itPunto)) puntosEncontrados.push(itPunto);
+            }
+        }
+
+        // Pase 2: Coincidencia flexible (substring) si no hubo exacta en la ruta
+        if (puntosEncontrados.length === 0) {
+            for (const it of MATRIZ_PUNTOS_RUTAS) {
+                if (it.estado === 'Inactivo') continue;
+                const itProv = cleanStr(it.proveedor);
+                const itPunto = (it.punto || '').trim();
+                if (!itPunto) continue;
+
+                if (rutaCoincide(it.ruta) && (itProv.includes(normProv) || normProv.includes(itProv))) {
+                    if (!puntosEncontrados.includes(itPunto)) puntosEncontrados.push(itPunto);
                 }
             }
         }
+
+        // Pase 3: Fallback si el proveedor está registrado en la matriz pero en otra ruta
+        if (puntosEncontrados.length === 0) {
+            for (const it of MATRIZ_PUNTOS_RUTAS) {
+                if (it.estado === 'Inactivo') continue;
+                const itProv = cleanStr(it.proveedor);
+                const itPunto = (it.punto || '').trim();
+                if (!itPunto) continue;
+
+                if (itProv === normProv || itProv.includes(normProv) || normProv.includes(itProv)) {
+                    if (!puntosEncontrados.includes(itPunto)) puntosEncontrados.push(itPunto);
+                }
+            }
+        }
+
         if (puntosEncontrados.length > 0) {
             return puntosEncontrados.sort((a, b) => a.localeCompare(b));
         }
@@ -1422,34 +1441,39 @@ function getProveedoresParaRuta(rutaSeleccionada) {
         return getTodosLosProveedores();
     }
 
-    const puntosRuta = getPuntosParaRuta(rutaSeleccionada);
-    const provsSet = new Set();
-
-    // 1. Extraer proveedores de los puntos de la ruta seleccionada
-    puntosRuta.forEach(pt => {
-        const prov = PUNTO_TO_PROVEEDOR_MAP[pt];
-        if (prov && prov !== 'PROVEEDOR GENERAL') {
-            provsSet.add(prov);
-        }
-    });
-
-    // 2. Extraer proveedores del mapa directo PROVEEDORES_POR_RUTA con búsqueda flexible
-    if (PROVEEDORES_POR_RUTA[rutaSeleccionada]) {
-        PROVEEDORES_POR_RUTA[rutaSeleccionada].forEach(pr => provsSet.add(pr));
-    }
-
-    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
     const normSelected = cleanStr(rutaSeleccionada);
     const matchNum = rutaSeleccionada.match(/RUTA\s*(\d+)/i);
     const num = matchNum ? matchNum[1] : null;
 
-    for (const key in PROVEEDORES_POR_RUTA) {
-        const normKey = cleanStr(key);
-        const keyNumMatch = key.match(/RUTA\s*(\d+)/i);
-        const keyNum = keyNumMatch ? keyNumMatch[1] : null;
+    const provsSet = new Set();
 
-        if (normKey === normSelected || (num && keyNum === num) || normKey.includes(normSelected) || normSelected.includes(normKey)) {
-            (PROVEEDORES_POR_RUTA[key] || []).forEach(pr => provsSet.add(pr));
+    // 1. Si MATRIZ_PUNTOS_RUTAS está disponible, extraer directamente los proveedores únicos de esa ruta
+    if (Array.isArray(MATRIZ_PUNTOS_RUTAS) && MATRIZ_PUNTOS_RUTAS.length > 0) {
+        MATRIZ_PUNTOS_RUTAS.forEach(it => {
+            if (it.estado === 'Inactivo') return;
+            const itRuta = cleanStr(it.ruta);
+            let coincide = (itRuta === normSelected) || normSelected.includes(itRuta) || itRuta.includes(normSelected);
+            if (!coincide && num) {
+                const itNumMatch = (it.ruta || '').match(/RUTA\s*(\d+)/i);
+                if (itNumMatch && itNumMatch[1] === num) coincide = true;
+            }
+            if (coincide && it.proveedor && it.proveedor.trim() !== '' && it.proveedor !== 'PROVEEDOR GENERAL') {
+                provsSet.add(it.proveedor.trim());
+            }
+        });
+    }
+
+    // 2. Fallback con PROVEEDORES_POR_RUTA si no se encontraron en MATRIZ
+    if (provsSet.size === 0) {
+        for (const key in PROVEEDORES_POR_RUTA) {
+            const normKey = cleanStr(key);
+            const keyNumMatch = key.match(/RUTA\s*(\d+)/i);
+            const keyNum = keyNumMatch ? keyNumMatch[1] : null;
+
+            if (normKey === normSelected || (num && keyNum === num) || normKey.includes(normSelected) || normSelected.includes(normKey)) {
+                (PROVEEDORES_POR_RUTA[key] || []).forEach(pr => provsSet.add(pr));
+            }
         }
     }
 
@@ -1757,19 +1781,67 @@ document.getElementById('btn-print-receipt')?.addEventListener('click', () => {
     window.print();
 });
 
+// Función global para forzar recarga y limpiar cachés en cualquier celular o PC
+window.forzarActualizacionApp = async function() {
+    try {
+        if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister()));
+        }
+        try {
+            localStorage.removeItem('proteinagro_catalogos_cache');
+            localStorage.removeItem('proteinagro_rutas_config');
+        } catch(e) {}
+    } catch (err) {
+        console.warn('Error limpiando caché:', err);
+    }
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.2&t=' + Date.now();
+};
+
 // Inicializar selectores dinámicos y catálogos al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. Inicializar inmediatamente con catálogo base pre-cargado (0ms de latencia, 100% offline-ready)
+    procesarPuntosRutasDinamicos(CATALOGO_PUNTOS_RUTAS_DEFAULT);
     renderDynamicProducts(DEFAULT_PRODUCTOS);
     renderDynamicDrivers(DEFAULT_CONDUCTORES);
+    renderDynamicRoutes(DEFAULT_RUTAS);
     initRutasYProveedores();
+
+    // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
 
-    // Registrar Service Worker para PWA instalable
+    // 3. Registrar Service Worker v1.3.2 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('✅ Service Worker activo (PWA instalable):', reg.scope))
+            navigator.serviceWorker.register('/sw.js?v=1.3.2')
+                .then(reg => {
+                    console.log('✅ Service Worker v1.3.2 activo (PWA instalable):', reg.scope);
+                    reg.update();
+                })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));
+        });
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+                refreshing = true;
+                console.log('🔄 Nuevo Service Worker detectado, recargando página...');
+                window.location.reload();
+            }
+        });
+
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.action === 'RELOAD_PAGE') {
+                if (!refreshing) {
+                    refreshing = true;
+                    console.log('🔄 Mensaje de recarga recibido del Service Worker...');
+                    window.location.reload();
+                }
+            }
         });
     }
 });
