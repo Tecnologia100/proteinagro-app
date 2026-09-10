@@ -801,8 +801,6 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
             const ss = String(now.getSeconds()).padStart(2, '0');
             return d + '/' + m + '/' + y + ' ' + hh + ':' + mm + ':' + ss;
         })(),
-        timestamp: Date.now(),
-        fechaIso: new Date().toISOString(),
         estado: navigator.onLine ? 'Sincronizado' : 'Offline'
     };
 
@@ -934,100 +932,44 @@ function renderCharts(records) {
     });
 }
 
-// === PARSEO Y ORDENAMIENTO CRONOLÓGICO ROBUSTO ===
-function parsearFechaRegistro(fechaVal) {
-    if (!fechaVal) return new Date(0);
-    if (fechaVal instanceof Date) return isNaN(fechaVal.getTime()) ? new Date(0) : fechaVal;
-    if (typeof fechaVal.toDate === 'function') return fechaVal.toDate();
-    if (typeof fechaVal === 'number') return new Date(fechaVal);
-    
-    const fechaStr = String(fechaVal).trim();
-    
-    // Si viene en formato ISO (ej. 2026-09-10T...) o YYYY-MM-DD
-    if (fechaStr.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(fechaStr)) {
-        const d = new Date(fechaStr);
-        if (!isNaN(d.getTime())) return d;
-    }
-    
-    // Formato común en Colombia: D/M/YYYY o DD/MM/YYYY con o sin hora HH:MM:SS
-    const match = fechaStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
-    if (match) {
-        const day = parseInt(match[1], 10);
-        const month = parseInt(match[2], 10) - 1;
-        const year = parseInt(match[3], 10);
-        const hour = match[4] ? parseInt(match[4], 10) : 0;
-        const min = match[5] ? parseInt(match[5], 10) : 0;
-        const sec = match[6] ? parseInt(match[6], 10) : 0;
-        return new Date(year, month, day, hour, min, sec);
-    }
-    
-    const fallback = new Date(fechaStr);
-    return isNaN(fallback.getTime()) ? new Date(0) : fallback;
-}
-
-function formatearFechaRegistro(fechaVal) {
-    const d = parsearFechaRegistro(fechaVal);
-    if (d.getTime() === 0) return fechaVal || '-';
-    const dia = String(d.getDate()).padStart(2, '0');
-    const mes = String(d.getMonth() + 1).padStart(2, '0');
-    const anio = d.getFullYear();
-    const hora = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    return `${dia}/${mes}/${anio} ${hora}`;
-}
-
 function loadAdminData() {
     const tbody = document.getElementById('admin-table-body');
-    if (!tbody) return;
     
-    // Consultar recolecciones en Firestore sin limitador restrictivo alfabético
-    db.collection('recolecciones')
+    db.collection('recolecciones').orderBy('fecha', 'desc').limit(100)
       .onSnapshot((querySnapshot) => {
           tbody.innerHTML = '';
-          const rawRecords = [];
+          const records = [];
           
           querySnapshot.forEach((doc) => {
               const data = doc.data();
-              rawRecords.push({
-                  ...data,
-                  _docId: doc.id
-              });
-          });
-          
-          // Ordenamiento cronológico estricto real (milisegundos) de más reciente a más antiguo
-          rawRecords.sort((a, b) => {
-              const timeA = a.timestamp || parsearFechaRegistro(a.fecha).getTime();
-              const timeB = b.timestamp || parsearFechaRegistro(b.fecha).getTime();
-              return timeB - timeA;
-          });
+              data._docId = doc.id;
+              records.push(data);
+              
+              const dateObj = new Date(data.fecha);
+              const badgeClass = data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
+              const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
 
-          window.adminRecordsMap = window.adminRecordsMap || {};
+              const obsText = data.observaciones ? data.observaciones : '-';
+              const provDisplay = data.proveedor || 'N/A';
+              const sucDisplay = data.punto || data.sucursal || 'General';
+              const docId = doc.id;
+              const recordLocalId = data.id || '';
 
-          rawRecords.forEach((item) => {
-              const docId = item._docId;
-              const recordLocalId = item.id || '';
-              window.adminRecordsMap[docId] = { ...item, id: item.id || ('REC-' + docId.slice(0, 8)) };
-
-              const fechaFormatted = formatearFechaRegistro(item.fecha);
-              const badgeClass = item.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
-              const ruta = item.ruta ? item.ruta.replace('_', ' ') : 'N/A';
-              const obsText = item.observaciones ? item.observaciones : '-';
-              const provDisplay = item.proveedor || 'N/A';
-              const sucDisplay = item.punto || item.sucursal || 'General';
-              const cleanTotalKg = Math.round((Number(item.totalKilos) || 0) * 100) / 100;
+              const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
 
               const tr = document.createElement('tr');
               tr.innerHTML = `
-                  <td style="white-space: nowrap; font-size: 0.85rem;">${fechaFormatted}</td>
-                  <td style="text-transform: capitalize;">${item.conductor || 'N/A'}</td>
+                  <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
+                  <td style="text-transform: capitalize;">${data.conductor}</td>
                   <td style="text-transform: capitalize;">${ruta}</td>
-                  <td style="text-transform: capitalize; font-weight: 500;">${provDisplay}</td>
-                  <td style="font-size: 0.85rem; color: #0284c7; font-weight: 600;">${sucDisplay}</td>
-                  <td style="font-weight: bold; color: #16a34a;">${cleanTotalKg} kg</td>
+                  <td style="text-transform: capitalize;">${provDisplay}</td>
+                  <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
+                  <td style="font-weight: bold;">${cleanTotalKg} kg</td>
                   <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
-                  <td><span class="badge ${badgeClass}">${item.estado || 'Sincronizado'}</span></td>
-                  <td><img src="${item.firma || ''}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
+                  <td><span class="badge ${badgeClass}">${data.estado}</span></td>
+                  <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
                   <td style="white-space: nowrap;">
-                      <button onclick="verSoporteAdminDirecto('${docId}')" title="Ver / Imprimir Soporte" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
+                      <button onclick="verSoporteDesdeTabla('${docId}', '${recordLocalId}')" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
                           📄 Soporte
                       </button>
                       <button onclick="eliminarRecoleccion('${docId}', '${recordLocalId}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
@@ -1038,22 +980,26 @@ function loadAdminData() {
               tbody.appendChild(tr);
           });
           
-          if (rawRecords.length === 0) {
+          adminRecordsCache = records;
+          
+          if (records.length === 0) {
               // Si Firebase está vacío, intentar cargar respaldo local
               let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
               if (savedBackup.length > 0) {
+                  adminRecordsCache = savedBackup;
                   renderRecordsInTable(savedBackup, tbody);
                   renderCharts(savedBackup);
                   return;
               }
               tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 20px;">No hay recolecciones guardadas aún. Haz una prueba desde el formulario.</td></tr>';
           } else {
-              renderCharts(rawRecords);
+              renderCharts(records);
           }
       }, (error) => {
           console.error("Error cargando recolecciones: ", error);
           let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
           if (savedBackup.length > 0) {
+              adminRecordsCache = savedBackup;
               renderRecordsInTable(savedBackup, tbody);
               renderCharts(savedBackup);
           } else {
@@ -1064,19 +1010,9 @@ function loadAdminData() {
 
 function renderRecordsInTable(records, tbody) {
     tbody.innerHTML = '';
-    const sorted = records.slice().sort((a, b) => {
-        const timeA = a.timestamp || parsearFechaRegistro(a.fecha).getTime();
-        const timeB = b.timestamp || parsearFechaRegistro(b.fecha).getTime();
-        return timeB - timeA;
-    });
-
-    sorted.forEach(data => {
-        const recordLocalId = data.id || '';
-        const recKey = recordLocalId || ('REC_LOCAL_' + Math.random().toString(36).substring(2, 9));
-        window.adminRecordsMap = window.adminRecordsMap || {};
-        window.adminRecordsMap[recKey] = { ...data, id: data.id || recKey };
-
-        const fechaFormatted = formatearFechaRegistro(data.fecha);
+    adminRecordsCache = records;
+    records.forEach(data => {
+        const dateObj = new Date(data.fecha);
         const badgeClass = data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
         const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
         const obsText = data.observaciones ? data.observaciones : '-';
@@ -1084,23 +1020,25 @@ function renderRecordsInTable(records, tbody) {
         const provDisplay = data.proveedor || 'N/A';
         const sucDisplay = data.punto || data.sucursal || 'General';
         const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
+        const recordLocalId = data.id || '';
+        const docId = data._docId || '';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td style="white-space: nowrap; font-size: 0.85rem;">${fechaFormatted}</td>
-            <td style="text-transform: capitalize;">${data.conductor || 'N/A'}</td>
+            <td>${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</td>
+            <td style="text-transform: capitalize;">${data.conductor}</td>
             <td style="text-transform: capitalize;">${ruta}</td>
-            <td style="text-transform: capitalize; font-weight: 500;">${provDisplay}</td>
-            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 600;">${sucDisplay}</td>
-            <td style="font-weight: bold; color: #16a34a;">${cleanTotalKg} kg</td>
+            <td style="text-transform: capitalize;">${provDisplay}</td>
+            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
+            <td style="font-weight: bold;">${cleanTotalKg} kg</td>
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
-            <td><span class="badge ${badgeClass}">${data.estado || 'Offline'}</span></td>
-            <td><img src="${data.firma || ''}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
+            <td><span class="badge ${badgeClass}">${data.estado}</span></td>
+            <td><img src="${data.firma}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
             <td style="white-space: nowrap;">
-                <button onclick="verSoporteAdminDirecto('${recKey}')" title="Ver / Imprimir Soporte" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
+                <button onclick="verSoporteDesdeTabla('${docId}', '${recordLocalId}')" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
                     📄 Soporte
                 </button>
-                <button onclick="eliminarRecoleccion('', '${recordLocalId}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
+                <button onclick="eliminarRecoleccion('${docId}', '${recordLocalId}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
                     🗑️ Eliminar
                 </button>
             </td>
@@ -1108,16 +1046,6 @@ function renderRecordsInTable(records, tbody) {
         tbody.appendChild(tr);
     });
 }
-
-// Función global para abrir el Soporte Oficial desde la tabla de Administración
-window.verSoporteAdminDirecto = function(docId) {
-    const data = window.adminRecordsMap ? window.adminRecordsMap[docId] : null;
-    if (data) {
-        mostrarComprobanteDigital(data);
-    } else {
-        alert("No se encontraron los datos para generar este soporte.");
-    }
-};
 
 // Función global para eliminar un registro individual
 async function eliminarRecoleccion(firestoreDocId, localRecordId) {
@@ -1147,29 +1075,23 @@ async function eliminarRecoleccion(firestoreDocId, localRecordId) {
 // === EXPORTAR A EXCEL / CSV ===
 document.getElementById('btn-export')?.addEventListener('click', async () => {
     try {
-        const snapshot = await db.collection('recolecciones').get();
+        const snapshot = await db.collection('recolecciones').orderBy('fecha', 'desc').get();
         if (snapshot.empty) {
             alert('No hay recolecciones para exportar.');
             return;
         }
 
-        const docs = [];
-        snapshot.forEach(doc => docs.push({ ...doc.data(), _docId: doc.id }));
-        docs.sort((a, b) => {
-            const timeA = a.timestamp || parsearFechaRegistro(a.fecha).getTime();
-            const timeB = b.timestamp || parsearFechaRegistro(b.fecha).getTime();
-            return timeB - timeA;
-        });
-
         let csvContent = "\uFEFF"; // UTF-8 BOM para abrir correctamente en Excel
         csvContent += "ID,Fecha,Conductor,Ruta,Proveedor,Sucursal/Punto,Productos,Total Kilos,Observaciones,Estado\n";
 
-        docs.forEach(data => {
-            const fechaFormatted = `"${formatearFechaRegistro(data.fecha)}"`;
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const dateObj = new Date(data.fecha);
+            const fechaFormatted = `"${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}"`;
             const conductor = `"${data.conductor || ''}"`;
             const ruta = `"${(data.ruta || '').replace('_', ' ')}"`;
             const proveedor = `"${(data.proveedor || '').replace('_', ' ')}"`;
-            const sucursal = `"${(data.sucursal || data.punto || 'General')}"`;
+            const sucursal = `"${(data.sucursal || 'General')}"`;
             
             let productosStr = '';
             if (data.productos && Array.isArray(data.productos)) {
@@ -1181,7 +1103,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
             const observaciones = `"${(data.observaciones || '').replace(/"/g, '""')}"`;
             const estado = `"${data.estado || ''}"`;
 
-            csvContent += `${data._docId || data.id},${fechaFormatted},${conductor},${ruta},${proveedor},${sucursal},${productosStr},${totalKilos},${observaciones},${estado}\n`;
+            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${sucursal},${productosStr},${totalKilos},${observaciones},${estado}\n`;
         });
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1857,29 +1779,29 @@ function mostrarComprobanteDigital(data) {
     const modal = document.getElementById('receipt-modal');
     if (!modal) return;
 
-    // Parseo inteligente de fecha y hora
-    let displayDate = '';
-    let displayTime = '';
+    let receiptDateStr = now.toLocaleDateString();
+    let receiptTimeStr = now.toLocaleTimeString();
     if (data.fecha) {
-        const d = parsearFechaRegistro(data.fecha);
-        if (d.getTime() > 0) {
-            displayDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-            displayTime = data.hora || (typeof data.fecha === 'string' && data.fecha.includes(':') ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+        if (typeof data.fecha === 'string' && data.fecha.includes(' ')) {
+            const parts = data.fecha.trim().split(' ');
+            receiptDateStr = parts[0];
+            receiptTimeStr = parts.slice(1).join(' ');
         } else {
-            displayDate = data.fecha;
-            displayTime = data.hora || '';
+            const dObj = new Date(data.fecha);
+            if (!isNaN(dObj.getTime())) {
+                receiptDateStr = dObj.toLocaleDateString();
+                receiptTimeStr = dObj.toLocaleTimeString();
+            } else {
+                receiptDateStr = String(data.fecha);
+            }
         }
-    } else {
-        const now = new Date();
-        displayDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-        displayTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    document.getElementById('receipt-number').textContent = `N° ${data.id || 'REC-' + Date.now().toString().slice(-6)}`;
-    document.getElementById('receipt-date').textContent = displayDate;
-    document.getElementById('receipt-time').textContent = displayTime || '--';
-    document.getElementById('receipt-driver').textContent = data.conductor || 'Oficina / Administración';
-    document.getElementById('receipt-route').textContent = data.ruta || 'Sede Administrativa / Planta';
+    document.getElementById('receipt-number').textContent = `N° ${data.id || (data._docId ? data._docId : 'REC-' + Date.now())}`;
+    document.getElementById('receipt-date').textContent = receiptDateStr;
+    document.getElementById('receipt-time').textContent = receiptTimeStr;
+    document.getElementById('receipt-driver').textContent = data.conductor || '-';
+    document.getElementById('receipt-route').textContent = data.ruta || '-';
     document.getElementById('receipt-provider').textContent = data.proveedor || '-';
     document.getElementById('receipt-branch').textContent = data.punto || data.sucursal || 'General';
 
@@ -1911,14 +1833,11 @@ function mostrarComprobanteDigital(data) {
     }
 
     const sigImg = document.getElementById('receipt-signature-img');
-    const adminBadge = document.getElementById('receipt-admin-badge');
-    if (data.firma && typeof data.firma === 'string' && data.firma.startsWith('data:image')) {
+    if (data.firma) {
         sigImg.src = data.firma;
         sigImg.style.display = 'inline-block';
-        if (adminBadge) adminBadge.style.display = 'none';
     } else {
         sigImg.style.display = 'none';
-        if (adminBadge) adminBadge.style.display = 'block';
     }
 
     modal.style.display = 'flex';
@@ -1929,19 +1848,14 @@ document.getElementById('btn-close-receipt')?.addEventListener('click', () => {
     if (modal) modal.style.display = 'none';
 });
 
-// Cerrar modal al hacer clic en el backdrop
-document.getElementById('receipt-modal')?.addEventListener('click', (e) => {
-    if (e.target.id === 'receipt-modal') {
-        e.currentTarget.style.display = 'none';
-    }
-});
-
 document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
     if (!currentReceiptData) return;
     const d = currentReceiptData;
-    const dateText = document.getElementById('receipt-date')?.textContent || '';
-    const timeText = document.getElementById('receipt-time')?.textContent || '';
-    const dateDisplay = (dateText + (timeText && timeText !== '--' ? ' ' + timeText : '')).trim() || new Date().toLocaleString();
+    let fechaMsg = d.fecha;
+    if (!fechaMsg) {
+        const dateObj = new Date();
+        fechaMsg = `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}`;
+    }
 
     let prodsTxt = '';
     if (d.productos && Array.isArray(d.productos)) {
@@ -1953,26 +1867,23 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
     }
 
     const cleanTotalKg = Math.round((Number(d.totalKilos) || 0) * 100) / 100;
-    const firmaStatus = (d.firma && typeof d.firma === 'string' && d.firma.startsWith('data:image'))
-        ? '✍️ *Firma Registrada:* OK (Firma en ruta)'
-        : '🛡️ *Aprobación:* Emisión Oficial Administración';
 
     const msg = `🌿 *PROTEINAGRO - COMPROBANTE DE RECOLECCIÓN*\n` +
         `-----------------------------------------\n` +
-        `📄 *N° Recibo:* ${d.id || 'N/A'}\n` +
-        `📅 *Fecha:* ${dateDisplay}\n` +
-        `🚛 *Conductor:* ${d.conductor || 'Oficina / Administración'}\n` +
-        `🗺️ *Ruta:* ${d.ruta || 'Sede Administrativa / Planta'}\n` +
-        `🏬 *Proveedor:* ${d.proveedor || '-'}\n` +
+        `📄 *N° Recibo:* ${d.id || d._docId || 'N/A'}\n` +
+        `📅 *Fecha:* ${fechaMsg}\n` +
+        `🚛 *Conductor:* ${d.conductor}\n` +
+        `🗺️ *Ruta:* ${d.ruta}\n` +
+        `🏬 *Proveedor:* ${d.proveedor}\n` +
         `📍 *Sucursal/Punto:* ${d.punto || d.sucursal || 'General'}\n` +
         `-----------------------------------------\n` +
         `📦 *PRODUCTOS RECOLECTADOS:*\n${prodsTxt}\n` +
         `-----------------------------------------\n` +
         `⚖️ *TOTAL RECOLECTADO: ${cleanTotalKg} KG*\n` +
         (d.observaciones ? `📝 *Observaciones:* ${d.observaciones}\n` : '') +
-        `${firmaStatus}\n` +
+        `✍️ *Firma Registrada:* OK\n` +
         `-----------------------------------------\n` +
-        `_Certificado digital emitido por ProteinAgro_`;
+        `_Certificado digital emitido en punto por ProteinAgro_`;
 
     const encoded = encodeURIComponent(msg);
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
@@ -1981,289 +1892,6 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
 document.getElementById('btn-print-receipt')?.addEventListener('click', () => {
     window.print();
 });
-
-// === GESTOR DE EMISIÓN DE SOPORTE OFICIAL EN ADMINISTRACIÓN ===
-let adminAddedProducts = [];
-
-function initAdminSoporteModal() {
-    const btnOpen = document.getElementById('btn-admin-nuevo-soporte');
-    const btnClose = document.getElementById('btn-cerrar-admin-soporte');
-    const modal = document.getElementById('admin-soporte-modal');
-    const form = document.getElementById('admin-soporte-form');
-    const provSelect = document.getElementById('admin-soporte-proveedor');
-    const customProvGroup = document.getElementById('admin-soporte-custom-prov-group');
-    const customProvInput = document.getElementById('admin-soporte-custom-prov');
-    const sucSelect = document.getElementById('admin-soporte-sucursal');
-    const customSucGroup = document.getElementById('admin-soporte-custom-suc-group');
-    const customSucInput = document.getElementById('admin-soporte-custom-suc');
-    const prodSelect = document.getElementById('admin-soporte-producto');
-    const kilosInput = document.getElementById('admin-soporte-kilos');
-    const btnAddProd = document.getElementById('btn-admin-add-prod');
-    const driverSelect = document.getElementById('admin-soporte-conductor');
-    const routeSelect = document.getElementById('admin-soporte-ruta');
-
-    if (!btnOpen || !modal || !form) return;
-
-    function renderAdminProductsList() {
-        const box = document.getElementById('admin-added-products-box');
-        const list = document.getElementById('admin-products-list');
-        const totalSpan = document.getElementById('admin-total-kilos-preview');
-        if (!box || !list || !totalSpan) return;
-
-        list.innerHTML = '';
-        if (adminAddedProducts.length === 0) {
-            box.style.display = 'none';
-            totalSpan.textContent = '0 KG';
-            return;
-        }
-
-        box.style.display = 'block';
-        let total = 0;
-        adminAddedProducts.forEach((item, index) => {
-            const kg = Math.round((Number(item.kilos) || 0) * 100) / 100;
-            total += kg;
-            const li = document.createElement('li');
-            li.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed #e2e8f0;';
-            li.innerHTML = `
-                <span>${getEmojiForProduct(item.producto)} <strong>${item.producto}</strong></span>
-                <span style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-weight: 700; color: #0284c7;">${kg} KG</span>
-                    <button type="button" data-index="${index}" style="background: none; border: none; cursor: pointer; color: #ef4444; font-size: 0.85rem; padding: 2px 4px;" title="Eliminar">❌</button>
-                </span>
-            `;
-            li.querySelector('button').addEventListener('click', (e) => {
-                const idx = parseInt(e.currentTarget.getAttribute('data-index'), 10);
-                adminAddedProducts.splice(idx, 1);
-                renderAdminProductsList();
-            });
-            list.appendChild(li);
-        });
-        totalSpan.textContent = `${Math.round(total * 100) / 100} KG`;
-    }
-
-    function populateAdminSelects() {
-        // 1. Proveedores
-        const provs = getTodosLosProveedores();
-        provSelect.innerHTML = '<option value="" disabled selected>Seleccione el proveedor...</option>';
-        provs.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p;
-            opt.textContent = p;
-            provSelect.appendChild(opt);
-        });
-        const optOtroProv = document.createElement('option');
-        optOtroProv.value = 'OTRO';
-        optOtroProv.textContent = '➕ OTRO (Escribir Proveedor Nuevo)...';
-        provSelect.appendChild(optOtroProv);
-
-        // 2. Sucursales reset
-        sucSelect.innerHTML = `
-            <option value="Sede Principal / General">Sede Principal / General</option>
-            <option value="OTRO">➕ OTRA (Escribir Punto Nuevo)...</option>
-        `;
-
-        // 3. Conductores
-        driverSelect.innerHTML = '<option value="Oficina / Administración">🏢 Oficina / Administración</option>';
-        DEFAULT_CONDUCTORES.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c;
-            opt.textContent = `🚛 ${c}`;
-            driverSelect.appendChild(opt);
-        });
-
-        // 4. Rutas
-        routeSelect.innerHTML = '<option value="Sede Administrativa / Planta">🏢 Sede Administrativa / Planta</option>';
-        DEFAULT_RUTAS.forEach(r => {
-            const opt = document.createElement('option');
-            opt.value = r;
-            opt.textContent = `🗺️ ${r}`;
-            routeSelect.appendChild(opt);
-        });
-
-        // 5. Productos
-        prodSelect.innerHTML = '';
-        const sortedProds = DEFAULT_PRODUCTOS.slice().sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-        sortedProds.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p;
-            opt.textContent = `${getEmojiForProduct(p)} ${p}`;
-            prodSelect.appendChild(opt);
-        });
-    }
-
-    btnOpen.addEventListener('click', () => {
-        populateAdminSelects();
-        adminAddedProducts = [];
-        renderAdminProductsList();
-
-        // Fechas por defecto: hoy y hora actual
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        document.getElementById('admin-soporte-fecha').value = `${yyyy}-${mm}-${dd}`;
-        const hh = String(now.getHours()).padStart(2, '0');
-        const min = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('admin-soporte-hora').value = `${hh}:${min}`;
-
-        customProvGroup.style.display = 'none';
-        customProvInput.value = '';
-        customProvInput.required = false;
-        customSucGroup.style.display = 'none';
-        customSucInput.value = '';
-        customSucInput.required = false;
-        document.getElementById('admin-soporte-obs').value = '';
-        kilosInput.value = '';
-
-        modal.style.display = 'flex';
-    });
-
-    btnClose?.addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
-
-    modal.addEventListener('click', (e) => {
-        if (e.target.id === 'admin-soporte-modal') {
-            modal.style.display = 'none';
-        }
-    });
-
-    // Delegación cuando cambia el proveedor
-    provSelect.addEventListener('change', () => {
-        const val = provSelect.value;
-        if (val === 'OTRO') {
-            customProvGroup.style.display = 'block';
-            customProvInput.required = true;
-            sucSelect.innerHTML = `
-                <option value="Sede Principal / General">Sede Principal / General</option>
-                <option value="OTRO">➕ OTRA (Escribir Punto Nuevo)...</option>
-            `;
-        } else {
-            customProvGroup.style.display = 'none';
-            customProvInput.required = false;
-
-            const puntos = getPuntosParaProveedor('', val);
-            sucSelect.innerHTML = '<option value="Sede Principal / General">Sede Principal / General</option>';
-            puntos.forEach(pt => {
-                if (pt !== 'Sede Principal / General') {
-                    const opt = document.createElement('option');
-                    opt.value = pt;
-                    opt.textContent = pt;
-                    sucSelect.appendChild(opt);
-                }
-            });
-            const optOtraSuc = document.createElement('option');
-            optOtraSuc.value = 'OTRO';
-            optOtraSuc.textContent = '➕ OTRA (Escribir Punto Nuevo)...';
-            sucSelect.appendChild(optOtraSuc);
-        }
-        customSucGroup.style.display = 'none';
-        customSucInput.value = '';
-        customSucInput.required = false;
-    });
-
-    // Delegación cuando cambia la sucursal
-    sucSelect.addEventListener('change', () => {
-        if (sucSelect.value === 'OTRO') {
-            customSucGroup.style.display = 'block';
-            customSucInput.required = true;
-        } else {
-            customSucGroup.style.display = 'none';
-            customSucInput.required = false;
-        }
-    });
-
-    // Añadir producto
-    btnAddProd.addEventListener('click', () => {
-        const prod = prodSelect.value;
-        const kg = parseFloat(kilosInput.value);
-
-        if (!prod) {
-            alert('Por favor seleccione un producto.');
-            return;
-        }
-        if (isNaN(kg) || kg <= 0) {
-            alert('Por favor ingrese una cantidad válida en kilos (mayor a 0).');
-            kilosInput.focus();
-            return;
-        }
-
-        const cleanKg = Math.round(kg * 100) / 100;
-        const existing = adminAddedProducts.find(p => p.producto === prod);
-        if (existing) {
-            existing.kilos = Math.round((existing.kilos + cleanKg) * 100) / 100;
-        } else {
-            adminAddedProducts.push({ producto: prod, kilos: cleanKg });
-        }
-
-        kilosInput.value = '';
-        kilosInput.focus();
-        renderAdminProductsList();
-    });
-
-    // Submit del formulario
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-
-        if (adminAddedProducts.length === 0) {
-            alert('⚠️ Debe añadir al menos una materia prima con su peso en kilos antes de generar el soporte.');
-            kilosInput.focus();
-            return;
-        }
-
-        let prov = provSelect.value;
-        if (!prov) {
-            alert('Por favor seleccione el proveedor.');
-            provSelect.focus();
-            return;
-        }
-        if (prov === 'OTRO') {
-            prov = customProvInput.value.trim();
-            if (!prov) {
-                alert('Por favor escriba el nombre del nuevo proveedor.');
-                customProvInput.focus();
-                return;
-            }
-        }
-
-        let suc = sucSelect.value;
-        if (suc === 'OTRO') {
-            suc = customSucInput.value.trim();
-            if (!suc) {
-                alert('Por favor escriba el nombre de la sucursal / punto.');
-                customSucInput.focus();
-                return;
-            }
-        }
-
-        const fecha = document.getElementById('admin-soporte-fecha').value;
-        const hora = document.getElementById('admin-soporte-hora').value;
-        const conductor = driverSelect.value;
-        const ruta = routeSelect.value;
-        const obs = document.getElementById('admin-soporte-obs').value.trim();
-        const totalKg = Math.round(adminAddedProducts.reduce((sum, p) => sum + (Number(p.kilos) || 0), 0) * 100) / 100;
-
-        // Visual only: Genera ID oficial de emisión y muestra en pantalla (NO se guarda en DB ni Sheets)
-        const receiptData = {
-            id: 'ADM-' + Math.floor(100000 + Math.random() * 900000),
-            fecha: fecha,
-            hora: hora,
-            conductor: conductor,
-            ruta: ruta,
-            proveedor: prov,
-            punto: suc,
-            sucursal: suc,
-            productos: [...adminAddedProducts],
-            totalKilos: totalKg,
-            observaciones: obs,
-            firma: null,
-            esAdminEmision: true
-        };
-
-        modal.style.display = 'none';
-        mostrarComprobanteDigital(receiptData);
-    });
-}
 
 // Función global para forzar recarga y limpiar cachés en cualquier celular o PC
 window.forzarActualizacionApp = async function() {
@@ -2283,8 +1911,293 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.6&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.5&t=' + Date.now();
 };
+
+// ==============================================================================
+// SISTEMA DE EMISIÓN DE SOPORTE OFICIAL PARA ROL ADMINISTRADOR (100% VISUAL)
+// ==============================================================================
+let adminRecordsCache = [];
+let currentAdminFoundRecord = null;
+
+function coincideFechaRecoleccion(fechaRegistro, fechaBuscadaIso) {
+    if (!fechaRegistro || !fechaBuscadaIso) return false;
+    const [bYear, bMonth, bDay] = fechaBuscadaIso.split('-').map(Number);
+    
+    const d = new Date(fechaRegistro);
+    if (!isNaN(d.getTime())) {
+        if (d.getFullYear() === bYear && (d.getMonth() + 1) === bMonth && d.getDate() === bDay) {
+            return true;
+        }
+    }
+    
+    const match = String(fechaRegistro).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (match) {
+        const rDay = Number(match[1]);
+        const rMonth = Number(match[2]);
+        const rYear = Number(match[3]);
+        if (rDay === bDay && rMonth === bMonth && rYear === bYear) {
+            return true;
+        }
+    }
+    return false;
+}
+
+window.verSoporteDesdeTabla = function(docId, recordLocalId) {
+    let match = adminRecordsCache.find(r => (docId && r._docId === docId) || (recordLocalId && (r.id === recordLocalId || r._docId === recordLocalId)));
+    if (!match && docId && navigator.onLine) {
+        db.collection('recolecciones').doc(docId).get().then(doc => {
+            if (doc.exists) {
+                const d = doc.data();
+                d._docId = doc.id;
+                mostrarComprobanteDigital(d);
+            } else {
+                alert("No se encontró el registro en la base de datos.");
+            }
+        }).catch(err => alert("Error consultando recolección: " + err.message));
+        return;
+    }
+    if (match) {
+        mostrarComprobanteDigital(match);
+    } else {
+        alert("No se pudo localizar el registro para generar el soporte.");
+    }
+};
+
+function initAdminSupportModal() {
+    const btnOpen = document.getElementById('btn-admin-support-modal');
+    const modal = document.getElementById('admin-support-modal');
+    const btnClose = document.getElementById('btn-close-admin-support-modal');
+    const dateInput = document.getElementById('admin-search-date');
+    const provSelect = document.getElementById('admin-search-provider');
+    const pointSelect = document.getElementById('admin-search-point');
+    const multipleBox = document.getElementById('admin-search-multiple-box');
+    const multipleSelect = document.getElementById('admin-search-multiple-select');
+    const resultBox = document.getElementById('admin-search-result-box');
+    const emptyBox = document.getElementById('admin-search-empty-box');
+    const loadingBox = document.getElementById('admin-search-loading');
+    const btnViewVoucher = document.getElementById('btn-admin-view-voucher');
+
+    if (!btnOpen || !modal) return;
+
+    const popularProveedoresAdmin = () => {
+        provSelect.innerHTML = '<option value="" disabled selected>Seleccione un proveedor</option>';
+        const provsSet = new Set(TODOS_LOS_PROVEEDORES);
+        adminRecordsCache.forEach(r => {
+            if (r.proveedor) provsSet.add(r.proveedor.trim());
+        });
+        const provsList = Array.from(provsSet).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+        provsList.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            provSelect.appendChild(opt);
+        });
+    };
+
+    btnOpen.addEventListener('click', () => {
+        modal.style.display = 'flex';
+        if (!dateInput.value) {
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = String(today.getMonth() + 1).padStart(2, '0');
+            const d = String(today.getDate()).padStart(2, '0');
+            dateInput.value = `${y}-${m}-${d}`;
+        }
+        popularProveedoresAdmin();
+        pointSelect.disabled = true;
+        pointSelect.innerHTML = '<option value="" disabled selected>Primero seleccione un proveedor</option>';
+        resultBox.style.display = 'none';
+        emptyBox.style.display = 'none';
+        multipleBox.style.display = 'none';
+    });
+
+    btnClose?.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+
+    provSelect.addEventListener('change', () => {
+        const provVal = provSelect.value;
+        if (!provVal) {
+            pointSelect.disabled = true;
+            pointSelect.innerHTML = '<option value="" disabled selected>Primero seleccione un proveedor</option>';
+            ejecutarBusqueda();
+            return;
+        }
+
+        pointSelect.disabled = false;
+        pointSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
+
+        const cleanStr = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        const targetProv = cleanStr(provVal);
+        const puntosSet = new Set();
+
+        const puntosCat = getPuntosParaProveedor('', provVal);
+        puntosCat.forEach(pt => puntosSet.add(pt));
+
+        adminRecordsCache.forEach(r => {
+            if (cleanStr(r.proveedor) === targetProv) {
+                const pt = r.punto || r.sucursal;
+                if (pt) puntosSet.add(pt);
+            }
+        });
+
+        const puntosList = Array.from(puntosSet).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+        if (puntosList.length > 0) {
+            puntosList.forEach(pt => {
+                const opt = document.createElement('option');
+                opt.value = pt;
+                opt.textContent = pt;
+                pointSelect.appendChild(opt);
+            });
+            if (puntosList.length === 1) {
+                pointSelect.value = puntosList[0];
+            }
+        } else {
+            const optGen = document.createElement('option');
+            optGen.value = 'Sede Principal / General';
+            optGen.textContent = 'Sede Principal / General';
+            pointSelect.appendChild(optGen);
+            pointSelect.value = 'Sede Principal / General';
+        }
+
+        ejecutarBusqueda();
+    });
+
+    dateInput.addEventListener('change', ejecutarBusqueda);
+    pointSelect.addEventListener('change', ejecutarBusqueda);
+
+    async function ejecutarBusqueda() {
+        const dateVal = dateInput.value;
+        const provVal = provSelect.value;
+        const pointVal = pointSelect.value;
+
+        resultBox.style.display = 'none';
+        emptyBox.style.display = 'none';
+        multipleBox.style.display = 'none';
+
+        if (!dateVal || !provVal || !pointVal) {
+            return;
+        }
+
+        loadingBox.style.display = 'block';
+
+        const cleanStr = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        const targetProv = cleanStr(provVal);
+        const targetPoint = cleanStr(pointVal);
+
+        let matches = adminRecordsCache.filter(r => {
+            const matchDate = coincideFechaRecoleccion(r.fecha, dateVal);
+            const matchProv = cleanStr(r.proveedor) === targetProv;
+            const pt = cleanStr(r.punto || r.sucursal);
+            const matchPoint = pt === targetPoint || pt.includes(targetPoint) || targetPoint.includes(pt);
+            return matchDate && matchProv && matchPoint;
+        });
+
+        if (matches.length === 0 && navigator.onLine) {
+            try {
+                const snapshot = await db.collection('recolecciones')
+                    .where('proveedor', '==', provVal)
+                    .get();
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    d._docId = doc.id;
+                    if (coincideFechaRecoleccion(d.fecha, dateVal)) {
+                        const pt = cleanStr(d.punto || d.sucursal);
+                        if (pt === targetPoint || pt.includes(targetPoint) || targetPoint.includes(pt)) {
+                            matches.push(d);
+                            if (!adminRecordsCache.some(c => c._docId === doc.id)) {
+                                adminRecordsCache.push(d);
+                            }
+                        }
+                    }
+                });
+            } catch (err) {
+                console.warn("Consulta extendida Firestore en Admin:", err);
+            }
+        }
+
+        loadingBox.style.display = 'none';
+
+        if (matches.length === 0) {
+            emptyBox.style.display = 'block';
+            currentAdminFoundRecord = null;
+            return;
+        }
+
+        if (matches.length > 1) {
+            multipleBox.style.display = 'block';
+            multipleSelect.innerHTML = '';
+            matches.forEach((m, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = `Viaje #${idx + 1} (${m.fecha}) - ${m.conductor || 'Sin conductor'} (${m.totalKilos || 0} kg)`;
+                multipleSelect.appendChild(opt);
+            });
+            multipleSelect.onchange = () => {
+                renderizarPreview(matches[Number(multipleSelect.value)]);
+            };
+            renderizarPreview(matches[0]);
+        } else {
+            renderizarPreview(matches[0]);
+        }
+    }
+
+    function renderizarPreview(rec) {
+        currentAdminFoundRecord = rec;
+        resultBox.style.display = 'block';
+        emptyBox.style.display = 'none';
+
+        document.getElementById('admin-search-receipt-id').textContent = rec.id || rec._docId || 'N/A';
+        
+        const metaDiv = document.getElementById('admin-search-meta');
+        metaDiv.innerHTML = `
+            <div><strong>🚛 Conductor:</strong> <span style="text-transform: capitalize;">${rec.conductor || '-'}</span></div>
+            <div><strong>🗺️ Ruta:</strong> <span style="text-transform: capitalize;">${rec.ruta || '-'}</span></div>
+            <div><strong>📅 Fecha/Hora:</strong> ${rec.fecha || '-'}</div>
+            <div><strong>📍 Punto:</strong> ${rec.punto || rec.sucursal || 'General'}</div>
+            ${rec.observaciones ? `<div><strong>📝 Observaciones:</strong> ${rec.observaciones}</div>` : ''}
+        `;
+
+        const prodsDiv = document.getElementById('admin-search-products-preview');
+        prodsDiv.innerHTML = '';
+        if (rec.productos && Array.isArray(rec.productos)) {
+            const prodsSorted = rec.productos.slice().sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
+            prodsSorted.forEach(p => {
+                const k = Math.round((Number(p.kilos) || 0) * 100) / 100;
+                const itemDiv = document.createElement('div');
+                itemDiv.style.display = 'flex';
+                itemDiv.style.justifyContent = 'space-between';
+                itemDiv.style.alignItems = 'center';
+                itemDiv.style.padding = '4px 0';
+                itemDiv.style.borderBottom = '1px dashed #f1f5f9';
+                itemDiv.innerHTML = `
+                    <span>${getEmojiForProduct(p.producto)} <strong>${p.producto}</strong></span>
+                    <span style="color: #0284c7; font-weight: 700;">${k} KG</span>
+                `;
+                prodsDiv.appendChild(itemDiv);
+            });
+        } else {
+            prodsDiv.innerHTML = `<div style="color: #64748b;">Producto: ${rec.producto || 'N/A'} - ${rec.totalKilos || 0} KG</div>`;
+        }
+
+        const totalKg = Math.round((Number(rec.totalKilos) || 0) * 100) / 100;
+        document.getElementById('admin-search-total').innerHTML = `⚖️ Total Recolectado: <span style="font-size: 1.25rem;">${totalKg} KG</span>`;
+    }
+
+    btnViewVoucher.addEventListener('click', () => {
+        if (currentAdminFoundRecord) {
+            modal.style.display = 'none';
+            mostrarComprobanteDigital(currentAdminFoundRecord);
+        }
+    });
+}
 
 // Inicializar selectores dinámicos y catálogos al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
@@ -2294,19 +2207,17 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDynamicDrivers(DEFAULT_CONDUCTORES);
     renderDynamicRoutes(DEFAULT_RUTAS);
     initRutasYProveedores();
+    initAdminSupportModal();
 
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
 
-    // 3. Inicializar modal de Soporte Oficial para Administradores
-    initAdminSoporteModal();
-
-    // 4. Registrar Service Worker v1.3.6 para PWA instalable con actualización automática inmediata
+    // 3. Registrar Service Worker v1.3.5 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.3.6')
+            navigator.serviceWorker.register('/sw.js?v=1.3.5')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.3.6 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.3.5 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

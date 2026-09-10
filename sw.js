@@ -3,7 +3,7 @@
 // Cache del App Shell con estrategia Network-First y Fallback a Cache Offline
 // ==============================================================================
 
-const CACHE_NAME = 'proteinagro-v1.3.6';
+const CACHE_NAME = 'proteinagro-v1.3.5';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -20,7 +20,7 @@ const APP_SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-cacheando App Shell de ProteinAgro v1.3.6');
+      console.log('[SW] Pre-cacheando App Shell de ProteinAgro v1.3.5');
       return cache.addAll(APP_SHELL).catch((err) => {
         console.warn('[SW] Advertencia pre-cacheando recursos:', err);
       });

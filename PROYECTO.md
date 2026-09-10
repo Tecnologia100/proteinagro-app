@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.3.6`  
+> **Versión Actual:** `v=1.3.5`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -140,13 +140,6 @@ Panel de control para supervisión y auditoría en tiempo real:
    - Descarga inmediata de reportes consolidados en formato **CSV** compatible con Microsoft Excel y Google Sheets.
 4. **Filtros Avanzados:**
    - Filtrado por rango de fechas, conductor específico o proveedor.
-5. **Generador Administrativo de Soporte Oficial (Voucher Visual - v1.3.5):**
-   - Emisión directa de soportes oficiales para cualquier fecha pasada o actual y cualquier proveedor con sus materias primas y kilos.
-   - Sello de certificación: *"🛡️ Emisión Oficial - Aprobado Administración"*.
-   - Compartir por WhatsApp o Imprimir / exportar a PDF con el diseño oficial idéntico al de campo.
-   - Operación puramente visual (no genera duplicidad de filas contables en Google Sheets ni Firestore).
-6. **Soporte Inmediato por Registro:**
-   - Botón `📄 Soporte` en cada fila de la tabla de auditoría para consultar, imprimir o compartir el comprobante de cualquier recolección histórica con 1 solo clic.
 
 ---
 
@@ -211,32 +204,18 @@ PROTEINAGRO/
 
 ---
 
-## 🔄 7. Historial de Versiones (Changelog)
+## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.3.6` (Septiembre 2026) - Versión Actual
-- **Corrección Crítica de Ordenamiento y Visualización en Rol de Administración:**
-  - **Causa raíz identificada:** La consulta anterior en Firestore utilizaba `.orderBy('fecha', 'desc').limit(100)` sobre el campo de texto `fecha` (`"D/M/YYYY"`). En la comparación alfanumérica de Firestore, las fechas de septiembre que inician con `"9/"` (`9/9/2026`) se consideraban superiores a las fechas que inician con `"10/"` (`10/9/2026`). Al existir más de 100 recolecciones entre el 3 y el 9 de septiembre, el límite de 100 truncaba y excluía todas las recolecciones del 10 de septiembre en adelante.
-  - **Solución implementada:** Se eliminó el limitador restrictivo alfabético de Firestore y se implementó un motor de ordenamiento cronológico real en memoria JavaScript (`parsearFechaRegistro`) que calcula los milisegundos exactos sin importar el formato de origen.
-  - **Formateo de Fechas en Español:** Se normalizó la presentación de fechas en `DD/MM/YYYY HH:MM:SS` para evitar que el navegador interprete días mayores a 12 como fechas inválidas o invierta meses y días.
-  - **Persistencia con Timestamp:** Se añadió `timestamp` numérico y `fechaIso` a cada nuevo guardado de recolección para facilitar futuras indexaciones.
-
-### `v=1.3.5` (Septiembre 2026)
-- **Generador Administrativo de Soporte Oficial de Recolección (Opción 1 - Visual):**
-  - Nuevo botón `📋 Generar Soporte Oficial` en el panel de administración.
-  - Modal interactivo para seleccionar Fecha, Hora, Proveedor (+ nuevo proveedor libre), Sucursal/Punto (+ nueva sucursal libre), Conductor, Ruta y Observaciones.
-  - Agregador dinámico de materias primas con cálculo en tiempo real de kilos totales y botones individuales para eliminar items.
-  - Generación instantánea del comprobante digital (Voucher oficial) idéntico al de campo, con sello *"🛡️ Emisión Oficial - Aprobado Administración"*.
-  - Compartir por WhatsApp con texto formateado e impresión / PDF.
-  - **Cero alteración de bases de datos:** El soporte emitido en este módulo es puramente visual para auditorías, reimpresiones o solicitudes especiales del cliente, sin escribir filas en Firestore ni Google Sheets.
-- **Acceso Directo a Soportes desde Tabla Administrativa:**
-  - Botón `📄 Soporte` en cada fila de recolección para abrir de inmediato el comprobante digital de cualquier viaje registrado.
+### `v=1.3.5` (Septiembre 2026) - Versión Actual
+- **Generador de Soporte Oficial de Recolección en Rol Administrador:**
+  - Incorporación del botón `📄 Emitir Soporte Oficial` en la barra de acciones del Panel Administrativo (`#admin-support-modal`).
+  - **Autollenado Inteligente por Filtros (Opción 1):** Al ingresar **Fecha** (calendario nativo), **Proveedor** y **Punto / Sucursal**, el sistema busca de forma automática en el historial existente y autocompleta todos los datos de la recolección: Conductor, Ruta, lista de productos recolectados con sus iconos oficiales, total de kilos y observaciones.
+  - **Manejo de Múltiples Viajes:** Si un proveedor registra más de una recolección en la misma fecha y punto (ej. dos viajes de ruta en el mismo día), se presenta un selector de viajes (`Viaje #1`, `Viaje #2`) para elegir la recolección exacta a emitir.
+  - **Acceso Rápido desde la Tabla de Recolecciones:** Cada fila de la tabla de recolecciones recientes del panel de administración incorpora un botón directo `📄 Soporte` para visualizar y emitir el comprobante oficial en 1 solo clic.
+  - **Comprobante Digital Oficial con Fecha Histórica:** Al pulsar `📄 Abrir Soporte Oficial`, se despliega el voucher oficial con la fecha y hora histórica real de la recolección, firma digital capturada en campo, totales con redondeo exacto a 2 decimales, y funciones completas de impresión / PDF y compartir por WhatsApp.
+  - **Integridad y Seguridad Contable:** La emisión de soportes desde el rol administrador es estrictamente de lectura y visualización (100% visual). No inserta nuevas filas en Google Sheets ni genera duplicados en Firebase Firestore.
 
 ### `v=1.3.4` (Septiembre 2026)
-- **Sincronización Integral de Iconografía y Ordenamiento A-Z:**
-  - Catálogo de 20 materias primas alineado con iconografía representativa (🛢️ Aceite, 🐮 Cabezas, 🦴 Calambombo res/cerdo, 🗑️ Desperdicio, 🐷 Empella, 🥓 Gordana, 🦴 Hueso blanco/cerdo/promoción/seco, 🪵 Leña, 🧈 Manteca/mantequilla/margarina/sebo, 🐷 Orejas cerdo, 🐔 Piel pollo, 🫁 Pulmón cerdo, 🥩 Tráqueas).
-  - Ordenamiento alfabético estricto en la cuadrícula de botones de conductores, modal de recibo y mensajes de WhatsApp.
-
-### `v=1.2.9` (Septiembre 2026)
 - **Iconografía Oficial en Productos Recolectados y Botones Táctiles:**
   - Implementación del mapa maestro de visualización `PRODUCT_DISPLAY_MAP` en JavaScript, vinculando de forma unívoca cada producto con su icono oficial exacto y etiqueta optimizada para móviles (ej. `🐷 HUESO CERDO`, `🫁 PULMON CERDO`, `🦴 CALAMBOMBO CERDO`, `🪵 LEÑA`).
   - Despliegue de los iconos oficiales en la lista en vivo de productos recolectados en pantalla (`#products-list`).
