@@ -375,11 +375,7 @@ const DEFAULT_CONDUCTORES = [
     "Ricardo Sepulveda",
     "Hernando Prado",
     "Emer Rodriguez",
-    "Jairo Peña",
-    "Diego Castellanos",
-    "Carolina Becerra",
-    "Luz Elena",
-    "Daniela"
+    "Jairo Peña"
 ];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
