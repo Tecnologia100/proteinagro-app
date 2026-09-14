@@ -11,7 +11,7 @@ const firebaseConfig = {
 };
 
 // URL del Webhook de Google Apps Script para sincronización directa con Google Sheets
-let GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxtZzQ4qibm-I5C_abeUOIY17Au-ZjMnCeQthBWUovO9oX1Y5aYm52MwVe7bhjbNIzzjQ/exec"; 
+let GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbx4X0yiSS7Tisgyn2Xn2NuAlB9uWRwAP019Jurc4TvSyBseg3un47xA2d6o0rFs0Y5o9A/exec"; 
 
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
@@ -375,7 +375,8 @@ const DEFAULT_CONDUCTORES = [
     "Ricardo Sepulveda",
     "Hernando Prado",
     "Emer Rodriguez",
-    "Jairo Peña"
+    "Jairo Peña",
+    "Carolina"
 ];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
