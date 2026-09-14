@@ -86,45 +86,169 @@ window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 updateNetworkStatus();
 
-// === LÓGICA DE LOGIN (Firebase Auth + PIN Legacy como fallback) ===
-const handleLogin = async (e) => {
+// === ESTADO DE AUTENTICACIÓN Y ROLES ===
+let CONDUCTORES_AUTH = {};
+let ADMIN_CLAVE_CONFIG = "0000";
+let CURRENT_LOGGED_DRIVER = null;
+
+// Cargar credenciales previas desde localStorage si existen (Soporte Offline inmediato)
+try {
+    const cachedAuth = localStorage.getItem('proteinagro_conductores_auth');
+    if (cachedAuth) {
+        CONDUCTORES_AUTH = JSON.parse(cachedAuth);
+    }
+    const cachedAdmin = localStorage.getItem('proteinagro_admin_clave');
+    if (cachedAdmin) {
+        ADMIN_CLAVE_CONFIG = cachedAdmin;
+    }
+} catch (e) {}
+
+// Elementos de cambio de modo en la pantalla de Login
+const conductorLoginSection = document.getElementById('conductor-login-section');
+const adminLoginSection = document.getElementById('admin-login-section');
+const btnToggleAdminLogin = document.getElementById('btn-toggle-admin-login');
+const btnBackToConductor = document.getElementById('btn-back-to-conductor');
+const btnAdminSubmit = document.getElementById('btn-admin-submit');
+
+const mostrarLoginAdmin = () => {
+    if (conductorLoginSection) conductorLoginSection.style.display = 'none';
+    if (adminLoginSection) adminLoginSection.style.display = 'block';
+    const err = document.getElementById('login-admin-error');
+    if (err) err.style.display = 'none';
+    document.getElementById('login-admin-pin')?.focus();
+};
+
+const mostrarLoginConductor = () => {
+    if (adminLoginSection) adminLoginSection.style.display = 'none';
+    if (conductorLoginSection) conductorLoginSection.style.display = 'block';
+    const err = document.getElementById('login-error');
+    if (err) err.style.display = 'none';
+    document.getElementById('login-conductor')?.focus();
+};
+
+btnToggleAdminLogin?.addEventListener('click', mostrarLoginAdmin);
+btnBackToConductor?.addEventListener('click', mostrarLoginConductor);
+
+// Función para ingresar como Administrador
+const entrarComoAdmin = () => {
+    loginOverlay.style.display = 'none';
+    driverView.style.display = 'none';
+    adminView.style.display = 'block';
+    document.body.style.backgroundColor = 'var(--bg-color)';
+    loadAdminData();
+};
+
+// Función para ingresar como Conductor (fijando y bloqueando el nombre)
+const entrarComoConductor = (nombre = null) => {
+    loginOverlay.style.display = 'none';
+    adminView.style.display = 'none';
+    driverView.style.display = 'flex';
+    document.body.style.backgroundColor = 'var(--bg-color)';
+
+    if (nombre) {
+        CURRENT_LOGGED_DRIVER = nombre;
+        try {
+            sessionStorage.setItem('proteinagro_current_driver', nombre);
+        } catch(e) {}
+
+        const select = document.getElementById('conductor');
+        if (select) {
+            let found = false;
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value.toLowerCase() === nombre.toLowerCase() || select.options[i].text.toLowerCase() === nombre.toLowerCase()) {
+                    select.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                const opt = document.createElement('option');
+                opt.value = nombre;
+                opt.textContent = nombre;
+                select.appendChild(opt);
+                select.value = nombre;
+            }
+            // Bloquear selector para evitar manipulación accidental
+            select.setAttribute('disabled', 'disabled');
+            select.classList.add('driver-locked');
+        }
+
+        // Mostrar badges visuales de sesión activa
+        const sessionBadge = document.getElementById('conductor-session-badge');
+        if (sessionBadge) sessionBadge.style.display = 'inline-flex';
+
+        const headerBadge = document.getElementById('driver-header-badge');
+        const headerName = document.getElementById('driver-header-name');
+        if (headerBadge && headerName) {
+            headerName.textContent = nombre;
+            headerBadge.style.display = 'inline-flex';
+        }
+    }
+};
+
+// Login de Conductor con clave individual
+const handleConductorLogin = (e) => {
     if (e) e.preventDefault();
-    const userInput = (document.getElementById('login-user')?.value || '').trim();
+    const driverSelect = document.getElementById('login-conductor');
+    const driverName = (driverSelect?.value || '').trim();
     const pin = (document.getElementById('login-pin')?.value || '').trim();
     const errorMsg = document.getElementById('login-error');
     if (errorMsg) errorMsg.style.display = 'none';
 
-    const entrarComoAdmin = () => {
-        loginOverlay.style.display = 'none';
-        driverView.style.display = 'none';
-        adminView.style.display = 'block';
-        document.body.style.backgroundColor = 'var(--bg-color)';
-        loadAdminData();
-    };
-
-    const entrarComoConductor = (nombre = null) => {
-        loginOverlay.style.display = 'none';
-        adminView.style.display = 'none';
-        driverView.style.display = 'flex';
-        if (nombre) {
-            const select = document.getElementById('conductor');
-            if (select) {
-                for (let i = 0; i < select.options.length; i++) {
-                    if (select.options[i].text.toLowerCase().includes(nombre.toLowerCase()) || select.options[i].value.toLowerCase().includes(nombre.toLowerCase())) {
-                        select.selectedIndex = i;
-                        break;
-                    }
-                }
-            }
+    if (!driverName) {
+        if (errorMsg) {
+            errorMsg.textContent = 'Por favor seleccione su nombre de conductor';
+            errorMsg.style.display = 'block';
         }
-    };
+        driverSelect?.focus();
+        return;
+    }
 
-    // 1. Intentar Firebase Auth si el input contiene "@" (email)
+    if (!pin) {
+        if (errorMsg) {
+            errorMsg.textContent = 'Por favor ingrese su PIN o contraseña';
+            errorMsg.style.display = 'block';
+        }
+        document.getElementById('login-pin')?.focus();
+        return;
+    }
+
+    // Verificar clave individual de Sheets
+    const expectedPin = CONDUCTORES_AUTH[driverName];
+
+    // Permitir si coincide con la clave de Sheets, clave maestra de respaldo ('0000'), o '1234' si aún no tiene clave en Sheets
+    const pinValido = (expectedPin && expectedPin !== '' && pin === expectedPin) ||
+                      (pin === '0000') ||
+                      (!expectedPin && (pin === '1234' || pin === '0000' || pin === ''));
+
+    if (pinValido) {
+        entrarComoConductor(driverName);
+    } else {
+        if (errorMsg) {
+            errorMsg.textContent = 'Contraseña incorrecta para ' + driverName;
+            errorMsg.style.display = 'block';
+        }
+        const pinInput = document.getElementById('login-pin');
+        if (pinInput) {
+            pinInput.value = '';
+            pinInput.focus();
+        }
+    }
+};
+
+// Login de Administrador
+const handleAdminLogin = async (e) => {
+    if (e) e.preventDefault();
+    const userInput = (document.getElementById('login-admin-user')?.value || '').trim();
+    const pin = (document.getElementById('login-admin-pin')?.value || '').trim();
+    const errorMsg = document.getElementById('login-admin-error');
+    if (errorMsg) errorMsg.style.display = 'none';
+
+    // 1. Firebase Auth si se ingresa un correo corporativo
     if (userInput.includes('@')) {
         try {
             const creds = await auth.signInWithEmailAndPassword(userInput, pin);
             if (creds.user) {
-                // Verificar rol desde email o custom claims (basico: admin si contiene "admin")
                 if (creds.user.email && creds.user.email.toLowerCase().includes('admin')) {
                     entrarComoAdmin();
                 } else {
@@ -133,23 +257,42 @@ const handleLogin = async (e) => {
                 return;
             }
         } catch (authErr) {
-            console.warn("⚠️ Firebase Auth falló, intentando PIN heredado:", authErr.message);
+            console.warn("⚠️ Firebase Auth falló, verificando clave admin directa:", authErr.message);
         }
     }
 
-    // 2. Fallback a login por PIN heredado (admin/0000 ó conductor/1234)
+    // 2. Validación de clave de Administrador
     const userLower = userInput.toLowerCase();
-    if ((userLower === 'admin' || userLower === 'administrador') && (pin === '0000' || pin === 'admin' || pin === '1234')) {
+    const esUsuarioAdmin = (userLower === 'admin' || userLower === 'administrador' || userLower === '');
+    const pinAdminValido = (ADMIN_CLAVE_CONFIG && pin === ADMIN_CLAVE_CONFIG) || 
+                           (pin === '0000' || pin === 'admin' || pin === '1234');
+
+    if (esUsuarioAdmin && pinAdminValido) {
         entrarComoAdmin();
-    } else if (userInput !== '' && (pin === '1234' || pin === '0000' || pin === '')) {
-        entrarComoConductor(userInput);
     } else {
-        if (errorMsg) errorMsg.style.display = 'block';
+        if (errorMsg) {
+            errorMsg.textContent = 'Usuario o contraseña de administrador incorrecta';
+            errorMsg.style.display = 'block';
+        }
+        const adminPinInput = document.getElementById('login-admin-pin');
+        if (adminPinInput) {
+            adminPinInput.value = '';
+            adminPinInput.focus();
+        }
     }
 };
 
-document.getElementById('login-form')?.addEventListener('submit', handleLogin);
-btnLogin?.addEventListener('click', handleLogin);
+// Escuchas de eventos para submit
+document.getElementById('login-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (adminLoginSection && adminLoginSection.style.display !== 'none') {
+        handleAdminLogin(e);
+    } else {
+        handleConductorLogin(e);
+    }
+});
+btnAdminSubmit?.addEventListener('click', handleAdminLogin);
+btnLogin?.addEventListener('click', handleConductorLogin);
 
 // Detectar sesión activa de Firebase Auth (persistencia en navegador)
 auth.onAuthStateChanged((user) => {
@@ -158,14 +301,39 @@ auth.onAuthStateChanged((user) => {
     }
 });
 
+// Cierre de sesión (Logout)
 const logout = () => {
     if (auth.currentUser) {
         auth.signOut().catch(() => {});
     }
+    CURRENT_LOGGED_DRIVER = null;
+    try {
+        sessionStorage.removeItem('proteinagro_current_driver');
+    } catch(e) {}
+
     loginOverlay.style.display = 'flex';
     driverView.style.display = 'none';
     adminView.style.display = 'none';
-    document.getElementById('login-pin').value = '';
+    
+    // Limpiar contraseñas
+    const pinInput = document.getElementById('login-pin');
+    if (pinInput) pinInput.value = '';
+    const adminPinInput = document.getElementById('login-admin-pin');
+    if (adminPinInput) adminPinInput.value = '';
+
+    // Restablecer modo conductor por defecto
+    mostrarLoginConductor();
+
+    // Desbloquear select de conductor para siguiente sesión
+    const select = document.getElementById('conductor');
+    if (select) {
+        select.removeAttribute('disabled');
+        select.classList.remove('driver-locked');
+    }
+    const sessionBadge = document.getElementById('conductor-session-badge');
+    if (sessionBadge) sessionBadge.style.display = 'none';
+    const headerBadge = document.getElementById('driver-header-badge');
+    if (headerBadge) headerBadge.style.display = 'none';
 };
 
 btnLogoutDriver.addEventListener('click', logout);
@@ -414,17 +582,39 @@ function renderDynamicProducts(prods) {
 }
 
 function renderDynamicDrivers(drivers) {
+    // 1. Selector en Formulario de Recolección
     const select = document.getElementById('conductor');
-    if (!select) return;
-    const currentVal = select.value;
-    select.innerHTML = '<option value="" disabled selected>Seleccione su nombre</option>';
-    drivers.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d;
-        opt.textContent = d;
-        select.appendChild(opt);
-    });
-    if (currentVal) select.value = currentVal;
+    if (select) {
+        const currentVal = CURRENT_LOGGED_DRIVER || select.value;
+        select.innerHTML = '<option value="" disabled selected>Seleccione su nombre</option>';
+        drivers.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d;
+            opt.textContent = d;
+            select.appendChild(opt);
+        });
+        if (currentVal) {
+            select.value = currentVal;
+            if (CURRENT_LOGGED_DRIVER) {
+                select.setAttribute('disabled', 'disabled');
+                select.classList.add('driver-locked');
+            }
+        }
+    }
+
+    // 2. Selector en Pantalla de Login Conductor
+    const loginSelect = document.getElementById('login-conductor');
+    if (loginSelect) {
+        const currentLoginVal = loginSelect.value;
+        loginSelect.innerHTML = '<option value="" disabled selected>Seleccione su nombre...</option>';
+        drivers.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d;
+            opt.textContent = d;
+            loginSelect.appendChild(opt);
+        });
+        if (currentLoginVal) loginSelect.value = currentLoginVal;
+    }
 }
 
 function renderDynamicRoutes(routes) {
@@ -525,7 +715,26 @@ async function cargarCatalogosDinamicos() {
                     if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
                     if (data.rutas && data.rutas.length > 0) renderDynamicRoutes(data.rutas);
 
-                    console.log("✅ Catálogos 100% dinámicos cargados en vivo desde Google Sheets.");
+                    // Sincronizar credenciales individuales de conductores desde Sheets
+                    if (data.conductores_detalle && Array.isArray(data.conductores_detalle)) {
+                        CONDUCTORES_AUTH = {};
+                        data.conductores_detalle.forEach(c => {
+                            if (c && c.nombre) {
+                                CONDUCTORES_AUTH[c.nombre.trim()] = String(c.clave !== undefined && c.clave !== null ? c.clave : '').trim();
+                            }
+                        });
+                        try {
+                            localStorage.setItem('proteinagro_conductores_auth', JSON.stringify(CONDUCTORES_AUTH));
+                        } catch(e) {}
+                    }
+                    if (data.admin_clave) {
+                        ADMIN_CLAVE_CONFIG = String(data.admin_clave).trim();
+                        try {
+                            localStorage.setItem('proteinagro_admin_clave', ADMIN_CLAVE_CONFIG);
+                        } catch(e) {}
+                    }
+
+                    console.log("✅ Catálogos 100% dinámicos y claves individuales cargadas en vivo desde Google Sheets.");
                     return;
                 }
             }
@@ -534,7 +743,25 @@ async function cargarCatalogosDinamicos() {
         }
     }
 
-    // 2. Fallback a valores por defecto si no hay conexión
+    // 2. Fallback a valores por defecto y caché local si no hay conexión
+    try {
+        const cachedAuth = localStorage.getItem('proteinagro_conductores_auth');
+        if (cachedAuth) {
+            CONDUCTORES_AUTH = JSON.parse(cachedAuth);
+        }
+        const cachedAdmin = localStorage.getItem('proteinagro_admin_clave');
+        if (cachedAdmin) {
+            ADMIN_CLAVE_CONFIG = cachedAdmin;
+        }
+    } catch(e) {}
+
+    // Fallback de seguridad si no hay claves en caché
+    if (Object.keys(CONDUCTORES_AUTH).length === 0) {
+        DEFAULT_CONDUCTORES.forEach(d => {
+            CONDUCTORES_AUTH[d] = '1234';
+        });
+    }
+
     renderDynamicProducts(DEFAULT_PRODUCTOS);
     renderDynamicDrivers(DEFAULT_CONDUCTORES);
     renderDynamicRoutes(DEFAULT_RUTAS);
@@ -838,11 +1065,15 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
             console.warn("⚠️ Firebase no respondió a tiempo, pero los datos se guardaron localmente y en Google Sheets:", fsErr);
         }
 
-        // Limpiar form conservando el nombre del conductor
+        // Limpiar form conservando el nombre del conductor fijado y bloqueado
         const conductorEl = document.getElementById('conductor');
-        const conductorActual = conductorEl ? conductorEl.value : '';
+        const conductorActual = CURRENT_LOGGED_DRIVER || (conductorEl ? conductorEl.value : '');
         document.getElementById('recoleccion-form').reset();
-        if (conductorEl && conductorActual) conductorEl.value = conductorActual;
+        if (conductorEl && conductorActual) {
+            conductorEl.value = conductorActual;
+            conductorEl.setAttribute('disabled', 'disabled');
+            conductorEl.classList.add('driver-locked');
+        }
         
         // Resetear selectores dinámicos
         if (document.getElementById('custom-ruta-group')) document.getElementById('custom-ruta-group').style.display = 'none';
@@ -1949,7 +2180,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.6&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.7&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -2232,12 +2463,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
 
-    // 3. Registrar Service Worker v1.3.6 para PWA instalable con actualización automática inmediata
+    // 3. Restaurar sesión activa de conductor si la página fue refrescada
+    try {
+        const savedDriver = sessionStorage.getItem('proteinagro_current_driver');
+        if (savedDriver) {
+            entrarComoConductor(savedDriver);
+        }
+    } catch(e) {}
+
+    // 4. Registrar Service Worker v1.3.7 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.3.6')
+            navigator.serviceWorker.register('/sw.js?v=1.3.7')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.3.6 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.3.7 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

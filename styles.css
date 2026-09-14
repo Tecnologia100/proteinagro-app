@@ -67,6 +67,52 @@ body {
     max-width: 400px;
 }
 
+/* Enlace discreto de cambio de modo (Admin / Conductor) */
+.btn-link-discrete {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    opacity: 0.8;
+}
+
+.btn-link-discrete:hover {
+    opacity: 1;
+    color: var(--primary);
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* Estado bloqueado de solo lectura para el conductor */
+.driver-locked {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-weight: 600 !important;
+    border-color: #cbd5e1 !important;
+    cursor: not-allowed !important;
+    user-select: none !important;
+}
+
+/* Badge de conductor activo en header */
+.driver-header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #059669;
+    background: rgba(16, 185, 129, 0.12);
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-top: 2px;
+}
+
 /* Header */
 .app-header {
     background-color: var(--card-bg);

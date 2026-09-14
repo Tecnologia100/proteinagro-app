@@ -173,6 +173,7 @@ La hoja de cálculo central contiene 4 pestañas fundamentales:
 ### Pestaña 3: `Conductores`
 - Columna A: `Nombre` (Nombre completo del conductor).
 - Columna B: `Estado` (`Activo` o `Inactivo`).
+- Columna C: `Contraseña` (PIN o clave individual de acceso a la app móvil).
 
 ### Pestaña 4: `Puntos_Rutas`
 - Matriz completa de logística: Ruta, Proveedor, Punto/Sucursal, Dirección, Teléfono, Horario Programado, Frecuencia y Estado.
@@ -206,7 +207,14 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.3.6` (Septiembre 2026) - Versión Actual
+### `v=1.3.7` (Septiembre 2026) - Versión Actual
+- **Autenticación Individual por Conductor vía Google Sheets & Acceso Administrativo Discreto:**
+  - **Claves Individuales desde Google Sheets:** La pestaña `Conductores` incorpora la Columna C (`Contraseña`). Cualquier PIN o clave asignada o modificada en Sheets se sincroniza en vivo con la app móvil.
+  - **Fijación e Inmutabilidad de Conductor en Recolección:** Al autenticarse el conductor, su nombre queda fijado y bloqueado (`disabled`) en el formulario con insignia visual `🔒 Sesión Activa`. Se elimina el doble tipeo/selección y se garantiza 100% de trazabilidad (ningún conductor puede registrar por error a nombre de otro).
+  - **Acceso Administrativo Discreto:** La pantalla de login presenta una experiencia 100% orientada al conductor con selector rápido y PIN, incorporando al pie un enlace discreto (`🔐 Acceso Administrativo`) que permite al administrador autenticarse y abrir el panel de control.
+  - **Persistencia de Sesión y Resiliencia Offline:** La app guarda la sesión activa en `sessionStorage` para no pedir clave al recargar la página en ruta, y almacena en `localStorage` las credenciales para permitir ingreso y registro seguro incluso en zonas rurales sin cobertura celular.
+
+### `v=1.3.6` (Septiembre 2026)
 - **Corrección de Ordenamiento Cronológico y Visualización de Recolecciones del Día:**
   - **Diagnóstico y Corrección de Consulta Firestore:** Se identificó que la consulta anterior ordenaba por el campo de texto `fecha` de forma lexicográfica/alfabética descendente (`"9/9/2026"` > `"10/9/2026"`), lo cual provocaba que al superar los 100 registros en la base de datos, las recolecciones del día 10 de septiembre (`10/9/2026`) quedaran relegadas y excluidas del límite de la consulta.
   - **Incorporación de Campo `timestamp` y Migración Retroactiva:** Se incorporó el campo numérico `timestamp: Date.now()` en cada nuevo registro y se ejecutó un script de backfill que actualizó el 100% de los documentos históricos (157 registros) con su marca de tiempo exacta en milisegundos.

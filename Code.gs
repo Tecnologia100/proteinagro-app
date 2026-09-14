@@ -25,16 +25,33 @@ function doGet(e) {
       }
     }
     
-    // 2. Obtener Conductores (filtrando Inactivos)
+    // 2. Obtener Conductores (filtrando Inactivos y extrayendo Contraseña en Columna C)
     var sheetConductores = ss.getSheetByName("Conductores");
     var conductores = [];
+    var conductoresDetalle = [];
+    var adminClave = '';
     if (sheetConductores && sheetConductores.getLastRow() > 1) {
-      var condData = sheetConductores.getRange(2, 1, sheetConductores.getLastRow() - 1, 2).getValues();
+      var numCols = Math.max(3, sheetConductores.getLastColumn());
+      var condData = sheetConductores.getRange(2, 1, sheetConductores.getLastRow() - 1, numCols).getValues();
       for (var j = 0; j < condData.length; j++) {
         var cNombre = String(condData[j][0] || '').trim();
         var cEstado = String(condData[j][1] || 'Activo').trim().toLowerCase();
+        var cClave = condData[j][2] !== undefined && condData[j][2] !== null ? String(condData[j][2]).trim() : '';
+
+        // Si es usuario administrador en la hoja, capturar su clave exclusiva
+        if (cNombre.toLowerCase() === 'admin' || cNombre.toLowerCase() === 'administrador') {
+          if (cClave !== '') {
+            adminClave = cClave;
+          }
+          continue;
+        }
+
         if (cNombre !== '' && cEstado !== 'inactivo') {
           conductores.push(cNombre);
+          conductoresDetalle.push({
+            nombre: cNombre,
+            clave: cClave
+          });
         }
       }
     }
@@ -117,6 +134,13 @@ function doGet(e) {
     }
     if (conductores.length === 0) {
       conductores = ["Camilo Perez", "Juan Gomez", "Miguel Otero", "Felipe Montilla", "Gildardo Tejada"];
+      conductoresDetalle = [
+        { nombre: "Camilo Perez", clave: "1234" },
+        { nombre: "Juan Gomez", clave: "1234" },
+        { nombre: "Miguel Otero", clave: "1234" },
+        { nombre: "Felipe Montilla", clave: "1234" },
+        { nombre: "Gildardo Tejada", clave: "1234" }
+      ];
     }
     if (rutas.length === 0) {
       rutas = [
@@ -132,6 +156,8 @@ function doGet(e) {
     var output = {
       productos: productos,
       conductores: conductores,
+      conductores_detalle: conductoresDetalle,
+      admin_clave: adminClave,
       rutas: rutas,
       puntos_rutas: puntosRutas
     };
@@ -286,7 +312,7 @@ function inicializarTablasYCatalogos() {
   var sheetCond = ss.getSheetByName("Conductores") || ss.insertSheet("Conductores");
   if (sheetCond.getLastRow() <= 1) {
     sheetCond.clearContents();
-    sheetCond.appendRow(["Nombre", "Estado"]);
+    sheetCond.appendRow(["Nombre", "Estado", "Contraseña"]);
   }
 
   // 3. Pestaña Rutas

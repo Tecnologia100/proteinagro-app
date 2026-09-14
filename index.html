@@ -28,7 +28,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.3.6">
+    <link rel="stylesheet" href="styles.css?v=1.3.7">
 
     <!-- Firebase (Carga no bloqueante con defer para acelerar FCP) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
@@ -40,7 +40,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.3.6" defer></script>
+    <script src="app.js?v=1.3.7" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -48,29 +48,70 @@
         <form class="login-card" id="login-form">
             <div class="logo-icon" style="font-size: 3rem; text-align: center; margin-bottom: 10px;">🌿</div>
             <h2 style="text-align: center; margin-bottom: 5px; color: var(--primary);">ProteinAgro</h2>
-            <p style="text-align: center; color: var(--text-muted); margin-bottom: 25px;">
-                Acceso al Sistema <span class="version-tag">v1.3.6</span>
+            <p style="text-align: center; color: var(--text-muted); margin-bottom: 22px;">
+                Acceso al Sistema <span class="version-tag">v1.3.7</span>
             </p>
             
-            <div class="form-group">
-                <label for="login-user">Usuario / Conductor</label>
-                <input type="text" id="login-user" class="premium-input" placeholder="Ej. Juan Gomez o admin" required>
-            </div>
-            
-            <div class="form-group" style="margin-bottom: 25px;">
-                <label for="login-pin">PIN de Seguridad</label>
-                <input type="password" id="login-pin" class="premium-input" placeholder="****" inputmode="numeric" required>
-            </div>
-            
-            <p id="login-error" style="color: #ef4444; text-align: center; font-weight: 500; display: none; margin-bottom: 15px;">PIN o usuario incorrecto</p>
-            
-            <button type="submit" id="btn-login" class="btn-primary" style="width: 100%;">
-                <span class="btn-text-content">Ingresar</span>
-            </button>
+            <!-- Modo Conductor (Predeterminado) -->
+            <div id="conductor-login-section">
+                <div class="form-group">
+                    <label for="login-conductor">Conductor</label>
+                    <select id="login-conductor" class="premium-input" required>
+                        <option value="" disabled selected>Cargando conductores...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 22px;">
+                    <label for="login-pin">PIN / Contraseña</label>
+                    <input type="password" id="login-pin" class="premium-input" placeholder="Ingrese su clave" required>
+                </div>
+                
+                <p id="login-error" style="color: #ef4444; text-align: center; font-weight: 500; display: none; margin-bottom: 15px;">PIN o usuario incorrecto</p>
+                
+                <button type="submit" id="btn-login" class="btn-primary" style="width: 100%;">
+                    <span class="btn-text-content">Ingresar a Ruta</span>
+                </button>
 
-            <button type="button" id="btn-pwa-install" class="btn-secondary" style="width: 100%; margin-top: 15px; display: none; align-items: center; justify-content: center; gap: 8px; border-color: #10b981; color: #10b981; font-weight: 600;">
-                📲 Instalar App en el Celular
-            </button>
+                <!-- Botón de Instalación en Celular Siempre Disponible -->
+                <button type="button" id="btn-pwa-install" class="btn-secondary" style="width: 100%; margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; border-color: #10b981; color: #10b981; font-weight: 600;">
+                    📲 Instalar App en el Celular
+                </button>
+
+                <div class="login-toggle-container" style="text-align: center; margin-top: 20px;">
+                    <button type="button" id="btn-toggle-admin-login" class="btn-link-discrete" title="Acceso exclusivo para administración">
+                        🔐 Acceso Administrativo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modo Administrador (Oculto por defecto con acceso discreto) -->
+            <div id="admin-login-section" style="display: none;">
+                <div style="background: rgba(14, 165, 233, 0.1); color: #0284c7; padding: 8px 12px; border-radius: 8px; font-size: 0.84rem; font-weight: 600; text-align: center; margin-bottom: 18px; border: 1px solid rgba(14, 165, 233, 0.2);">
+                    👑 Módulo de Administración y Control
+                </div>
+
+                <div class="form-group">
+                    <label for="login-admin-user">Usuario Administrador</label>
+                    <input type="text" id="login-admin-user" class="premium-input" value="admin" placeholder="admin o correo corporativo">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 22px;">
+                    <label for="login-admin-pin">Contraseña de Administrador</label>
+                    <input type="password" id="login-admin-pin" class="premium-input" placeholder="****">
+                </div>
+
+                <p id="login-admin-error" style="color: #ef4444; text-align: center; font-weight: 500; display: none; margin-bottom: 15px;">Credenciales de administrador inválidas</p>
+
+                <button type="button" id="btn-admin-submit" class="btn-primary" style="width: 100%; background: #0284c7; border-color: #0284c7;">
+                    <span class="btn-text-content">Ingresar al Panel</span>
+                </button>
+
+                <div class="login-toggle-container" style="text-align: center; margin-top: 20px;">
+                    <button type="button" id="btn-back-to-conductor" class="btn-link-discrete">
+                        ← Volver a Conductor
+                    </button>
+                </div>
+            </div>
         </form>
     </div>
 
@@ -145,11 +186,14 @@
         <header class="app-header">
             <div class="logo-container">
                 <div class="logo-icon">🌿</div>
-                <h1>ProteinAgro</h1>
-                <span class="version-tag">v1.3.6</span>
+                <div>
+                    <h1 style="font-size: 1.25rem; line-height: 1.1; margin: 0;">ProteinAgro</h1>
+                    <span id="driver-header-badge" class="driver-header-badge" style="display: none;">👤 <span id="driver-header-name">Conductor</span></span>
+                </div>
+                <span class="version-tag">v1.3.7</span>
             </div>
             <div class="app-header-right">
-                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.3.6</button>
+                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.3.7</button>
                 <button id="btn-pwa-install-header" class="btn-text" style="display: none; color: #10b981; font-weight: 600; font-size: 0.85rem; align-items: center; gap: 4px;">📲 Instalar</button>
                 <div class="status-indicator offline" id="network-status">
                     <span class="dot"></span>
@@ -172,9 +216,9 @@
 
                 <form id="recoleccion-form" novalidate>
                     
-                    <!-- Selección de Conductor -->
-                    <div class="form-group">
-                        <label for="conductor">Conductor</label>
+                    <!-- Selección de Conductor (Fijado con Sesión Activa) -->
+                    <div class="form-group" id="conductor-group">
+                        <label for="conductor">Conductor <span id="conductor-session-badge" class="autofill-badge" style="display:none; background:#ecfdf5; color:#059669; border-color:#a7f3d0;">🔒 Sesión Activa</span></label>
                         <select id="conductor" required class="premium-input">
                             <option value="" disabled selected>Cargando conductores...</option>
                         </select>
