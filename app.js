@@ -708,7 +708,12 @@ async function cargarCatalogosDinamicos() {
                 if (data && data.productos && data.productos.length > 0) {
                     if (data.puntos_rutas && data.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(data.puntos_rutas);
                     renderDynamicProducts(data.productos);
-                    if (data.conductores && data.conductores.length > 0) renderDynamicDrivers(data.conductores);
+                    if (data.conductores && data.conductores.length > 0) {
+                        renderDynamicDrivers(data.conductores);
+                        try {
+                            localStorage.setItem('proteinagro_conductores_cache', JSON.stringify(data.conductores));
+                        } catch(e) {}
+                    }
                     if (data.rutas && data.rutas.length > 0) renderDynamicRoutes(data.rutas);
 
                     // Sincronizar credenciales individuales de conductores desde Sheets
@@ -2451,7 +2456,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Inicializar inmediatamente con catálogo base pre-cargado (0ms de latencia, 100% offline-ready)
     procesarPuntosRutasDinamicos(CATALOGO_PUNTOS_RUTAS_DEFAULT);
     renderDynamicProducts(DEFAULT_PRODUCTOS);
-    renderDynamicDrivers(DEFAULT_CONDUCTORES);
+    
+    // Cargar conductores activos de inmediato desde caché local o valores por defecto reales
+    let initialDrivers = DEFAULT_CONDUCTORES;
+    try {
+        const cachedDrivers = localStorage.getItem('proteinagro_conductores_cache');
+        if (cachedDrivers) {
+            const parsed = JSON.parse(cachedDrivers);
+            if (Array.isArray(parsed) && parsed.length > 0) initialDrivers = parsed;
+        }
+    } catch(e) {}
+    renderDynamicDrivers(initialDrivers);
+
     renderDynamicRoutes(DEFAULT_RUTAS);
     initRutasYProveedores();
     initAdminSupportModal();
