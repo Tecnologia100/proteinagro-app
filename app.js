@@ -87,7 +87,18 @@ window.addEventListener('offline', updateNetworkStatus);
 updateNetworkStatus();
 
 // === ESTADO DE AUTENTICACIÓN Y ROLES ===
-let CONDUCTORES_AUTH = {};
+const DEFAULT_CONDUCTORES_AUTH = {
+    "Ricardo Sepulveda": "1649",
+    "Hernando Prado": "8063",
+    "Emer Rodriguez": "6860",
+    "Jairo Peña": "5301",
+    "Carolina": "1306",
+    "Carolina ": "1306",
+    "Luz elena lopez": "6700",
+    "francisco larrahondo": "1234"
+};
+
+let CONDUCTORES_AUTH = Object.assign({}, DEFAULT_CONDUCTORES_AUTH);
 let ADMIN_CLAVE_CONFIG = "0000";
 let CURRENT_LOGGED_DRIVER = null;
 
@@ -95,7 +106,17 @@ let CURRENT_LOGGED_DRIVER = null;
 try {
     const cachedAuth = localStorage.getItem('proteinagro_conductores_auth');
     if (cachedAuth) {
-        CONDUCTORES_AUTH = JSON.parse(cachedAuth);
+        const parsed = JSON.parse(cachedAuth);
+        if (parsed && typeof parsed === 'object') {
+            // Limpiar claves dummy obsoletas ('1234') para conductores con contraseña oficial asignada
+            Object.keys(parsed).forEach(k => {
+                const cleanKey = k.trim();
+                if (parsed[k] === '1234' && DEFAULT_CONDUCTORES_AUTH[cleanKey] && DEFAULT_CONDUCTORES_AUTH[cleanKey] !== '1234') {
+                    parsed[k] = DEFAULT_CONDUCTORES_AUTH[cleanKey];
+                }
+            });
+            CONDUCTORES_AUTH = Object.assign({}, DEFAULT_CONDUCTORES_AUTH, parsed);
+        }
     }
     const cachedAdmin = localStorage.getItem('proteinagro_admin_clave');
     if (cachedAdmin) {
@@ -213,13 +234,20 @@ const handleConductorLogin = (e) => {
         return;
     }
 
-    // Verificar clave individual de Sheets
-    const expectedPin = CONDUCTORES_AUTH[driverName];
+    // Verificar clave individual de Sheets o credenciales predeterminadas
+    const cleanDriverName = driverName.trim();
+    const expectedPin = CONDUCTORES_AUTH[cleanDriverName] || 
+                        CONDUCTORES_AUTH[driverName] || 
+                        DEFAULT_CONDUCTORES_AUTH[cleanDriverName] || 
+                        DEFAULT_CONDUCTORES_AUTH[driverName];
 
-    // Permitir si coincide con la clave de Sheets, clave maestra de respaldo ('0000'), o '1234' si aún no tiene clave en Sheets
+    // Validación de seguridad estricta:
+    // 1. Debe coincidir con la clave asignada al conductor
+    // 2. O clave maestra de respaldo de administración ('0000')
+    // 3. Solo si el conductor no tuviese ninguna clave asignada en el sistema, se admite '1234' o '0000'
     const pinValido = (expectedPin && expectedPin !== '' && pin === expectedPin) ||
                       (pin === '0000') ||
-                      (!expectedPin && (pin === '1234' || pin === '0000' || pin === ''));
+                      (!expectedPin && (pin === '1234' || pin === '0000'));
 
     if (pinValido) {
         entrarComoConductor(driverName);
@@ -376,7 +404,9 @@ const DEFAULT_CONDUCTORES = [
     "Hernando Prado",
     "Emer Rodriguez",
     "Jairo Peña",
-    "Carolina"
+    "Carolina",
+    "Luz elena lopez",
+    "francisco larrahondo"
 ];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
@@ -692,12 +722,70 @@ function procesarPuntosRutasDinamicos(puntosArray) {
     }
 }
 
+// Sincronización directa en vivo con la hoja de Conductores de Google Sheets vía Gviz
+async function sincronizarCredencialesDesdeGviz() {
+    try {
+        const gvizUrl = 'https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/gviz/tq?tqx=out:csv&sheet=Conductores&t=' + Date.now();
+        const res = await fetch(gvizUrl);
+        if (res.ok) {
+            const csvText = await res.text();
+            const lines = csvText.split(/\r?\n/);
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const cols = [];
+                let cur = '';
+                let inQuotes = false;
+                for (let j = 0; j < line.length; j++) {
+                    const char = line[j];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        cols.push(cur.trim());
+                        cur = '';
+                    } else {
+                        cur += char;
+                    }
+                }
+                cols.push(cur.trim());
+
+                const nombre = cols[0] ? cols[0].replace(/^"|"$/g, '').trim() : '';
+                const estado = (cols[1] ? cols[1].replace(/^"|"$/g, '').trim() : 'Activo').toLowerCase();
+                const clave = cols[2] !== undefined ? cols[2].replace(/^"|"$/g, '').trim() : '';
+
+                if (nombre && estado !== 'inactivo') {
+                    if (nombre.toLowerCase() === 'admin' || nombre.toLowerCase() === 'administrador') {
+                        if (clave) {
+                            ADMIN_CLAVE_CONFIG = clave;
+                            try { localStorage.setItem('proteinagro_admin_clave', clave); } catch(e) {}
+                        }
+                    } else if (clave) {
+                        CONDUCTORES_AUTH[nombre] = clave;
+                        if (nombre.trim() !== nombre) {
+                            CONDUCTORES_AUTH[nombre.trim()] = clave;
+                        }
+                    }
+                }
+            }
+            try {
+                localStorage.setItem('proteinagro_conductores_auth', JSON.stringify(CONDUCTORES_AUTH));
+            } catch(e) {}
+            console.log("✅ Credenciales de conductores sincronizadas en vivo vía Google Sheets Gviz.");
+        }
+    } catch (err) {
+        console.warn("⚠️ No se pudo sincronizar credenciales vía Google Sheets Gviz:", err);
+    }
+}
+
 async function cargarCatalogosDinamicos() {
     // Eliminar cachés obsoletas para garantizar sincronicidad 100% en vivo con Google Sheets
     try {
         localStorage.removeItem('proteinagro_catalogos_cache');
         localStorage.removeItem('proteinagro_rutas_config');
     } catch(e) {}
+
+    // Sincronizar credenciales en vivo directamente desde Google Sheets Gviz
+    await sincronizarCredencialesDesdeGviz();
 
     // 1. Obtener catálogos en vivo desde Google Sheets (evitando caché HTTP con timestamp)
     if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
@@ -717,12 +805,15 @@ async function cargarCatalogosDinamicos() {
                     }
                     if (data.rutas && data.rutas.length > 0) renderDynamicRoutes(data.rutas);
 
-                    // Sincronizar credenciales individuales de conductores desde Sheets
+                    // Sincronizar credenciales individuales de conductores desde Sheets si vienen en webhook
                     if (data.conductores_detalle && Array.isArray(data.conductores_detalle)) {
-                        CONDUCTORES_AUTH = {};
                         data.conductores_detalle.forEach(c => {
                             if (c && c.nombre) {
-                                CONDUCTORES_AUTH[c.nombre.trim()] = String(c.clave !== undefined && c.clave !== null ? c.clave : '').trim();
+                                const clave = String(c.clave !== undefined && c.clave !== null ? c.clave : '').trim();
+                                if (clave) {
+                                    CONDUCTORES_AUTH[c.nombre.trim()] = clave;
+                                    CONDUCTORES_AUTH[c.nombre] = clave;
+                                }
                             }
                         });
                         try {
@@ -749,7 +840,10 @@ async function cargarCatalogosDinamicos() {
     try {
         const cachedAuth = localStorage.getItem('proteinagro_conductores_auth');
         if (cachedAuth) {
-            CONDUCTORES_AUTH = JSON.parse(cachedAuth);
+            const parsed = JSON.parse(cachedAuth);
+            if (parsed && typeof parsed === 'object') {
+                CONDUCTORES_AUTH = Object.assign({}, DEFAULT_CONDUCTORES_AUTH, parsed);
+            }
         }
         const cachedAdmin = localStorage.getItem('proteinagro_admin_clave');
         if (cachedAdmin) {
@@ -757,12 +851,8 @@ async function cargarCatalogosDinamicos() {
         }
     } catch(e) {}
 
-    // Fallback de seguridad si no hay claves en caché
-    if (Object.keys(CONDUCTORES_AUTH).length === 0) {
-        DEFAULT_CONDUCTORES.forEach(d => {
-            CONDUCTORES_AUTH[d] = '1234';
-        });
-    }
+    // Garantizar credenciales oficiales por defecto
+    CONDUCTORES_AUTH = Object.assign({}, DEFAULT_CONDUCTORES_AUTH, CONDUCTORES_AUTH);
 
     renderDynamicProducts(DEFAULT_PRODUCTOS);
     renderDynamicDrivers(DEFAULT_CONDUCTORES);
@@ -2484,12 +2574,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.3.7 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.3.8 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.3.7')
+            navigator.serviceWorker.register('/sw.js?v=1.3.8')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.3.7 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.3.8 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

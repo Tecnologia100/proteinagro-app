@@ -207,7 +207,14 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.3.7` (Septiembre 2026) - Versión Actual
+### `v=1.3.8` (Septiembre 2026) - Versión Actual
+- **Corrección Crítica de Validación de Contraseña Asignada por Conductor (Jairo Peña y equipo):**
+  - **Validación Estricta de Claves Asignadas:** Se corrigió la lógica en `handleConductorLogin` para que ningún conductor con contraseña configurada en Google Sheets pueda ingresar con el PIN dummy `1234`. La clave `1234` queda bloqueada y solo se acepta la contraseña real asignada a cada conductor (ej. Jairo Peña: `5301`).
+  - **Sincronización Directa de Credenciales en Vivo (Google Sheets Gviz):** Se implementó `sincronizarCredencialesDesdeGviz()` como canal directo en tiempo real hacia la pestaña `Conductores`, leyendo la Columna C (`Contraseña`) con soporte CORS total. Esto garantiza que cualquier cambio de contraseña en Google Sheets se refleje de inmediato en la app sin depender del despliegue del Webhook de Apps Script.
+  - **Eliminación de Caché Obsoleta de PINs:** Se añadió un saneador en el arranque de la app que purga cualquier valor residual `1234` guardado en el `localStorage` de navegadores móviles para conductores cuya clave real difiera de `1234`.
+  - **Respaldo Oficial Offline `DEFAULT_CONDUCTORES_AUTH`:** Incorporación en el código base de las contraseñas oficiales asignadas a los 7 conductores activos (Ricardo: 1649, Hernando: 8063, Emer: 6860, Jairo: 5301, Carolina: 1306, Luz Elena: 6700, Francisco: 1234).
+
+### `v=1.3.7` (Septiembre 2026)
 - **Autenticación Individual por Conductor vía Google Sheets & Acceso Administrativo Discreto:**
   - **Claves Individuales desde Google Sheets:** La pestaña `Conductores` incorpora la Columna C (`Contraseña`). Cualquier PIN o clave asignada o modificada en Sheets se sincroniza en vivo con la app móvil.
   - **Fijación e Inmutabilidad de Conductor en Recolección:** Al autenticarse el conductor, su nombre queda fijado y bloqueado (`disabled`) en el formulario con insignia visual `🔒 Sesión Activa`. Se elimina el doble tipeo/selección y se garantiza 100% de trazabilidad (ningún conductor puede registrar por error a nombre de otro).

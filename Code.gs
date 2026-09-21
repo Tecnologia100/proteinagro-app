@@ -31,6 +31,10 @@ function doGet(e) {
     var conductoresDetalle = [];
     var adminClave = '';
     if (sheetConductores && sheetConductores.getLastRow() > 1) {
+      var maxCols = sheetConductores.getMaxColumns();
+      if (maxCols < 3) {
+        sheetConductores.insertColumnsAfter(maxCols, 3 - maxCols);
+      }
       var numCols = Math.max(3, sheetConductores.getLastColumn());
       var condData = sheetConductores.getRange(2, 1, sheetConductores.getLastRow() - 1, numCols).getValues();
       for (var j = 0; j < condData.length; j++) {
@@ -133,13 +137,15 @@ function doGet(e) {
       productos = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HARINA CARNE", "HUESO BLANCO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
     }
     if (conductores.length === 0) {
-      conductores = ["Camilo Perez", "Juan Gomez", "Miguel Otero", "Felipe Montilla", "Gildardo Tejada"];
+      conductores = ["Ricardo Sepulveda", "Hernando Prado", "Emer Rodriguez", "Jairo Peña", "Carolina", "Luz elena lopez", "francisco larrahondo"];
       conductoresDetalle = [
-        { nombre: "Camilo Perez", clave: "1234" },
-        { nombre: "Juan Gomez", clave: "1234" },
-        { nombre: "Miguel Otero", clave: "1234" },
-        { nombre: "Felipe Montilla", clave: "1234" },
-        { nombre: "Gildardo Tejada", clave: "1234" }
+        { nombre: "Ricardo Sepulveda", clave: "1649" },
+        { nombre: "Hernando Prado", clave: "8063" },
+        { nombre: "Emer Rodriguez", clave: "6860" },
+        { nombre: "Jairo Peña", clave: "5301" },
+        { nombre: "Carolina", clave: "1306" },
+        { nombre: "Luz elena lopez", clave: "6700" },
+        { nombre: "francisco larrahondo", clave: "1234" }
       ];
     }
     if (rutas.length === 0) {
