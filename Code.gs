@@ -11,6 +11,11 @@ function doGet(e) {
       return guardarRecoleccionSheet(ss, e.parameter.payload);
     }
 
+    // 0.1 Diagnóstico en vivo de Precios y Recolecciones
+    if (e && e.parameter && e.parameter.action === 'debugPrecios') {
+      return diagnosticoPreciosSheet(ss, e.parameter.proveedor, e.parameter.producto);
+    }
+
     // 1. Obtener Productos (filtrando Inactivos)
     var sheetProductos = ss.getSheetByName("Productos");
     var productos = [];
@@ -160,6 +165,7 @@ function doGet(e) {
     }
 
     var output = {
+      version: "1.4.0-precio-fix",
       productos: productos,
       conductores: conductores,
       conductores_detalle: conductoresDetalle,
@@ -215,15 +221,12 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     }
     
     var lastRowData = sheet.getLastRow();
-    var searchRange = [];
     var existingRecordsMap = {};
 
     if (lastRowData > 1) {
-      searchRange = sheet.getRange(2, 5, lastRowData - 1, 7).getValues(); 
-
       var startCheckRow = Math.max(2, lastRowData - 200);
       var numRowsToCheck = lastRowData - startCheckRow + 1;
-      var existingData = sheet.getRange(startCheckRow, 1, numRowsToCheck, 7).getValues();
+      var existingData = sheet.getRange(startCheckRow, 1, numRowsToCheck, Math.min(sheet.getLastColumn(), 7)).getValues();
       for (var ex = 0; ex < existingData.length; ex++) {
         var exId = String(existingData[ex][0] || '').trim();
         var exProd = String(existingData[ex][6] || '').trim();
@@ -243,30 +246,12 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         continue;
       }
 
-      var precio = '';
+      // Búsqueda inteligente del precio histórico (insensible a mayúsculas, espacios, guiones y tildes)
+      var precio = buscarPrecioHistorico(sheet, proveedor, punto, prodNombre);
       var valor = '';
       
-      if (searchRange.length > 0) {
-        for (var i = searchRange.length - 1; i >= 0; i--) {
-          var rowProv = String(searchRange[i][0] || '').trim().toLowerCase().replace(/\s+/g, ' ');
-          var rowProd = String(searchRange[i][2] || '').trim().toLowerCase().replace(/\s+/g, ' ');
-          
-          var targetProv = String(proveedor).trim().toLowerCase().replace(/\s+/g, ' ');
-          var targetProd = String(prodNombre).trim().toLowerCase().replace(/\s+/g, ' ');
-          
-          // Además, para mitigar problemas con guiones (ej. "A-B" vs "A - B"):
-          rowProv = rowProv.replace(/\s*-\s*/g, '-');
-          targetProv = targetProv.replace(/\s*-\s*/g, '-');
-          
-          if (rowProv === targetProv && rowProd === targetProd) {
-            precio = searchRange[i][6];
-            break;
-          }
-        }
-      }
-      
       if (precio !== '' && !isNaN(parseFloat(precio)) && !isNaN(parseFloat(prodKilos))) {
-        valor = parseFloat(precio) * parseFloat(prodKilos);
+        valor = Math.round(parseFloat(precio) * parseFloat(prodKilos) * 100) / 100;
       }
       
       sheet.appendRow([
@@ -281,6 +266,203 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// ==============================================================================
+// MOTOR INTELIGENTE DE BÚSQUEDA DE PRECIO HISTÓRICO
+// ==============================================================================
+function buscarPrecioHistorico(sheet, proveedor, punto, producto) {
+  try {
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return '';
+
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+
+    // 1. Mapeo dinámico de columnas por encabezados de fila 1
+    var colIdx = {
+      proveedor: 4,  // Col E por defecto
+      punto: 5,      // Col F por defecto
+      producto: 6,   // Col G por defecto
+      precio: 10     // Col K por defecto
+    };
+
+    for (var c = 0; c < headers.length; c++) {
+      var h = normalizarTexto(headers[c]);
+      if (h.indexOf('proveedor') !== -1) colIdx.proveedor = c;
+      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.producto = c;
+      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1 || h.indexOf('unitario') !== -1) colIdx.precio = c;
+    }
+
+    var numRows = lastRow - 1;
+    var allData = sheet.getRange(2, 1, numRows, lastCol).getValues();
+
+    var targetProv = normalizarTexto(proveedor);
+    var targetPunto = normalizarTexto(punto);
+    var targetProd = normalizarTexto(producto);
+
+    // Palabras clave principales del proveedor (ej. "supertienda", "canaveral", "frigorivalle")
+    var provKeywords = targetProv.split(/[\s\-]+/).filter(function(w) { return w.length > 3; });
+
+    var precioExacto = null;
+    var precioParcial = null;
+    var precioPunto = null;
+    var precioCualquiera = null;
+
+    // Buscar de abajo hacia arriba (desde la fila más reciente hacia la más antigua)
+    for (var i = allData.length - 1; i >= 0; i--) {
+      var row = allData[i];
+      var rawPrecio = colIdx.precio < row.length ? row[colIdx.precio] : null;
+      var cleanPrice = parsePrecioMoneda(rawPrecio);
+
+      // ¡REGLA DE ORO!: Si esta fila histórica NO tiene precio (> 0), IGNORARLA y seguir buscando hacia atrás
+      if (cleanPrice === null) continue;
+
+      var rowProd = normalizarTexto(colIdx.producto < row.length ? row[colIdx.producto] : '');
+      var rowProv = normalizarTexto(colIdx.proveedor < row.length ? row[colIdx.proveedor] : '');
+      var rowPunto = normalizarTexto(colIdx.punto < row.length ? row[colIdx.punto] : '');
+
+      // El producto debe coincidir
+      var coincideProd = (rowProd === targetProd || rowProd.indexOf(targetProd) !== -1 || targetProd.indexOf(rowProd) !== -1);
+      if (!coincideProd) continue;
+
+      // Nivel 1: Coincidencia EXACTA Proveedor + Producto
+      if (rowProv === targetProv) {
+        precioExacto = cleanPrice;
+        break; // ¡Coincidencia perfecta con precio real encontrada!
+      }
+
+      // Nivel 2: Coincidencia Parcial de Proveedor (ej. "supertienda canaveral" coincide con "supertienda canaveral - frigorivalle")
+      if (precioParcial === null) {
+        if (targetProv.indexOf(rowProv) !== -1 || rowProv.indexOf(targetProv) !== -1) {
+          precioParcial = cleanPrice;
+        } else {
+          for (var k = 0; k < provKeywords.length; k++) {
+            if (rowProv.indexOf(provKeywords[k]) !== -1) {
+              precioParcial = cleanPrice;
+              break;
+            }
+          }
+        }
+      }
+
+      // Nivel 3: Coincidencia por Punto / Sucursal (ej. "canaveral matadero")
+      if (precioPunto === null && targetPunto !== '') {
+        if (rowPunto === targetPunto || targetPunto.indexOf(rowPunto) !== -1 || rowPunto.indexOf(targetPunto) !== -1) {
+          precioPunto = cleanPrice;
+        }
+      }
+
+      // Nivel 4: Último precio registrado para este producto (cualquier proveedor como último recurso)
+      if (precioCualquiera === null) {
+        precioCualquiera = cleanPrice;
+      }
+    }
+
+    if (precioExacto !== null) return precioExacto;
+    if (precioParcial !== null) return precioParcial;
+    if (precioPunto !== null) return precioPunto;
+    return precioCualquiera !== null ? precioCualquiera : '';
+
+  } catch (err) {
+    return '';
+  }
+}
+
+// Normalización de texto: quita tildes, minúsculas, espacios extra y normaliza guiones
+function normalizarTexto(str) {
+  if (!str) return '';
+  var s = String(str).trim().toLowerCase();
+  // Quitar tildes y diacríticos (ej. Cañaveral -> canaveral, Tuluá -> tulua)
+  try {
+    s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  } catch (e) {}
+  s = s.replace(/\s+/g, ' ');
+  s = s.replace(/\s*-\s*/g, '-');
+  return s;
+}
+
+// Parser de precios adaptado al formato colombiano (punto o coma como miles, símbolo $)
+function parsePrecioMoneda(val) {
+  if (val === null || val === undefined || val === '') return null;
+  if (typeof val === 'number') {
+    return val > 0 ? val : null;
+  }
+  var s = String(val).trim().replace(/\$/g, '').replace(/\s+/g, '');
+  if (!s) return null;
+
+  // Formato con punto y coma (ej. 1.800,50 o 1,800.50)
+  if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      s = s.replace(/\./g, '').replace(',', '.'); // Latino: 1.800,50 -> 1800.50
+    } else {
+      s = s.replace(/,/g, ''); // Anglo: 1,800.50 -> 1800.50
+    }
+  } else if (s.indexOf('.') !== -1) {
+    var partsDot = s.split('.');
+    if (partsDot.length === 2 && partsDot[1].length === 3 && parseInt(partsDot[0], 10) > 0) {
+      s = partsDot[0] + partsDot[1]; // Miles en Colombia: 1.800 -> 1800
+    } else if (partsDot.length > 2) {
+      s = partsDot.join(''); // Múltiples puntos: 1.200.000 -> 1200000
+    }
+  } else if (s.indexOf(',') !== -1) {
+    var partsComma = s.split(',');
+    if (partsComma.length === 2 && partsComma[1].length === 3) {
+      s = partsComma[0] + partsComma[1]; // Miles con coma: 1,800 -> 1800
+    } else {
+      s = partsComma[0] + '.' + partsComma[1]; // Decimal con coma: 1800,5 -> 1800.5
+    }
+  }
+
+  var num = parseFloat(s);
+  return (!isNaN(num) && num > 0) ? num : null;
+}
+
+// Función de diagnóstico en vivo para consultar estado de Recolecciones y Precios vía GET
+function diagnosticoPreciosSheet(ss, testProv, testProd) {
+  var sheet = ss.getSheetByName("Recolecciones");
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({ error: "No existe hoja Recolecciones" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  
+  var startRow = Math.max(2, lastRow - 9);
+  var numRows = lastRow - startRow + 1;
+  var sampleRows = [];
+  if (numRows > 0) {
+    sampleRows = sheet.getRange(startRow, 1, numRows, lastCol).getValues();
+  }
+  
+  var provsEnRecolecciones = {};
+  if (lastRow > 1) {
+    var allProvs = sheet.getRange(2, 5, lastRow - 1, 1).getValues();
+    for (var i = 0; i < allProvs.length; i++) {
+      var p = String(allProvs[i][0] || '').trim();
+      if (p) provsEnRecolecciones[p] = (provsEnRecolecciones[p] || 0) + 1;
+    }
+  }
+
+  var queryProv = testProv || 'Supertienda Cañaveral - Frigorivalle';
+  var queryProd = testProd || 'DESPERDICIO';
+  var testResult = buscarPrecioHistorico(sheet, queryProv, '', queryProd);
+
+  return ContentService.createTextOutput(JSON.stringify({
+    version: "1.4.0-precio-fix",
+    totalFilasRecolecciones: lastRow,
+    encabezados: headers,
+    proveedoresEnRecolecciones: Object.keys(provsEnRecolecciones),
+    ultimasFilas: sampleRows,
+    testBusqueda: {
+      proveedorConsultado: queryProv,
+      productoConsultado: queryProd,
+      precioEncontrado: testResult
+    }
+  }, null, 2)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
