@@ -219,10 +219,17 @@ function doPost(e) {{
       
       if (searchRange.length > 0) {{
         for (var i = searchRange.length - 1; i >= 0; i--) {{
-          var rowProv = String(searchRange[i][0] || '').trim();
-          var rowProd = String(searchRange[i][2] || '').trim();
+          var rowProv = String(searchRange[i][0] || '').trim().toLowerCase().replace(/\s+/g, ' ');
+          var rowProd = String(searchRange[i][2] || '').trim().toLowerCase().replace(/\s+/g, ' ');
           
-          if (rowProv === String(proveedor).trim() && rowProd === String(prodNombre).trim()) {{
+          var targetProv = String(proveedor).trim().toLowerCase().replace(/\s+/g, ' ');
+          var targetProd = String(prodNombre).trim().toLowerCase().replace(/\s+/g, ' ');
+          
+          // Además, para mitigar problemas con guiones (ej. "A-B" vs "A - B"):
+          rowProv = rowProv.replace(/\s*-\s*/g, '-');
+          targetProv = targetProv.replace(/\s*-\s*/g, '-');
+          
+          if (rowProv === targetProv && rowProd === targetProd) {{
             precio = searchRange[i][6];
             break;
           }}
