@@ -165,7 +165,7 @@ function doGet(e) {
     }
 
     var output = {
-      version: "1.4.0-precio-fix",
+      version: "1.4.1-nombre-propio",
       productos: productos,
       conductores: conductores,
       conductores_detalle: conductoresDetalle,
@@ -254,9 +254,17 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         valor = Math.round(parseFloat(precio) * parseFloat(prodKilos) * 100) / 100;
       }
       
+      // Formato "Nombre Propio" automático (Title Case estilo =NOMPROPIO)
+      var rutaFinal = aNombrePropio(ruta);
+      var conductorFinal = aNombrePropio(conductor);
+      var proveedorFinal = aNombrePropio(proveedor);
+      var puntoFinal = aNombrePropio(punto);
+      var prodNombreFinal = aNombrePropio(prodNombre);
+      var observacionesFinal = capitalizarOracion(observaciones);
+      
       sheet.appendRow([
-        id, fecha, ruta, conductor, proveedor, punto,
-        prodNombre, prodKilos, observaciones, ubicacionGps, precio, valor
+        id, fecha, rutaFinal, conductorFinal, proveedorFinal, puntoFinal,
+        prodNombreFinal, prodKilos, observacionesFinal, ubicacionGps, precio, valor
       ]);
     }
 
@@ -417,6 +425,71 @@ function parsePrecioMoneda(val) {
 
   var num = parseFloat(s);
   return (!isNaN(num) && num > 0) ? num : null;
+}
+
+// ==============================================================================
+// FUNCIONES DE FORMATO DE TEXTO (NOMBRE PROPIO / CAPITALIZACIÓN)
+// ==============================================================================
+
+// Convierte texto a formato "Nombre Propio" (Title Case estilo =NOMPROPIO() de Excel)
+// Soportando caracteres con tildes, eñes y delimitadores comunes (-, /, (, ), etc.)
+function aNombrePropio(texto) {
+  if (!texto) return '';
+  var s = String(texto).trim().toLowerCase();
+  if (!s) return '';
+  
+  return s.replace(/(?:^|[\s\-\/\(\)\.,;:])([a-záéíóúüñ])/g, function(match) {
+    return match.toUpperCase();
+  });
+}
+
+// Capitaliza solo la primera letra para texto libre u observaciones (Formato Oración)
+function capitalizarOracion(texto) {
+  if (!texto) return '';
+  var s = String(texto).trim();
+  if (!s) return '';
+  // Si todo viene en mayúsculas sostenidas, pasarlo a minúsculas primero
+  if (s === s.toUpperCase()) {
+    s = s.toLowerCase();
+  }
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Función utilitaria opcional: Ejecutable desde Apps Script para convertir
+// todas las filas históricas anteriores de la hoja "Recolecciones" a Nombre Propio
+function convertirHistoricoANombrePropio() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Recolecciones");
+  if (!sheet || sheet.getLastRow() <= 1) return "Hoja vacía o no encontrada";
+  
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  var range = sheet.getRange(2, 1, lastRow - 1, lastCol);
+  var values = range.getValues();
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  
+  var colIdx = { ruta: -1, conductor: -1, proveedor: -1, punto: -1, producto: -1, obs: -1 };
+  for (var c = 0; c < headers.length; c++) {
+    var h = normalizarTexto(headers[c]);
+    if (h.indexOf('ruta') !== -1) colIdx.ruta = c;
+    else if (h.indexOf('conductor') !== -1) colIdx.conductor = c;
+    else if (h.indexOf('proveedor') !== -1) colIdx.proveedor = c;
+    else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+    else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.producto = c;
+    else if (h.indexOf('observacion') !== -1) colIdx.obs = c;
+  }
+  
+  for (var i = 0; i < values.length; i++) {
+    if (colIdx.ruta !== -1 && values[i][colIdx.ruta]) values[i][colIdx.ruta] = aNombrePropio(values[i][colIdx.ruta]);
+    if (colIdx.conductor !== -1 && values[i][colIdx.conductor]) values[i][colIdx.conductor] = aNombrePropio(values[i][colIdx.conductor]);
+    if (colIdx.proveedor !== -1 && values[i][colIdx.proveedor]) values[i][colIdx.proveedor] = aNombrePropio(values[i][colIdx.proveedor]);
+    if (colIdx.punto !== -1 && values[i][colIdx.punto]) values[i][colIdx.punto] = aNombrePropio(values[i][colIdx.punto]);
+    if (colIdx.producto !== -1 && values[i][colIdx.producto]) values[i][colIdx.producto] = aNombrePropio(values[i][colIdx.producto]);
+    if (colIdx.obs !== -1 && values[i][colIdx.obs]) values[i][colIdx.obs] = capitalizarOracion(values[i][colIdx.obs]);
+  }
+  
+  range.setValues(values);
+  return "Se actualizaron " + (lastRow - 1) + " filas históricas a formato Nombre Propio exitosamente.";
 }
 
 // Función de diagnóstico en vivo para consultar estado de Recolecciones y Precios vía GET
