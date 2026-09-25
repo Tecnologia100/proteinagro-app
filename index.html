@@ -438,6 +438,9 @@
                     <button id="btn-print-receipt" class="btn-print-voucher">
                         📄 Imprimir / PDF
                     </button>
+                    <button type="button" id="btn-edit-from-receipt" class="btn-secondary" style="display: none; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; border-radius: 8px; padding: 10px 14px; cursor: pointer;">
+                        ✏️ Corregir
+                    </button>
                     <button id="btn-close-receipt" class="btn-close-voucher">
                         ❌ Cerrar
                     </button>
@@ -516,9 +519,14 @@
                     <!-- Total kilos -->
                 </div>
 
-                <button type="button" id="btn-admin-view-voucher" class="btn-primary" style="width: 100%; background: #0284c7; border-color: #0284c7; padding: 12px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.2);">
-                    📄 Abrir Soporte Oficial (WhatsApp / Imprimir)
-                </button>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button type="button" id="btn-admin-view-voucher" class="btn-primary" style="width: 100%; background: #0284c7; border-color: #0284c7; padding: 12px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.2);">
+                        📄 Abrir Soporte Oficial (WhatsApp / Imprimir)
+                    </button>
+                    <button type="button" id="btn-admin-edit-found" class="btn-secondary" style="width: 100%; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 11px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; border-radius: 8px;">
+                        ✏️ Corregir / Editar esta Recolección
+                    </button>
+                </div>
             </div>
 
             <!-- Estado Vacío -->

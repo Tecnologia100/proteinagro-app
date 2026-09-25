@@ -2425,6 +2425,20 @@ function mostrarComprobanteDigital(data) {
         sigImg.style.display = 'none';
     }
 
+    const btnEditFromReceipt = document.getElementById('btn-edit-from-receipt');
+    if (btnEditFromReceipt) {
+        const adminView = document.getElementById('admin-view');
+        if (adminView && adminView.style.display !== 'none') {
+            btnEditFromReceipt.style.display = 'inline-block';
+            btnEditFromReceipt.onclick = () => {
+                modal.style.display = 'none';
+                abrirModalEditarRecoleccion(data._docId, data.id);
+            };
+        } else {
+            btnEditFromReceipt.style.display = 'none';
+        }
+    }
+
     modal.style.display = 'flex';
 }
 
@@ -2759,6 +2773,14 @@ function initAdminSupportModal() {
         if (currentAdminFoundRecord) {
             modal.style.display = 'none';
             mostrarComprobanteDigital(currentAdminFoundRecord);
+        }
+    });
+
+    const btnEditFound = document.getElementById('btn-admin-edit-found');
+    btnEditFound?.addEventListener('click', () => {
+        if (currentAdminFoundRecord) {
+            modal.style.display = 'none';
+            abrirModalEditarRecoleccion(currentAdminFoundRecord._docId, currentAdminFoundRecord.id);
         }
     });
 }
