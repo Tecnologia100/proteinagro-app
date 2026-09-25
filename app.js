@@ -49,6 +49,59 @@ async function subirFirmaAStorage(dataUrl, recordId) {
     }
 }
 
+// Función auxiliar para subir foto de evidencia de novedad a Firebase Storage
+async function subirEvidenciaNovedadAStorage(dataUrl, recordId) {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) return dataUrl;
+    if (!navigator.onLine || !storage) return dataUrl;
+
+    try {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const storageRef = storage.ref().child(`novedades/${recordId}.jpg`);
+        
+        const uploadTask = storageRef.put(blob, { contentType: 'image/jpeg' });
+        const uploadPromise = new Promise((resolve, reject) => {
+            uploadTask.on('state_changed', null, reject, async () => {
+                const downloadURL = await storageRef.getDownloadURL();
+                resolve(downloadURL);
+            });
+        });
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout subiendo foto de novedad a Firebase Storage")), 5000)
+        );
+
+        const urlFinal = await Promise.race([uploadPromise, timeoutPromise]);
+        console.log("✅ Evidencia fotográfica subida a Firebase Storage exitosamente:", urlFinal);
+        return urlFinal;
+    } catch (err) {
+        console.warn("⚠️ No se pudo subir foto de novedad a Storage (se mantendrá en base64 local):", err);
+        return dataUrl;
+    }
+}
+
+// Función auxiliar para capturar coordenadas GPS en vivo con fallback rápido
+function obtenerUbicacionGpsActual() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            resolve("0");
+            return;
+        }
+        const timeoutId = setTimeout(() => resolve("0"), 3500);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                clearTimeout(timeoutId);
+                const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+                resolve(coords);
+            },
+            () => {
+                clearTimeout(timeoutId);
+                resolve("0");
+            },
+            { enableHighAccuracy: true, timeout: 3000, maximumAge: 60000 }
+        );
+    });
+}
+
 // Habilitar persistencia Offline (Magia de Firebase)
 db.enablePersistence()
   .catch((err) => {
@@ -451,6 +504,7 @@ const PRODUCT_DISPLAY_MAP = {
 
 function getEmojiForProduct(name) {
     const key = (name || '').trim().toUpperCase();
+    if (key.includes('VISITA FALLIDA') || key.includes('NOVEDAD')) return '⚠️';
     if (PRODUCT_DISPLAY_MAP[key]) return PRODUCT_DISPLAY_MAP[key].emoji;
 
     if (key.includes('ACEITE')) return '🛢️';
@@ -1379,27 +1433,34 @@ function renderRecordsInTable(records, tbody) {
     adminRecordsCache = records;
     records.forEach(data => {
         const fechaTexto = formatFechaParaMostrar(data.fecha || data.timestamp);
-        const badgeClass = data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline';
+        const isNovedad = data.tipo === 'Novedad' || data.estado === 'Visita Fallida' || (data.id && String(data.id).startsWith('NOV-'));
+        const badgeClass = isNovedad ? 'badge-novedad' : (data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline');
+        const badgeText = isNovedad ? '⚠️ Visita Fallida' : (data.estado || 'Sincronizado');
+        const badgeStyle = isNovedad ? 'style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 700;"' : '';
         const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
         const obsText = data.observaciones ? data.observaciones : '-';
 
         const provDisplay = data.proveedor || 'N/A';
         const sucDisplay = data.punto || data.sucursal || 'General';
-        const cleanTotalKg = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
+        const cleanTotalKg = isNovedad ? '<span style="color: #dc2626; font-weight: 700;">0 kg (Novedad)</span>' : `${Math.round((Number(data.totalKilos) || 0) * 100) / 100} kg`;
         const recordLocalId = data.id || '';
         const docId = data._docId || '';
+        const photoOrSign = data.foto || data.firma || '';
 
         const tr = document.createElement('tr');
+        if (isNovedad) tr.style.background = '#fffdfa';
         tr.innerHTML = `
             <td style="font-weight: 500; white-space: nowrap;">${fechaTexto}</td>
             <td style="text-transform: capitalize;">${data.conductor || '-'}</td>
             <td style="text-transform: capitalize;">${ruta}</td>
             <td style="text-transform: capitalize;">${provDisplay}</td>
             <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
-            <td style="font-weight: bold;">${cleanTotalKg} kg</td>
+            <td style="font-weight: bold;">${cleanTotalKg}</td>
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
-            <td><span class="badge ${badgeClass}">${data.estado || 'Sincronizado'}</span></td>
-            <td><img src="${data.firma || ''}" style="height: 30px; border: 1px solid #ccc; background: white;" alt="firma"></td>
+            <td><span class="badge ${badgeClass}" ${badgeStyle}>${badgeText}</span></td>
+            <td>
+                ${photoOrSign ? `<img src="${photoOrSign}" style="height: 32px; width: 32px; border: 1px solid #ccc; background: white; border-radius: 4px; object-fit: cover; cursor: pointer;" alt="${isNovedad ? 'Foto Evidencia' : 'Firma'}" title="Clic para ver completa" onclick="window.open('${photoOrSign}', '_blank')">` : '-'}
+            </td>
             <td style="white-space: nowrap;">
                 <button onclick="verSoporteDesdeTabla('${docId}', '${recordLocalId}')" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
                     📄 Soporte
@@ -1494,10 +1555,13 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
 async function enviarAGoogleSheets(data) {
     if (!GOOGLE_SHEETS_WEBHOOK_URL) return;
 
-    // Crear objeto ligero sin firma base64 pesada para el envío a Sheets
+    // Crear objeto ligero sin imágenes base64 pesadas para el envío a Sheets vía URL
     const dataLight = { ...data };
-    if (dataLight.firma && dataLight.firma.length > 300) {
+    if (dataLight.firma && dataLight.firma.length > 300 && !dataLight.firma.startsWith('http')) {
         dataLight.firma = "Firma Registrada";
+    }
+    if (dataLight.foto && dataLight.foto.length > 300 && !dataLight.foto.startsWith('http')) {
+        dataLight.foto = "Foto Evidencia Registrada";
     }
 
     try {
@@ -2542,6 +2606,334 @@ function initAdminSupportModal() {
     });
 }
 
+// ==============================================================================
+// MÓDULO DE REPORTE DE NOVEDADES Y VISITAS FALLIDAS (v1.4.2)
+// ==============================================================================
+function initNovedadesModal() {
+    const btnAbrirModal = document.getElementById('btn-abrir-modal-novedad');
+    const modal = document.getElementById('modal-novedad');
+    const btnCerrar = document.getElementById('btn-cerrar-modal-novedad');
+    const btnCancelar = document.getElementById('btn-cancelar-novedad');
+    const formNovedad = document.getElementById('form-novedad');
+    const causalSelect = document.getElementById('novedad-causal');
+    const fotoInput = document.getElementById('novedad-foto-input');
+    const btnTomarFoto = document.getElementById('btn-tomar-foto-novedad');
+    const previewBox = document.getElementById('novedad-preview-box');
+    const previewImg = document.getElementById('novedad-preview-img');
+    const btnCambiarFoto = document.getElementById('btn-cambiar-foto-novedad');
+    const gpsBadge = document.getElementById('novedad-gps-badge');
+    const obsTextarea = document.getElementById('novedad-observaciones');
+    const btnGuardar = document.getElementById('btn-guardar-novedad');
+
+    const resumenProv = document.getElementById('novedad-resumen-proveedor');
+    const resumenPunto = document.getElementById('novedad-resumen-punto');
+    const resumenRuta = document.getElementById('novedad-resumen-ruta');
+    const resumenCond = document.getElementById('novedad-resumen-conductor');
+
+    if (!btnAbrirModal || !modal || !formNovedad) return;
+
+    let capturedNovedadPhoto = null;
+
+    const cerrarModal = () => {
+        modal.style.display = 'none';
+    };
+
+    btnCerrar?.addEventListener('click', cerrarModal);
+    btnCancelar?.addEventListener('click', cerrarModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) cerrarModal();
+    });
+
+    // Abrir Modal con validaciones previas de la recolección
+    btnAbrirModal.addEventListener('click', () => {
+        // 1. Validar Conductor
+        const conductorSel = document.getElementById('conductor');
+        const conductorName = conductorSel?.options[conductorSel.selectedIndex]?.text || conductorSel?.value || '';
+        if (!conductorSel || !conductorSel.value) {
+            if (conductorSel) {
+                conductorSel.classList.add('input-error');
+                conductorSel.focus();
+                conductorSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            alert("⚠️ Por favor seleccione el Conductor antes de registrar una novedad.");
+            return;
+        }
+        conductorSel.classList.remove('input-error');
+
+        // 2. Validar Ruta
+        const rutaSel = document.getElementById('ruta');
+        let rutaName = rutaSel?.value || '';
+        if (!rutaSel || !rutaSel.value) {
+            if (rutaSel) {
+                rutaSel.classList.add('input-error');
+                rutaSel.focus();
+                rutaSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            alert("⚠️ Por favor seleccione la Ruta de Recolección antes de registrar una novedad.");
+            return;
+        }
+        rutaSel.classList.remove('input-error');
+        if (rutaSel.value === 'OTRA') {
+            rutaName = document.getElementById('custom-ruta')?.value.trim() || 'Otra Ruta';
+        } else if (rutaSel.selectedIndex >= 0) {
+            rutaName = rutaSel.options[rutaSel.selectedIndex].text;
+        }
+
+        // 3. Validar Proveedor
+        const provSel = document.getElementById('proveedor');
+        let provName = provSel?.value || '';
+        if (!provSel || !provSel.value) {
+            if (provSel) {
+                provSel.classList.add('input-error');
+                provSel.focus();
+                provSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            alert("⚠️ Por favor seleccione el Proveedor / Razón Social antes de registrar una novedad.");
+            return;
+        }
+        provSel.classList.remove('input-error');
+        if (provSel.value === 'OTRO') {
+            provName = document.getElementById('custom-proveedor')?.value.trim() || 'Otro Proveedor';
+        } else if (provSel.selectedIndex >= 0) {
+            provName = provSel.options[provSel.selectedIndex].text;
+        }
+
+        // 4. Validar Punto / Sucursal obligatorio
+        if (!validarPuntoObligatorio(true)) {
+            return;
+        }
+        const puntoName = obtenerPuntoSeleccionado();
+
+        // Rellenar resumen en el modal
+        if (resumenProv) resumenProv.textContent = provName;
+        if (resumenPunto) resumenPunto.textContent = puntoName;
+        if (resumenRuta) resumenRuta.textContent = rutaName;
+        if (resumenCond) resumenCond.textContent = conductorName;
+
+        // Resetear campos del modal
+        if (causalSelect) causalSelect.selectedIndex = 0;
+        if (obsTextarea) obsTextarea.value = '';
+        capturedNovedadPhoto = null;
+        if (fotoInput) fotoInput.value = '';
+        if (previewBox) previewBox.style.display = 'none';
+        if (previewImg) previewImg.src = '';
+        if (btnTomarFoto) btnTomarFoto.style.display = 'flex';
+
+        // Verificación de GPS en vivo
+        if (gpsBadge) {
+            gpsBadge.textContent = '🔄 Verificando GPS...';
+            gpsBadge.style.color = '#0284c7';
+            gpsBadge.style.background = '#e0f2fe';
+        }
+        obtenerUbicacionGpsActual().then(coords => {
+            if (gpsBadge) {
+                if (coords && coords !== '0') {
+                    gpsBadge.textContent = '📍 GPS listo';
+                    gpsBadge.style.color = '#059669';
+                    gpsBadge.style.background = '#ecfdf5';
+                } else {
+                    gpsBadge.textContent = '📍 GPS aproximado';
+                    gpsBadge.style.color = '#d97706';
+                    gpsBadge.style.background = '#fef3c7';
+                }
+            }
+        });
+
+        // Abrir modal
+        modal.style.display = 'flex';
+    });
+
+    // Control de Captura de Fotografía
+    if (btnTomarFoto) {
+        btnTomarFoto.addEventListener('click', () => {
+            fotoInput?.click();
+        });
+    }
+    if (btnCambiarFoto) {
+        btnCambiarFoto.addEventListener('click', () => {
+            fotoInput?.click();
+        });
+    }
+
+    fotoInput?.addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                // Compresión inteligente en canvas: máximo 960px y JPEG calidad 0.72 (~80-120 KB)
+                const canvas = document.createElement('canvas');
+                const maxDim = 960;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxDim) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    }
+                } else {
+                    if (height > maxDim) {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                capturedNovedadPhoto = canvas.toDataURL('image/jpeg', 0.72);
+                if (previewImg) previewImg.src = capturedNovedadPhoto;
+                if (previewBox) previewBox.style.display = 'block';
+                if (btnTomarFoto) btnTomarFoto.style.display = 'none';
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // Envío del Formulario de Novedad
+    formNovedad.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const causal = causalSelect?.value || '';
+        if (!causal) {
+            alert("⚠️ Por favor seleccione la causal de la novedad.");
+            causalSelect?.focus();
+            return;
+        }
+
+        if (!capturedNovedadPhoto) {
+            alert("⚠️ Es obligatorio tomar o adjuntar una foto de constancia / evidencia para registrar la visita fallida.");
+            return;
+        }
+
+        const spinner = btnGuardar?.querySelector('.spinner');
+        const textSpan = btnGuardar?.querySelector('.btn-text-content');
+        if (spinner) spinner.style.display = 'inline-block';
+        if (textSpan) textSpan.textContent = ' Guardando Novedad...';
+        if (btnGuardar) btnGuardar.disabled = true;
+
+        try {
+            const recordId = 'NOV-' + Date.now();
+            const tsNow = Date.now();
+            const obsUser = (obsTextarea?.value || '').trim();
+            const observacionesFinal = obsUser ? `${causal}: ${obsUser}` : causal;
+
+            const conductorSel = document.getElementById('conductor');
+            const conductorName = conductorSel?.options[conductorSel.selectedIndex]?.text || conductorSel?.value || '';
+
+            const rutaSel = document.getElementById('ruta');
+            let rutaName = rutaSel?.value || '';
+            if (rutaSel?.value === 'OTRA') {
+                rutaName = document.getElementById('custom-ruta')?.value.trim() || 'Otra Ruta';
+            } else if (rutaSel && rutaSel.selectedIndex >= 0) {
+                rutaName = rutaSel.options[rutaSel.selectedIndex].text;
+            }
+
+            const provSel = document.getElementById('proveedor');
+            let provName = provSel?.value || '';
+            if (provSel?.value === 'OTRO') {
+                provName = document.getElementById('custom-proveedor')?.value.trim() || 'Otro Proveedor';
+            } else if (provSel && provSel.selectedIndex >= 0) {
+                provName = provSel.options[provSel.selectedIndex].text;
+            }
+
+            const puntoName = obtenerPuntoSeleccionado();
+            const ubicacionGps = await obtenerUbicacionGpsActual();
+
+            const fechaTexto = (() => {
+                const now = new Date();
+                const d = now.getDate();
+                const m = now.getMonth() + 1;
+                const y = now.getFullYear();
+                const hh = String(now.getHours()).padStart(2, '0');
+                const mm = String(now.getMinutes()).padStart(2, '0');
+                const ss = String(now.getSeconds()).padStart(2, '0');
+                return d + '/' + m + '/' + y + ' ' + hh + ':' + mm + ':' + ss;
+            })();
+
+            // Subir evidencia a Firebase Storage si hay internet
+            let fotoURL = capturedNovedadPhoto;
+            if (navigator.onLine) {
+                fotoURL = await subirEvidenciaNovedadAStorage(capturedNovedadPhoto, recordId);
+            }
+
+            const dataNovedad = {
+                id: recordId,
+                timestamp: tsNow,
+                tipo: 'Novedad',
+                conductor: conductorName,
+                ruta: rutaName,
+                proveedor: provName,
+                sucursal: puntoName,
+                punto: puntoName,
+                causal: causal,
+                productos: [{
+                    producto: `Visita Fallida: ${causal}`,
+                    kilos: 0
+                }],
+                totalKilos: 0,
+                observaciones: observacionesFinal,
+                ubicacionGps: ubicacionGps,
+                foto: fotoURL,
+                firma: fotoURL, // Compatibilidad con comprobante y vista previa
+                fecha: fechaTexto,
+                estado: navigator.onLine ? 'Visita Fallida' : 'Offline'
+            };
+
+            // 1. Guardar en respaldo local (LocalStorage)
+            let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+            savedBackup.unshift({ ...dataNovedad });
+            localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
+
+            // 2. Enviar a Google Sheets vía webhook en segundo plano
+            if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== '') {
+                enviarAGoogleSheets({ ...dataNovedad });
+            }
+
+            // 3. Guardar en Firestore con timeout de 4 segundos
+            try {
+                const firestorePromise = db.collection('recolecciones').add({ ...dataNovedad });
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error("Timeout guardando novedad en Firebase")), 4000)
+                );
+                await Promise.race([firestorePromise, timeoutPromise]);
+                console.log("✅ Novedad guardada exitosamente en Firestore");
+            } catch (fsErr) {
+                console.warn("⚠️ Firestore demoró o falló, novedad respaldada en local y Sheets:", fsErr);
+            }
+
+            // Cerrar modal de novedad
+            cerrarModal();
+
+            // Limpiar selector de punto y proveedor en formulario principal para el siguiente cliente
+            resetearDropdownSucursal("Primero seleccione un proveedor");
+            const provSelect = document.getElementById('proveedor');
+            if (provSelect) provSelect.selectedIndex = 0;
+            const customProvGroup = document.getElementById('custom-proveedor-group');
+            if (customProvGroup) customProvGroup.style.display = 'none';
+            const customSucGroup = document.getElementById('custom-sucursal-group');
+            if (customSucGroup) customSucGroup.style.display = 'none';
+
+            // Mostrar Comprobante Digital Modal al conductor con opción de WhatsApp
+            mostrarComprobanteDigital({ ...dataNovedad });
+
+        } catch (err) {
+            console.error("Error al registrar novedad:", err);
+            alert("Hubo un error al registrar la novedad. Por favor verifique e intente nuevamente.");
+        } finally {
+            if (spinner) spinner.style.display = 'none';
+            if (textSpan) textSpan.textContent = '💾 Registrar Novedad (0 Kg)';
+            if (btnGuardar) btnGuardar.disabled = false;
+        }
+    });
+}
+
 // Inicializar selectores dinámicos y catálogos al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Inicializar inmediatamente con catálogo base pre-cargado (0ms de latencia, 100% offline-ready)
@@ -2562,6 +2954,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDynamicRoutes(DEFAULT_RUTAS);
     initRutasYProveedores();
     initAdminSupportModal();
+    initNovedadesModal();
 
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
@@ -2574,12 +2967,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.3.8 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.4.2 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.3.8')
+            navigator.serviceWorker.register('/sw.js?v=1.4.2')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.3.8 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.4.2 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

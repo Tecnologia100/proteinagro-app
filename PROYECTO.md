@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.4.1`  
+> **Versión Actual:** `v=1.4.2`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,8 +207,24 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.3.8` (Septiembre 2026) - Versión Actual
-- **Corrección Crítica de Validación de Contraseña Asignada por Conductor (Jairo Peña y equipo):**
+### `v=1.4.2` (Septiembre 2026) - Versión Actual
+- **Módulo Independiente de Reporte de Novedades y Visitas Fallidas (`⚠️ Registrar Novedad / Visita Fallida`):**
+  - **Constancia Oficial con 0 Kg:** Permite al conductor registrar formalmente visitas donde no se pudo recolectar producto, guardando el registro con `totalKilos: 0` y estado `Visita Fallida`.
+  - **10 Causales Estandarizadas:** Desplegable intuitivo con 10 opciones predeterminadas (*Establecimiento Cerrado, Sin Materia Prima Disponible (0 Kg), No Pueden Atender en el Momento, Sin Parqueo / Acceso Bloqueado, Encargado Ausente, Producto Aún en Proceso, No Cumple Calidad / Mal Estado, Entregado a Otro Recolector, Camión Lleno (Capacidad Máxima), Otra Novedad*).
+  - **Evidencia Fotográfica Obligatoria desde Cámara Móvil:** Input nativo con `capture="environment"` para abrir la cámara trasera del dispositivo móvil directamente. Validación estricta que impide registrar la novedad sin foto de constancia.
+  - **Compresión Nativa en Canvas:** Reducción automática de imágenes pesadas a máximo 960px y compresión JPEG calidad 0.72 (~80-120 KB), garantizando subida ultrarrápida incluso en redes 3G o zonas con baja cobertura.
+  - **Almacenamiento en Firebase Storage & Tri-Persistencia:** Las fotos se almacenan en `novedades/NOV-XXXXX.jpg` en Cloud Storage, con respaldo de URL en Firestore, registro en LocalStorage (`recolecciones_backup`) y sincronización inmediata con la hoja contable de Google Sheets vía Webhook.
+  - **Captura Automática de GPS:** Coordenadas de geolocalización en vivo (`latitud, longitud`) registradas para auditoría del punto visitado.
+  - **Comprobante Digital y Soporte WhatsApp:** Generación inmediata del comprobante oficial de novedad en pantalla con opción de compartir por WhatsApp con operaciones y administración.
+  - **Cero Regresiones:** El formulario y flujo principal de recolección normal de kilos no fue modificado y continúa funcionando al 100%.
+
+### `v=1.4.1` (Septiembre 2026)
+- **Motor Inteligente de Precios Históricos y Formato Nombre Propio (Title Case):**
+  - Búsqueda automatizada en Google Apps Script (`Code.gs`) de precios históricos previos por proveedor, punto y producto con normalización de texto.
+  - Cálculo automático de `Valor = Precio * Kg` en la hoja contable `Recolecciones`.
+  - Conversión automática a formato Nombre Propio (`=NOMPROPIO`) para Conductor, Ruta, Proveedor, Punto y Materia Prima al guardar en Google Sheets.
+
+### `v=1.3.8` (Septiembre 2026)
   - **Validación Estricta de Claves Asignadas:** Se corrigió la lógica en `handleConductorLogin` para que ningún conductor con contraseña configurada en Google Sheets pueda ingresar con el PIN dummy `1234`. La clave `1234` queda bloqueada y solo se acepta la contraseña real asignada a cada conductor (ej. Jairo Peña: `5301`).
   - **Sincronización Directa de Credenciales en Vivo (Google Sheets Gviz):** Se implementó `sincronizarCredencialesDesdeGviz()` como canal directo en tiempo real hacia la pestaña `Conductores`, leyendo la Columna C (`Contraseña`) con soporte CORS total. Esto garantiza que cualquier cambio de contraseña en Google Sheets se refleje de inmediato en la app sin depender del despliegue del Webhook de Apps Script.
   - **Eliminación de Caché Obsoleta de PINs:** Se añadió un saneador en el arranque de la app que purga cualquier valor residual `1234` guardado en el `localStorage` de navegadores móviles para conductores cuya clave real difiera de `1234`.
