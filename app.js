@@ -430,6 +430,121 @@ const productsListUl = document.getElementById('products-list');
 let currentProduct = null;
 let collectedProducts = [];
 
+// ==============================================================================
+// FORMATEO INTELIGENTE DE MILES Y DECIMALES (v1.4.3)
+// ==============================================================================
+
+// Formatea un número a formato con separador de miles colombiano (ej. 150000 -> 150.000, 150000.5 -> 150.000,5)
+function formatKilosDisplay(number) {
+    if (number === null || number === undefined || isNaN(number)) return "0";
+    const num = Number(number);
+    return num.toLocaleString('es-CO', {
+        minimumFractionDigits: (num % 1 !== 0) ? (String(num).split('.')[1]?.length || 1) : 0,
+        maximumFractionDigits: 2
+    });
+}
+
+// Parsea un string que puede tener puntos de miles y/o coma decimal a un Float numérico
+function parseKilosFloat(str) {
+    if (!str && str !== 0) return 0;
+    const clean = String(str).trim();
+    if (!clean) return 0;
+
+    // Si tiene coma, la coma es el separador decimal y los puntos son miles
+    if (clean.includes(',')) {
+        const parts = clean.split(',');
+        const intPart = parts[0].replace(/\./g, '').replace(/\D/g, '');
+        const decPart = parts.slice(1).join('').replace(/\D/g, '').slice(0, 2);
+        const num = parseFloat((intPart || '0') + '.' + decPart);
+        return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+    }
+
+    // Si solo tiene puntos:
+    // Si hay un solo punto y tiene 1 o 2 dígitos al final (ej. "35.5"), se interpreta como decimal
+    const dotParts = clean.split('.');
+    if (dotParts.length === 2 && dotParts[1].length <= 2 && !dotParts[0].includes('.')) {
+        const num = parseFloat(clean);
+        return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+    }
+
+    // En cualquier otro caso, todos los puntos son separadores de miles
+    const digitsOnly = clean.replace(/\./g, '').replace(/\D/g, '');
+    const num = parseFloat(digitsOnly);
+    return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+}
+
+// Formatea el valor mientras el conductor escribe en el campo #kilos conservando el cursor
+function formatKilosInputLive(inputEl) {
+    if (!inputEl) return;
+    const raw = inputEl.value;
+    const oldCursor = inputEl.selectionStart || raw.length;
+
+    // Contar cuántos caracteres válidos (dígitos, coma) había antes del cursor
+    let charsBefore = 0;
+    for (let i = 0; i < oldCursor && i < raw.length; i++) {
+        const c = raw[i];
+        if (/\d/.test(c) || c === ',' || c === '.') {
+            charsBefore++;
+        }
+    }
+
+    let isDecimalInitiated = raw.endsWith(',') || raw.endsWith('.');
+    let parts = raw.split(',');
+    if (parts.length === 1 && raw.includes('.')) {
+        const dotParts = raw.split('.');
+        if (dotParts.length === 2 && dotParts[1].length <= 2 && !dotParts[0].includes('.')) {
+            parts = dotParts;
+        } else {
+            parts = [raw.replace(/\./g, '')];
+        }
+    }
+
+    let intPart = parts[0].replace(/\D/g, '');
+    if (intPart.length > 1 && intPart.startsWith('0')) {
+        intPart = intPart.replace(/^0+/, '') || '0';
+    }
+
+    let decPart = parts.length > 1 ? parts.slice(1).join('').replace(/\D/g, '').slice(0, 2) : '';
+    let formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    if (!formattedInt && (decPart || isDecimalInitiated)) {
+        formattedInt = '0';
+    }
+
+    let formatted = formattedInt;
+    if (decPart) {
+        formatted += ',' + decPart;
+    } else if (isDecimalInitiated) {
+        formatted += ',';
+    }
+
+    inputEl.value = formatted;
+
+    // Reposicionar cursor
+    let newCursor = 0;
+    let seen = 0;
+    for (let j = 0; j < formatted.length; j++) {
+        if (seen === charsBefore) {
+            newCursor = j;
+            break;
+        }
+        const c = formatted[j];
+        if (/\d/.test(c) || c === ',') {
+            seen++;
+        }
+        newCursor = j + 1;
+    }
+
+    try {
+        inputEl.setSelectionRange(newCursor, newCursor);
+    } catch (e) {}
+}
+
+if (kilosInput) {
+    kilosInput.addEventListener('input', () => {
+        formatKilosInputLive(kilosInput);
+    });
+}
+
 const DEFAULT_PRODUCTOS = [
     "ACEITE",
     "CABEZAS",
@@ -922,7 +1037,8 @@ btnRegistrarProducto.addEventListener('click', () => {
         alert("Primero selecciona un producto.");
         return;
     }
-    if (!kilosInput.value || parseFloat(kilosInput.value) <= 0) {
+    const kilosVal = parseKilosFloat(kilosInput.value);
+    if (!kilosInput.value || kilosVal <= 0) {
         alert("Ingresa la cantidad en kilos (debe ser mayor a 0).");
         kilosInput.focus();
         return;
@@ -931,7 +1047,7 @@ btnRegistrarProducto.addEventListener('click', () => {
     // Guardar en la lista (redondeado a 2 decimales para evitar imprecisión de punto flotante)
     collectedProducts.push({
         producto: currentProduct,
-        kilos: Math.round(parseFloat(kilosInput.value) * 100) / 100
+        kilos: kilosVal
     });
 
     // Mantener la lista de productos recolectados siempre organizada en orden alfabético
@@ -958,7 +1074,7 @@ function renderAddedProducts() {
                         <span>${p.producto}</span>
                     </span>
                     <span style="display: flex; align-items: center; gap: 10px;">
-                        <strong style="color: #0284c7;">${p.kilos} kg</strong>
+                        <strong style="color: #0284c7;">${formatKilosDisplay(p.kilos)} kg</strong>
                         <button type="button" onclick="eliminarProductoRegistrado(${index})" title="Borrar este producto" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; cursor: pointer;">✕ Borrar</button>
                     </span>
                 </li>
@@ -1116,10 +1232,11 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     const sucursalName = obtenerPuntoSeleccionado();
     
     // Auto-registrar cualquier producto que el usuario haya seleccionado y colocado kilos pero no haya hecho clic en +
-    if (currentProduct && kilosInput && kilosInput.value && parseFloat(kilosInput.value) > 0) {
+    const kilosPending = parseKilosFloat(kilosInput?.value);
+    if (currentProduct && kilosInput && kilosInput.value && kilosPending > 0) {
         collectedProducts.push({
             producto: currentProduct,
-            kilos: Math.round(parseFloat(kilosInput.value) * 100) / 100
+            kilos: kilosPending
         });
         currentProduct = null;
         kilosInput.value = '';
@@ -1442,7 +1559,7 @@ function renderRecordsInTable(records, tbody) {
 
         const provDisplay = data.proveedor || 'N/A';
         const sucDisplay = data.punto || data.sucursal || 'General';
-        const cleanTotalKg = isNovedad ? '<span style="color: #dc2626; font-weight: 700;">0 kg (Novedad)</span>' : `${Math.round((Number(data.totalKilos) || 0) * 100) / 100} kg`;
+        const cleanTotalKg = isNovedad ? '<span style="color: #dc2626; font-weight: 700;">0 kg (Novedad)</span>' : `${formatKilosDisplay(data.totalKilos)} kg`;
         const recordLocalId = data.id || '';
         const docId = data._docId || '';
         const photoOrSign = data.foto || data.firma || '';
@@ -2236,18 +2353,16 @@ function mostrarComprobanteDigital(data) {
     if (data.productos && Array.isArray(data.productos)) {
         const prodsSorted = data.productos.slice().sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
         prodsSorted.forEach(p => {
-            const cleanKg = Math.round((Number(p.kilos) || 0) * 100) / 100;
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #1e293b;">${getEmojiForProduct(p.producto)} ${p.producto}</td>
-                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #0284c7;">${cleanKg} KG</td>
+                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #0284c7;">${formatKilosDisplay(p.kilos)} KG</td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    const cleanReceiptTotal = Math.round((Number(data.totalKilos) || 0) * 100) / 100;
-    document.getElementById('receipt-total-kilos').textContent = `${cleanReceiptTotal} KG`;
+    document.getElementById('receipt-total-kilos').textContent = `${formatKilosDisplay(data.totalKilos)} KG`;
 
     const obsContainer = document.getElementById('receipt-obs-container');
     if (data.observaciones && data.observaciones.trim() !== '') {
@@ -2286,12 +2401,9 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
     if (d.productos && Array.isArray(d.productos)) {
         const prodsSorted = d.productos.slice().sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
         prodsTxt = prodsSorted.map(p => {
-            const k = Math.round((Number(p.kilos) || 0) * 100) / 100;
-            return `  • ${getEmojiForProduct(p.producto)} ${p.producto}: *${k} KG*`;
+            return `  • ${getEmojiForProduct(p.producto)} ${p.producto}: *${formatKilosDisplay(p.kilos)} KG*`;
         }).join('\n');
     }
-
-    const cleanTotalKg = Math.round((Number(d.totalKilos) || 0) * 100) / 100;
 
     const msg = `🌿 *PROTEINAGRO - COMPROBANTE DE RECOLECCIÓN*\n` +
         `-----------------------------------------\n` +
@@ -2304,7 +2416,7 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
         `-----------------------------------------\n` +
         `📦 *PRODUCTOS RECOLECTADOS:*\n${prodsTxt}\n` +
         `-----------------------------------------\n` +
-        `⚖️ *TOTAL RECOLECTADO: ${cleanTotalKg} KG*\n` +
+        `⚖️ *TOTAL RECOLECTADO: ${formatKilosDisplay(d.totalKilos)} KG*\n` +
         (d.observaciones ? `📝 *Observaciones:* ${d.observaciones}\n` : '') +
         `✍️ *Firma Registrada:* OK\n` +
         `-----------------------------------------\n` +
@@ -2544,7 +2656,7 @@ function initAdminSupportModal() {
             matches.forEach((m, idx) => {
                 const opt = document.createElement('option');
                 opt.value = idx;
-                opt.textContent = `Viaje #${idx + 1} (${m.fecha}) - ${m.conductor || 'Sin conductor'} (${m.totalKilos || 0} kg)`;
+                opt.textContent = `Viaje #${idx + 1} (${m.fecha}) - ${m.conductor || 'Sin conductor'} (${formatKilosDisplay(m.totalKilos || 0)} kg)`;
                 multipleSelect.appendChild(opt);
             });
             multipleSelect.onchange = () => {
@@ -2577,7 +2689,6 @@ function initAdminSupportModal() {
         if (rec.productos && Array.isArray(rec.productos)) {
             const prodsSorted = rec.productos.slice().sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
             prodsSorted.forEach(p => {
-                const k = Math.round((Number(p.kilos) || 0) * 100) / 100;
                 const itemDiv = document.createElement('div');
                 itemDiv.style.display = 'flex';
                 itemDiv.style.justifyContent = 'space-between';
@@ -2586,16 +2697,15 @@ function initAdminSupportModal() {
                 itemDiv.style.borderBottom = '1px dashed #f1f5f9';
                 itemDiv.innerHTML = `
                     <span>${getEmojiForProduct(p.producto)} <strong>${p.producto}</strong></span>
-                    <span style="color: #0284c7; font-weight: 700;">${k} KG</span>
+                    <span style="color: #0284c7; font-weight: 700;">${formatKilosDisplay(p.kilos)} KG</span>
                 `;
                 prodsDiv.appendChild(itemDiv);
             });
         } else {
-            prodsDiv.innerHTML = `<div style="color: #64748b;">Producto: ${rec.producto || 'N/A'} - ${rec.totalKilos || 0} KG</div>`;
+            prodsDiv.innerHTML = `<div style="color: #64748b;">Producto: ${rec.producto || 'N/A'} - ${formatKilosDisplay(rec.totalKilos || 0)} KG</div>`;
         }
 
-        const totalKg = Math.round((Number(rec.totalKilos) || 0) * 100) / 100;
-        document.getElementById('admin-search-total').innerHTML = `⚖️ Total Recolectado: <span style="font-size: 1.25rem;">${totalKg} KG</span>`;
+        document.getElementById('admin-search-total').innerHTML = `⚖️ Total Recolectado: <span style="font-size: 1.25rem;">${formatKilosDisplay(rec.totalKilos)} KG</span>`;
     }
 
     btnViewVoucher.addEventListener('click', () => {
@@ -2967,12 +3077,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.4.2 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.4.3 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.4.2')
+            navigator.serviceWorker.register('/sw.js?v=1.4.3')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.4.2 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.4.3 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

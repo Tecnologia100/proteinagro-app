@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.4.2`  
+> **Versión Actual:** `v=1.4.3`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,16 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.4.2` (Septiembre 2026) - Versión Actual
+### `v=1.4.3` (Septiembre 2026) - Versión Actual
+- **Formato Inteligente de Miles en Kilos (es-CO):**
+  - **Formateo en Vivo en Campo de Kilos:** El campo `#kilos` se actualizó para formatear automáticamente con separador de punto de miles (ej. `150000` se muestra como `150.000` en tiempo real mientras el conductor digita), conservando la posición natural del cursor.
+  - **Soporte de Decimales:** Permite ingresar decimales con coma `,` o punto `.` (ej. `150.000,5`), parseando limpiamente al valor numérico flotante.
+  - **Formateo en Lista de Productos:** La lista de productos agregados por el conductor muestra la cantidad con separador de miles (ej. `150.000 kg`).
+  - **Formateo en Comprobante Digital y WhatsApp:** El voucher en pantalla y el mensaje para compartir por WhatsApp reflejan las cantidades y el total general en formato de miles (ej. `150.000 KG`).
+  - **Formateo en Panel Administrativo:** La tabla de recolecciones recientes y el buscador de soportes oficiales formatean los kilos totales e individuales con separador de miles.
+  - **Integridad Numérica Total:** La base de datos (Firestore, Google Sheets y LocalStorage) almacena el valor numérico puro (`150000`), manteniendo 100% intactas las operaciones matemáticas, gráficos y fórmulas contables.
+
+### `v=1.4.2` (Septiembre 2026)
 - **Módulo Independiente de Reporte de Novedades y Visitas Fallidas (`⚠️ Registrar Novedad / Visita Fallida`):**
   - **Constancia Oficial con 0 Kg:** Permite al conductor registrar formalmente visitas donde no se pudo recolectar producto, guardando el registro con `totalKilos: 0` y estado `Visita Fallida`.
   - **10 Causales Estandarizadas:** Desplegable intuitivo con 10 opciones predeterminadas (*Establecimiento Cerrado, Sin Materia Prima Disponible (0 Kg), No Pueden Atender en el Momento, Sin Parqueo / Acceso Bloqueado, Encargado Ausente, Producto Aún en Proceso, No Cumple Calidad / Mal Estado, Entregado a Otro Recolector, Camión Lleno (Capacidad Máxima), Otra Novedad*).
