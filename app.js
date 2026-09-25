@@ -139,6 +139,16 @@ window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 updateNetworkStatus();
 
+// === FUNCIONES DE FORMATO DE TEXTO (NOMBRE PROPIO) ===
+function aNombrePropio(texto) {
+    if (!texto) return '';
+    const s = String(texto).trim().toLowerCase();
+    if (!s) return '';
+    return s.replace(/(?:^|[\s\-\/\(\)\.,;:])([a-záéíóúñ])/g, function(match) {
+        return match.toUpperCase();
+    });
+}
+
 // === ESTADO DE AUTENTICACIÓN Y ROLES ===
 const DEFAULT_CONDUCTORES_AUTH = {
     "Ricardo Sepulveda": "1649",
@@ -147,8 +157,12 @@ const DEFAULT_CONDUCTORES_AUTH = {
     "Jairo Peña": "5301",
     "Carolina": "1306",
     "Carolina ": "1306",
+    "Luz Elena Lopez": "6700",
     "Luz elena lopez": "6700",
-    "francisco larrahondo": "1234"
+    "Francisco Larrahondo": "1234",
+    "francisco larrahondo": "1234",
+    "Daniela": "1234",
+    "Daniela ": "1234"
 };
 
 let CONDUCTORES_AUTH = Object.assign({}, DEFAULT_CONDUCTORES_AUTH);
@@ -220,27 +234,30 @@ const entrarComoConductor = (nombre = null) => {
     document.body.style.backgroundColor = 'var(--bg-color)';
 
     if (nombre) {
-        CURRENT_LOGGED_DRIVER = nombre;
+        const cleanNombre = aNombrePropio(nombre);
+        CURRENT_LOGGED_DRIVER = cleanNombre;
         try {
-            sessionStorage.setItem('proteinagro_current_driver', nombre);
+            sessionStorage.setItem('proteinagro_current_driver', cleanNombre);
         } catch(e) {}
 
         const select = document.getElementById('conductor');
         if (select) {
             let found = false;
             for (let i = 0; i < select.options.length; i++) {
-                if (select.options[i].value.toLowerCase() === nombre.toLowerCase() || select.options[i].text.toLowerCase() === nombre.toLowerCase()) {
+                if (select.options[i].value.toLowerCase() === cleanNombre.toLowerCase() || select.options[i].text.toLowerCase() === cleanNombre.toLowerCase()) {
                     select.selectedIndex = i;
+                    select.options[i].value = cleanNombre;
+                    select.options[i].textContent = cleanNombre;
                     found = true;
                     break;
                 }
             }
             if (!found) {
                 const opt = document.createElement('option');
-                opt.value = nombre;
-                opt.textContent = nombre;
+                opt.value = cleanNombre;
+                opt.textContent = cleanNombre;
                 select.appendChild(opt);
-                select.value = nombre;
+                select.value = cleanNombre;
             }
             // Bloquear selector para evitar manipulación accidental
             select.setAttribute('disabled', 'disabled');
@@ -254,7 +271,7 @@ const entrarComoConductor = (nombre = null) => {
         const headerBadge = document.getElementById('driver-header-badge');
         const headerName = document.getElementById('driver-header-name');
         if (headerBadge && headerName) {
-            headerName.textContent = nombre;
+            headerName.textContent = cleanNombre;
             headerBadge.style.display = 'inline-flex';
         }
     }
@@ -291,8 +308,10 @@ const handleConductorLogin = (e) => {
     const cleanDriverName = driverName.trim();
     const expectedPin = CONDUCTORES_AUTH[cleanDriverName] || 
                         CONDUCTORES_AUTH[driverName] || 
+                        CONDUCTORES_AUTH[cleanDriverName.toLowerCase()] ||
                         DEFAULT_CONDUCTORES_AUTH[cleanDriverName] || 
-                        DEFAULT_CONDUCTORES_AUTH[driverName];
+                        DEFAULT_CONDUCTORES_AUTH[driverName] ||
+                        DEFAULT_CONDUCTORES_AUTH[cleanDriverName.toLowerCase()];
 
     // Validación de seguridad estricta:
     // 1. Debe coincidir con la clave asignada al conductor
@@ -573,8 +592,9 @@ const DEFAULT_CONDUCTORES = [
     "Emer Rodriguez",
     "Jairo Peña",
     "Carolina",
-    "Luz elena lopez",
-    "francisco larrahondo"
+    "Luz Elena Lopez",
+    "Francisco Larrahondo",
+    "Daniela"
 ];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
@@ -784,13 +804,14 @@ function renderDynamicDrivers(drivers) {
         const currentVal = CURRENT_LOGGED_DRIVER || select.value;
         select.innerHTML = '<option value="" disabled selected>Seleccione su nombre</option>';
         drivers.forEach(d => {
+            const cleanD = aNombrePropio(d);
             const opt = document.createElement('option');
-            opt.value = d;
-            opt.textContent = d;
+            opt.value = cleanD;
+            opt.textContent = cleanD;
             select.appendChild(opt);
         });
         if (currentVal) {
-            select.value = currentVal;
+            select.value = aNombrePropio(currentVal);
             if (CURRENT_LOGGED_DRIVER) {
                 select.setAttribute('disabled', 'disabled');
                 select.classList.add('driver-locked');
@@ -804,12 +825,13 @@ function renderDynamicDrivers(drivers) {
         const currentLoginVal = loginSelect.value;
         loginSelect.innerHTML = '<option value="" disabled selected>Seleccione su nombre...</option>';
         drivers.forEach(d => {
+            const cleanD = aNombrePropio(d);
             const opt = document.createElement('option');
-            opt.value = d;
-            opt.textContent = d;
+            opt.value = cleanD;
+            opt.textContent = cleanD;
             loginSelect.appendChild(opt);
         });
-        if (currentLoginVal) loginSelect.value = currentLoginVal;
+        if (currentLoginVal) loginSelect.value = aNombrePropio(currentLoginVal);
     }
 }
 
@@ -899,6 +921,7 @@ async function sincronizarCredencialesDesdeGviz() {
         if (res.ok) {
             const csvText = await res.text();
             const lines = csvText.split(/\r?\n/);
+            const gvizConductores = [];
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
@@ -918,28 +941,46 @@ async function sincronizarCredencialesDesdeGviz() {
                 }
                 cols.push(cur.trim());
 
-                const nombre = cols[0] ? cols[0].replace(/^"|"$/g, '').trim() : '';
+                const rawNombre = cols[0] ? cols[0].replace(/^"|"$/g, '').trim() : '';
                 const estado = (cols[1] ? cols[1].replace(/^"|"$/g, '').trim() : 'Activo').toLowerCase();
                 const clave = cols[2] !== undefined ? cols[2].replace(/^"|"$/g, '').trim() : '';
 
-                if (nombre && estado !== 'inactivo') {
+                if (rawNombre && estado !== 'inactivo') {
+                    // Normalizar a Nombre Propio (Title Case) para visualización siempre profesional
+                    const nombre = aNombrePropio(rawNombre);
+
                     if (nombre.toLowerCase() === 'admin' || nombre.toLowerCase() === 'administrador') {
                         if (clave) {
                             ADMIN_CLAVE_CONFIG = clave;
                             try { localStorage.setItem('proteinagro_admin_clave', clave); } catch(e) {}
                         }
-                    } else if (clave) {
-                        CONDUCTORES_AUTH[nombre] = clave;
-                        if (nombre.trim() !== nombre) {
-                            CONDUCTORES_AUTH[nombre.trim()] = clave;
+                    } else {
+                        if (!gvizConductores.includes(nombre)) {
+                            gvizConductores.push(nombre);
+                        }
+                        if (clave) {
+                            CONDUCTORES_AUTH[nombre] = clave;
+                            CONDUCTORES_AUTH[rawNombre] = clave;
+                            CONDUCTORES_AUTH[nombre.toLowerCase()] = clave;
+                            if (nombre.trim() !== nombre) {
+                                CONDUCTORES_AUTH[nombre.trim()] = clave;
+                            }
                         }
                     }
                 }
             }
+
+            if (gvizConductores.length > 0) {
+                renderDynamicDrivers(gvizConductores);
+                try {
+                    localStorage.setItem('proteinagro_conductores_cache', JSON.stringify(gvizConductores));
+                } catch(e) {}
+            }
+
             try {
                 localStorage.setItem('proteinagro_conductores_auth', JSON.stringify(CONDUCTORES_AUTH));
             } catch(e) {}
-            console.log("✅ Credenciales de conductores sincronizadas en vivo vía Google Sheets Gviz.");
+            console.log("✅ Conductores y credenciales sincronizados en vivo vía Google Sheets Gviz:", gvizConductores);
         }
     } catch (err) {
         console.warn("⚠️ No se pudo sincronizar credenciales vía Google Sheets Gviz:", err);
@@ -951,6 +992,7 @@ async function cargarCatalogosDinamicos() {
     try {
         localStorage.removeItem('proteinagro_catalogos_cache');
         localStorage.removeItem('proteinagro_rutas_config');
+        localStorage.removeItem('proteinagro_conductores_cache');
     } catch(e) {}
 
     // Sincronizar credenciales en vivo directamente desde Google Sheets Gviz
@@ -1568,7 +1610,7 @@ function renderRecordsInTable(records, tbody) {
         if (isNovedad) tr.style.background = '#fffdfa';
         tr.innerHTML = `
             <td style="font-weight: 500; white-space: nowrap;">${fechaTexto}</td>
-            <td style="text-transform: capitalize;">${data.conductor || '-'}</td>
+            <td style="text-transform: capitalize;">${aNombrePropio(data.conductor || '-')}</td>
             <td style="text-transform: capitalize;">${ruta}</td>
             <td style="text-transform: capitalize;">${provDisplay}</td>
             <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
@@ -1581,6 +1623,9 @@ function renderRecordsInTable(records, tbody) {
             <td style="white-space: nowrap;">
                 <button onclick="verSoporteDesdeTabla('${docId}', '${recordLocalId}')" style="background: #0284c7; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
                     📄 Soporte
+                </button>
+                <button onclick="abrirModalEditarRecoleccion('${docId}', '${recordLocalId}')" style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
+                    ✏️ Editar
                 </button>
                 <button onclick="eliminarRecoleccion('${docId}', '${recordLocalId}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
                     🗑️ Eliminar
@@ -2444,11 +2489,13 @@ window.forzarActualizacionApp = async function() {
         try {
             localStorage.removeItem('proteinagro_catalogos_cache');
             localStorage.removeItem('proteinagro_rutas_config');
+            localStorage.removeItem('proteinagro_conductores_cache');
+            localStorage.removeItem('proteinagro_conductores_auth');
         } catch(e) {}
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.3.7&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.4.4&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -2712,6 +2759,350 @@ function initAdminSupportModal() {
         if (currentAdminFoundRecord) {
             modal.style.display = 'none';
             mostrarComprobanteDigital(currentAdminFoundRecord);
+        }
+    });
+}
+
+// ==============================================================================
+// MÓDULO DE EDICIÓN Y CORRECCIÓN DE RECOLECCIONES PARA ADMINISTRADOR (v1.4.4)
+// ==============================================================================
+window.abrirModalEditarRecoleccion = function(docId, recordLocalId) {
+    const modal = document.getElementById('admin-edit-modal');
+    if (!modal) return;
+
+    let rec = adminRecordsCache.find(r => (docId && r._docId === docId) || (recordLocalId && (r.id === recordLocalId || r._docId === recordLocalId)));
+    if (!rec) {
+        alert("No se encontró el registro para editar.");
+        return;
+    }
+
+    document.getElementById('edit-doc-id').value = rec._docId || docId || '';
+    document.getElementById('edit-local-id').value = rec.id || recordLocalId || '';
+    document.getElementById('admin-edit-id-subtitle').textContent = `Recolección: ${rec.id || rec._docId || 'N/A'}`;
+
+    // 1. Popular Conductor
+    const condSelect = document.getElementById('edit-conductor');
+    condSelect.innerHTML = '';
+    const driversList = (typeof DEFAULT_CONDUCTORES !== 'undefined' ? DEFAULT_CONDUCTORES : []);
+    driversList.forEach(d => {
+        const cleanD = aNombrePropio(d);
+        const opt = document.createElement('option');
+        opt.value = cleanD;
+        opt.textContent = cleanD;
+        condSelect.appendChild(opt);
+    });
+    const currentCond = aNombrePropio(rec.conductor || '');
+    if (currentCond) {
+        if (!Array.from(condSelect.options).some(o => o.value.toLowerCase() === currentCond.toLowerCase())) {
+            const opt = document.createElement('option');
+            opt.value = currentCond;
+            opt.textContent = currentCond;
+            condSelect.appendChild(opt);
+        }
+        condSelect.value = currentCond;
+    }
+
+    // 2. Popular Ruta
+    const rutaSelect = document.getElementById('edit-ruta');
+    rutaSelect.innerHTML = '';
+    const routesList = (typeof DEFAULT_RUTAS !== 'undefined' ? DEFAULT_RUTAS : []);
+    routesList.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r;
+        rutaSelect.appendChild(opt);
+    });
+    if (rec.ruta) {
+        if (!Array.from(rutaSelect.options).some(o => o.value === rec.ruta)) {
+            const opt = document.createElement('option');
+            opt.value = rec.ruta;
+            opt.textContent = rec.ruta;
+            rutaSelect.appendChild(opt);
+        }
+        rutaSelect.value = rec.ruta;
+    }
+
+    // 3. Proveedores y Puntos con Datalists autollenados
+    const provInput = document.getElementById('edit-proveedor');
+    const pointInput = document.getElementById('edit-punto');
+    const provDatalist = document.getElementById('edit-prov-list');
+    const pointDatalist = document.getElementById('edit-point-list');
+
+    provInput.value = rec.proveedor || '';
+    pointInput.value = rec.punto || rec.sucursal || '';
+
+    if (provDatalist) {
+        provDatalist.innerHTML = '';
+        const provsSet = new Set(TODOS_LOS_PROVEEDORES);
+        adminRecordsCache.forEach(r => { if (r.proveedor) provsSet.add(r.proveedor.trim()); });
+        Array.from(provsSet).sort((a,b) => a.localeCompare(b, 'es', {sensitivity: 'base'})).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            provDatalist.appendChild(opt);
+        });
+    }
+
+    if (pointDatalist) {
+        pointDatalist.innerHTML = '';
+        const ptsSet = new Set();
+        adminRecordsCache.forEach(r => {
+            const pt = r.punto || r.sucursal;
+            if (pt) ptsSet.add(pt.trim());
+        });
+        Array.from(ptsSet).sort((a,b) => a.localeCompare(b, 'es', {sensitivity: 'base'})).forEach(pt => {
+            const opt = document.createElement('option');
+            opt.value = pt;
+            pointDatalist.appendChild(opt);
+        });
+    }
+
+    // 4. Fecha y Observaciones
+    document.getElementById('edit-fecha').value = rec.fecha || '';
+    document.getElementById('edit-observaciones').value = rec.observaciones || '';
+
+    // 5. Lista de productos
+    let prodsToRender = [];
+    if (rec.productos && Array.isArray(rec.productos) && rec.productos.length > 0) {
+        prodsToRender = rec.productos.map(p => ({
+            producto: p.producto,
+            kilos: p.kilos
+        }));
+    } else if (rec.producto) {
+        prodsToRender = [{ producto: rec.producto, kilos: rec.totalKilos || 0 }];
+    } else {
+        prodsToRender = [{ producto: 'DESPERDICIO', kilos: rec.totalKilos || 0 }];
+    }
+
+    renderEditProductsList(prodsToRender);
+
+    modal.style.display = 'flex';
+};
+
+function renderEditProductsList(prods) {
+    const container = document.getElementById('edit-products-list');
+    if (!container) return;
+    container.innerHTML = '';
+    prods.forEach(p => {
+        addEditProductRow(p.producto, p.kilos);
+    });
+    if (prods.length === 0) {
+        addEditProductRow('', 0);
+    }
+    recalcularTotalEditKilos();
+}
+
+function addEditProductRow(prodName, kilosVal) {
+    const container = document.getElementById('edit-products-list');
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = 'edit-product-row';
+    row.style.display = 'flex';
+    row.style.gap = '8px';
+    row.style.alignItems = 'center';
+    row.style.background = 'white';
+    row.style.padding = '6px 8px';
+    row.style.borderRadius = '6px';
+    row.style.border = '1px solid #e2e8f0';
+
+    const prodSelect = document.createElement('select');
+    prodSelect.className = 'premium-input edit-prod-select';
+    prodSelect.style.padding = '6px 8px';
+    prodSelect.style.fontSize = '0.85rem';
+    prodSelect.style.flex = '2';
+
+    const allProds = (typeof DEFAULT_PRODUCTOS !== 'undefined' ? DEFAULT_PRODUCTOS : []);
+    allProds.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = `${getEmojiForProduct(p)} ${p}`;
+        prodSelect.appendChild(opt);
+    });
+
+    const cleanProdName = (prodName || '').trim().toUpperCase();
+    if (cleanProdName && !allProds.includes(cleanProdName)) {
+        const opt = document.createElement('option');
+        opt.value = cleanProdName;
+        opt.textContent = `${getEmojiForProduct(cleanProdName)} ${cleanProdName}`;
+        prodSelect.appendChild(opt);
+    }
+    if (cleanProdName) prodSelect.value = cleanProdName;
+
+    const kilosInput = document.createElement('input');
+    kilosInput.type = 'text';
+    kilosInput.className = 'premium-input edit-prod-kilos';
+    kilosInput.style.padding = '6px 8px';
+    kilosInput.style.fontSize = '0.85rem';
+    kilosInput.style.flex = '1';
+    kilosInput.style.textAlign = 'right';
+    kilosInput.style.fontWeight = '700';
+    kilosInput.value = kilosVal !== undefined ? formatKilosDisplay(kilosVal) : '0';
+
+    kilosInput.addEventListener('input', recalcularTotalEditKilos);
+    prodSelect.addEventListener('change', recalcularTotalEditKilos);
+
+    const btnRemove = document.createElement('button');
+    btnRemove.type = 'button';
+    btnRemove.innerHTML = '🗑️';
+    btnRemove.title = 'Eliminar este producto';
+    btnRemove.style.background = '#fef2f2';
+    btnRemove.style.color = '#ef4444';
+    btnRemove.style.border = '1px solid #fecaca';
+    btnRemove.style.borderRadius = '6px';
+    btnRemove.style.padding = '6px 8px';
+    btnRemove.style.cursor = 'pointer';
+    btnRemove.addEventListener('click', () => {
+        const rows = container.querySelectorAll('.edit-product-row');
+        if (rows.length <= 1) {
+            alert("La recolección debe tener al menos un producto.");
+            return;
+        }
+        row.remove();
+        recalcularTotalEditKilos();
+    });
+
+    row.appendChild(prodSelect);
+    row.appendChild(kilosInput);
+    row.appendChild(btnRemove);
+    container.appendChild(row);
+}
+
+function recalcularTotalEditKilos() {
+    const rows = document.querySelectorAll('.edit-product-row');
+    let total = 0;
+    rows.forEach(r => {
+        const input = r.querySelector('.edit-prod-kilos');
+        if (input) {
+            const val = parseKilosFloat(input.value) || 0;
+            total += val;
+        }
+    });
+    total = Math.round(total * 100) / 100;
+    const totalEl = document.getElementById('edit-total-preview');
+    if (totalEl) {
+        totalEl.innerHTML = `⚖️ Total Kilos: <span style="font-size: 1.15rem; color: #16a34a;">${formatKilosDisplay(total)} KG</span>`;
+    }
+    return total;
+}
+
+function initAdminEditModal() {
+    const modal = document.getElementById('admin-edit-modal');
+    const btnClose = document.getElementById('btn-close-admin-edit-modal');
+    const btnCancel = document.getElementById('btn-cancel-admin-edit');
+    const btnAddProd = document.getElementById('btn-edit-add-product');
+    const form = document.getElementById('form-admin-edit');
+
+    if (!modal || !form) return;
+
+    const cerrarModal = () => {
+        modal.style.display = 'none';
+    };
+
+    btnClose?.addEventListener('click', cerrarModal);
+    btnCancel?.addEventListener('click', cerrarModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) cerrarModal();
+    });
+
+    btnAddProd?.addEventListener('click', () => {
+        addEditProductRow('', 0);
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const docId = document.getElementById('edit-doc-id').value;
+        const localId = document.getElementById('edit-local-id').value;
+        const conductor = document.getElementById('edit-conductor').value;
+        const ruta = document.getElementById('edit-ruta').value;
+        const proveedor = document.getElementById('edit-proveedor').value.trim();
+        const punto = document.getElementById('edit-punto').value.trim();
+        const fecha = document.getElementById('edit-fecha').value.trim();
+        const observaciones = document.getElementById('edit-observaciones').value.trim();
+
+        if (!conductor || !proveedor || !punto) {
+            alert("Por favor complete los campos obligatorios: Conductor, Proveedor y Punto.");
+            return;
+        }
+
+        const rows = document.querySelectorAll('.edit-product-row');
+        const productos = [];
+        let totalKilos = 0;
+        rows.forEach(r => {
+            const prod = r.querySelector('.edit-prod-select')?.value;
+            const kilos = parseKilosFloat(r.querySelector('.edit-prod-kilos')?.value) || 0;
+            if (prod && kilos > 0) {
+                productos.push({ producto: prod.toUpperCase(), kilos: kilos });
+                totalKilos += kilos;
+            }
+        });
+
+        if (productos.length === 0) {
+            alert("Debe incluir al menos un producto con kilos válidos mayores a 0.");
+            return;
+        }
+
+        totalKilos = Math.round(totalKilos * 100) / 100;
+
+        const btnSave = document.getElementById('btn-save-admin-edit');
+        if (btnSave) {
+            btnSave.disabled = true;
+            btnSave.innerHTML = '⏳ Guardando...';
+        }
+
+        try {
+            const updatedData = {
+                conductor: aNombrePropio(conductor),
+                ruta: ruta,
+                proveedor: aNombrePropio(proveedor),
+                punto: aNombrePropio(punto),
+                sucursal: aNombrePropio(punto),
+                fecha: fecha,
+                observaciones: observaciones,
+                productos: productos,
+                totalKilos: totalKilos,
+                modificadoEn: new Date().toLocaleString()
+            };
+
+            // 1. Actualizar en Firebase Firestore
+            if (docId) {
+                await db.collection('recolecciones').doc(docId).update(updatedData);
+            }
+
+            // 2. Actualizar en cache de registros Admin
+            const idx = adminRecordsCache.findIndex(r => (docId && r._docId === docId) || (localId && (r.id === localId || r._docId === localId)));
+            if (idx !== -1) {
+                Object.assign(adminRecordsCache[idx], updatedData);
+            }
+
+            // 3. Actualizar respaldo local en localStorage
+            try {
+                let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+                const bIdx = savedBackup.findIndex(r => (docId && r._docId === docId) || (localId && (r.id === localId || r._docId === localId)));
+                if (bIdx !== -1) {
+                    Object.assign(savedBackup[bIdx], updatedData);
+                    localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
+                }
+            } catch(e) {}
+
+            // 4. Sincronizar actualización con Google Sheets en segundo plano
+            if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== '') {
+                const payloadParam = encodeURIComponent(JSON.stringify({ ...updatedData, id: localId || docId }));
+                fetch(GOOGLE_SHEETS_WEBHOOK_URL + '?action=updateRecoleccion&payload=' + payloadParam, { method: 'GET', mode: 'no-cors' }).catch(err => console.warn("Sync Sheets edit err:", err));
+            }
+
+            // 5. Re-renderizar tabla de Administrador
+            renderRecordsInTable(adminRecordsCache, document.getElementById('admin-table-body'));
+
+            modal.style.display = 'none';
+            alert("✅ Recolección corregida exitosamente.\n\nLos cambios ya están reflejados en el sistema y en los soportes oficiales.");
+        } catch (err) {
+            console.error("Error al actualizar recolección:", err);
+            alert("Hubo un error al guardar los cambios: " + err.message);
+        } finally {
+            if (btnSave) {
+                btnSave.disabled = false;
+                btnSave.innerHTML = '💾 Guardar Corrección';
+            }
         }
     });
 }
@@ -3056,7 +3447,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const cachedDrivers = localStorage.getItem('proteinagro_conductores_cache');
         if (cachedDrivers) {
             const parsed = JSON.parse(cachedDrivers);
-            if (Array.isArray(parsed) && parsed.length > 0) initialDrivers = parsed;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                initialDrivers = parsed.map(d => aNombrePropio(d));
+            }
         }
     } catch(e) {}
     renderDynamicDrivers(initialDrivers);
@@ -3064,6 +3457,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDynamicRoutes(DEFAULT_RUTAS);
     initRutasYProveedores();
     initAdminSupportModal();
+    initAdminEditModal();
     initNovedadesModal();
 
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
@@ -3077,12 +3471,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.4.3 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.4.4 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.4.3')
+            navigator.serviceWorker.register('/sw.js?v=1.4.4')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.4.3 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.4.4 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

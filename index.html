@@ -28,7 +28,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.4.3">
+    <link rel="stylesheet" href="styles.css?v=1.4.4">
 
     <!-- Firebase (Carga no bloqueante con defer para acelerar FCP) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
@@ -40,7 +40,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.4.3" defer></script>
+    <script src="app.js?v=1.4.4" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -49,7 +49,7 @@
             <div class="logo-icon" style="font-size: 3rem; text-align: center; margin-bottom: 10px;">🌿</div>
             <h2 style="text-align: center; margin-bottom: 5px; color: var(--primary);">ProteinAgro</h2>
             <p style="text-align: center; color: var(--text-muted); margin-bottom: 22px;">
-                Acceso al Sistema <span class="version-tag">v1.4.3</span>
+                Acceso al Sistema <span class="version-tag">v1.4.4</span>
             </p>
             
             <!-- Modo Conductor (Predeterminado) -->
@@ -190,10 +190,10 @@
                     <h1 style="font-size: 1.25rem; line-height: 1.1; margin: 0;">ProteinAgro</h1>
                     <span id="driver-header-badge" class="driver-header-badge" style="display: none;">👤 <span id="driver-header-name">Conductor</span></span>
                 </div>
-                <span class="version-tag">v1.3.7</span>
+                <span class="version-tag">v1.4.4</span>
             </div>
             <div class="app-header-right">
-                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.3.7</button>
+                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.4.4</button>
                 <button id="btn-pwa-install-header" class="btn-text" style="display: none; color: #10b981; font-weight: 600; font-size: 0.85rem; align-items: center; gap: 4px;">📲 Instalar</button>
                 <div class="status-indicator offline" id="network-status">
                     <span class="dot"></span>
@@ -361,7 +361,7 @@
 
                 <!-- Footer de Versión & Ayuda de Caché -->
                 <div style="text-align: center; margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">ProteinAgro Digital v1.3.6 • Soporte Oficial Admin & Trazabilidad Diaria</p>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">ProteinAgro Digital v1.4.4 • Soporte Oficial Admin & Trazabilidad Diaria</p>
                     <button type="button" onclick="forzarActualizacionApp()" style="background: none; border: 1px dashed #cbd5e1; color: #64748b; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">
                         🔄 ¿No ves los cambios? Toca aquí para actualizar
                     </button>
@@ -525,6 +525,87 @@
             <div id="admin-search-empty-box" style="display: none; text-align: center; padding: 18px; background: #fff1f2; border: 1px dashed #f43f5e; border-radius: 10px; color: #be123c; font-size: 0.85rem; margin-bottom: 15px;">
                 ⚠️ No se encontró ninguna recolección registrada para esta fecha, proveedor y punto. Verifique los datos seleccionados.
             </div>
+        </div>
+    </div>
+
+    <!-- Modal para Editar Recolección desde Admin (v1.4.4) -->
+    <div id="admin-edit-modal" class="voucher-modal-overlay" style="display: none;">
+        <div class="voucher-card" style="max-width: 560px; width: 92%; max-height: 90vh; overflow-y: auto; text-align: left; padding: 22px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.6rem;">✏️</span>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 700;">Editar Recolección</h3>
+                        <p style="margin: 0; font-size: 0.75rem; color: #64748b;" id="admin-edit-id-subtitle">Modificar datos registrados</p>
+                    </div>
+                </div>
+                <button type="button" id="btn-close-admin-edit-modal" style="background: none; border: none; font-size: 1.6rem; color: #94a3b8; cursor: pointer; padding: 0 4px; line-height: 1;">&times;</button>
+            </div>
+
+            <form id="form-admin-edit" novalidate>
+                <input type="hidden" id="edit-doc-id">
+                <input type="hidden" id="edit-local-id">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label for="edit-conductor" style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">🚛 Conductor</label>
+                        <select id="edit-conductor" class="premium-input" style="padding: 8px 10px; font-size: 0.9rem;" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-ruta" style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">🗺️ Ruta</label>
+                        <select id="edit-ruta" class="premium-input" style="padding: 8px 10px; font-size: 0.9rem;" required></select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label for="edit-proveedor" style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">🏬 Proveedor</label>
+                        <input type="text" id="edit-proveedor" list="edit-prov-list" class="premium-input" style="padding: 8px 10px; font-size: 0.9rem;" required>
+                        <datalist id="edit-prov-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-punto" style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">📍 Punto / Sucursal</label>
+                        <input type="text" id="edit-punto" list="edit-point-list" class="premium-input" style="padding: 8px 10px; font-size: 0.9rem;" required>
+                        <datalist id="edit-point-list"></datalist>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="edit-fecha" style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">📅 Fecha / Hora</label>
+                    <input type="text" id="edit-fecha" class="premium-input" style="padding: 8px 10px; font-size: 0.9rem;" required>
+                </div>
+
+                <!-- Lista de Productos Editables -->
+                <div style="margin-bottom: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="font-size: 0.85rem; font-weight: 700; color: #1e293b;">📦 Productos y Kilos Registrados</label>
+                        <button type="button" id="btn-edit-add-product" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 6px; padding: 4px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
+                            ➕ Agregar Producto
+                        </button>
+                    </div>
+                    <div id="edit-products-list" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;">
+                        <!-- Filas de producto dinámicas -->
+                    </div>
+                </div>
+
+                <div id="edit-total-preview" style="font-size: 1.05rem; font-weight: 800; color: #16a34a; text-align: right; margin-bottom: 14px;">
+                    ⚖️ Total Kilos: 0 KG
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="edit-observaciones" style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">📝 Observaciones</label>
+                    <textarea id="edit-observaciones" class="premium-input" style="padding: 8px 10px; font-size: 0.88rem; min-height: 50px; resize: vertical;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" id="btn-cancel-admin-edit" class="btn-secondary" style="flex: 1; padding: 10px; font-weight: 600;">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-save-admin-edit" class="btn-primary" style="flex: 2; padding: 10px; font-weight: 700; background: #f59e0b; border-color: #d97706; display: flex; justify-content: center; align-items: center; gap: 6px;">
+                        💾 Guardar Corrección
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

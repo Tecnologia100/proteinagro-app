@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.4.3`  
+> **Versión Actual:** `v=1.4.4`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,18 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.4.3` (Septiembre 2026) - Versión Actual
+### `v=1.4.4` (Septiembre 2026) - Versión Actual
+- **Módulo de Edición y Corrección de Recolecciones para Administrador (`✏️ Editar`):**
+  - **Edición en Línea de Recolecciones:** Incorporación del botón `✏️ Editar` en cada fila de la tabla del panel administrativo. Permite corregir errores cometidos por los conductores al ingresar productos, kilos, ruta, conductor, fecha, proveedor, punto o sucursal y observaciones.
+  - **Gestión Dinámica de Productos:** Permite añadir nuevos productos (`➕ Agregar Producto`), modificar productos existentes con selector desplegable oficial, editar los pesos en kilos y eliminar ítems erróneos con cálculo automático en vivo del Total de Kilos.
+  - **Sincronización Bidireccional Inmediata:** Al guardar los cambios, la corrección se actualiza de inmediato en **Firebase Firestore**, en la memoria local del navegador y se envía a **Google Sheets** vía Webhook (`action=updateRecoleccion`), eliminando automáticamente las filas desactualizadas en la hoja contable y re-insertando los datos corregidos con precios y valores recalculados.
+  - **Actualización Inmediata de Soportes Oficiales:** Los comprobantes de soporte oficial (voucher digital e impresión/WhatsApp) se actualizan al instante sin discrepancias.
+- **Normalización Estricta a Nombre Propio (Title Case) para Conductores:**
+  - **Corrección de Conductores en Minúsculas:** Se corrigió el nombre de `Francisco Larrahondo` (anteriormente en minúsculas en fallbacks y cachés residuales) y `Luz Elena Lopez`, garantizando que siempre se presenten en Nombre Propio profesional en el login, cabeceras, formularios, tablas y vouchers.
+  - **Sincronización Dinámica con Google Sheets Gviz:** `sincronizarCredencialesDesdeGviz()` ahora lee en vivo la pestaña `Conductores`, formatea automáticamente a Nombre Propio (`aNombrePropio()`), actualiza los selectores dinámicos y guarda las credenciales individuales de forma insensible a mayúsculas/minúsculas para evitar bloqueos de PIN.
+  - **Saneamiento Automático de Caché:** Purga automática de cachés antiguas en navegadores para que los usuarios vean de inmediato los nombres corregidos.
+
+### `v=1.4.3` (Septiembre 2026)
 - **Formato Inteligente de Miles en Kilos (es-CO):**
   - **Formateo en Vivo en Campo de Kilos:** El campo `#kilos` se actualizó para formatear automáticamente con separador de punto de miles (ej. `150000` se muestra como `150.000` en tiempo real mientras el conductor digita), conservando la posición natural del cursor.
   - **Soporte de Decimales:** Permite ingresar decimales con coma `,` o punto `.` (ej. `150.000,5`), parseando limpiamente al valor numérico flotante.

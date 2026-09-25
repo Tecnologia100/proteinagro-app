@@ -11,6 +11,11 @@ function doGet(e) {
       return guardarRecoleccionSheet(ss, e.parameter.payload);
     }
 
+    // 0.05 Si viene una petición de actualización/edición de recolección
+    if (e && e.parameter && e.parameter.action === 'updateRecoleccion') {
+      return actualizarRecoleccionSheet(ss, e.parameter.payload);
+    }
+
     // 0.1 Diagnóstico en vivo de Precios y Recolecciones
     if (e && e.parameter && e.parameter.action === 'debugPrecios') {
       return diagnosticoPreciosSheet(ss, e.parameter.proveedor, e.parameter.producto);
@@ -142,15 +147,16 @@ function doGet(e) {
       productos = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HARINA CARNE", "HUESO BLANCO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
     }
     if (conductores.length === 0) {
-      conductores = ["Ricardo Sepulveda", "Hernando Prado", "Emer Rodriguez", "Jairo Peña", "Carolina", "Luz elena lopez", "francisco larrahondo"];
+      conductores = ["Ricardo Sepulveda", "Hernando Prado", "Emer Rodriguez", "Jairo Peña", "Carolina", "Luz Elena Lopez", "Francisco Larrahondo", "Daniela"];
       conductoresDetalle = [
         { nombre: "Ricardo Sepulveda", clave: "1649" },
         { nombre: "Hernando Prado", clave: "8063" },
         { nombre: "Emer Rodriguez", clave: "6860" },
         { nombre: "Jairo Peña", clave: "5301" },
         { nombre: "Carolina", clave: "1306" },
-        { nombre: "Luz elena lopez", clave: "6700" },
-        { nombre: "francisco larrahondo", clave: "1234" }
+        { nombre: "Luz Elena Lopez", clave: "6700" },
+        { nombre: "Francisco Larrahondo", clave: "1234" },
+        { nombre: "Daniela", clave: "1234" }
       ];
     }
     if (rutas.length === 0) {
@@ -271,6 +277,46 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     return ContentService.createTextOutput(JSON.stringify({"result": "success", "message": "Guardado exitosamente"}))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==============================================================================
+// ACTUALIZAR / CORREGIR RECOLECCIÓN EXISTENTE EN HOJA RECOLECCIONES (v1.4.4)
+// ==============================================================================
+function actualizarRecoleccionSheet(ss, rawPayload) {
+  try {
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) throw new Error("No existe la pestaña Recolecciones.");
+    
+    var data = null;
+    if (typeof rawPayload === 'string') {
+      try { data = JSON.parse(rawPayload); } catch(e) { data = null; }
+    } else {
+      data = rawPayload;
+    }
+    if (!data || !data.id) throw new Error("Payload o ID inválido.");
+
+    var idTarget = String(data.id).trim();
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      var idColData = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      var rowsToDelete = [];
+      for (var r = idColData.length - 1; r >= 0; r--) {
+        var currentId = String(idColData[r][0] || '').trim();
+        if (currentId === idTarget) {
+          rowsToDelete.push(r + 2); // Índice base 1
+        }
+      }
+      for (var d = 0; d < rowsToDelete.length; d++) {
+        sheet.deleteRow(rowsToDelete[d]);
+      }
+    }
+
+    // Re-insertar filas corregidas con cálculo de precio/valor automático
+    return guardarRecoleccionSheet(ss, data);
+  } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
   }
