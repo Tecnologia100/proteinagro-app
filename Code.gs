@@ -21,6 +21,11 @@ function doGet(e) {
       return corregirKilosFechasSheet(ss);
     }
 
+    // 0.09 Inicializar o sincronizar pestaña Tarifas (precios vigentes y pendientes)
+    if (e && e.parameter && e.parameter.action === 'inicializarTarifas') {
+      return inicializarPestanaTarifas(ss);
+    }
+
     // 0.1 Diagnóstico en vivo de Precios y Recolecciones
     if (e && e.parameter && e.parameter.action === 'debugPrecios') {
       return diagnosticoPreciosSheet(ss, e.parameter.proveedor, e.parameter.producto);
@@ -258,8 +263,8 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         continue;
       }
 
-      // Búsqueda inteligente del precio histórico (insensible a mayúsculas, espacios, guiones y tildes)
-      var precio = buscarPrecioHistorico(sheet, proveedor, punto, prodNombre);
+      // Búsqueda inteligente de tarifa: Primero en hoja "Tarifas", y fallback a histórico de Recolecciones
+      var precio = obtenerPrecioTarifa(ss, proveedor, punto, prodNombre);
       var valor = '';
       
       if (precio !== '' && !isNaN(parseFloat(precio)) && prodKilos > 0) {
@@ -329,7 +334,102 @@ function actualizarRecoleccionSheet(ss, rawPayload) {
 }
 
 // ==============================================================================
-// MOTOR INTELIGENTE DE BÚSQUEDA DE PRECIO HISTÓRICO
+// MOTOR INTELIGENTE DE TARIFA VIGENTE (HOJA TARIFAS + FALLBACK HISTÓRICO)
+// ==============================================================================
+
+// Búsqueda inteligente de tarifa: Primero en hoja "Tarifas", si no existe o está vacía, busca en el histórico de "Recolecciones"
+function obtenerPrecioTarifa(ss, proveedor, punto, producto) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var targetProv = normalizarTexto(proveedor);
+    var targetPunto = normalizarTexto(punto);
+    var targetProd = normalizarTexto(producto);
+
+    // 1. INTENTAR BUSCAR EN PESTAÑA "Tarifas"
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
+      var lastRow = sheetTarifas.getLastRow();
+      var lastCol = sheetTarifas.getLastColumn();
+      var headers = sheetTarifas.getRange(1, 1, 1, lastCol).getValues()[0];
+      
+      var colIdx = { prov: 0, punto: 1, prod: 2, precio: 3, estado: 4 };
+      for (var c = 0; c < headers.length; c++) {
+        var h = normalizarTexto(headers[c]);
+        if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+        else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+        else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+        else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+        else if (h.indexOf('estado') !== -1) colIdx.estado = c;
+      }
+
+      var tarifasData = sheetTarifas.getRange(2, 1, lastRow - 1, lastCol).getValues();
+      var precioExactoPunto = null;
+      var precioGeneralProv = null;
+      var precioParcial = null;
+
+      var provKeywords = targetProv.split(/[\s\-]+/).filter(function(w) { return w.length > 3; });
+
+      for (var i = 0; i < tarifasData.length; i++) {
+        var row = tarifasData[i];
+        var rowEstado = normalizarTexto(colIdx.estado < row.length ? row[colIdx.estado] : 'activo');
+        if (rowEstado === 'inactivo') continue;
+
+        var rowProd = normalizarTexto(colIdx.prod < row.length ? row[colIdx.prod] : '');
+        var coincideProd = (rowProd === targetProd || rowProd.indexOf(targetProd) !== -1 || targetProd.indexOf(rowProd) !== -1);
+        if (!coincideProd) continue;
+
+        var rawPrice = colIdx.precio < row.length ? row[colIdx.precio] : null;
+        var cleanP = parsePrecioMoneda(rawPrice);
+        if (cleanP === null || cleanP <= 0) continue;
+
+        var rowProv = normalizarTexto(colIdx.prov < row.length ? row[colIdx.prov] : '');
+        var rowPunto = normalizarTexto(colIdx.punto < row.length ? row[colIdx.punto] : '');
+
+        // Nivel 1: Proveedor exacto + Punto exacto
+        if (rowProv === targetProv && targetPunto !== '' && (rowPunto === targetPunto || rowPunto.indexOf(targetPunto) !== -1)) {
+          precioExactoPunto = cleanP;
+          break;
+        }
+
+        // Nivel 2: Proveedor exacto + Todas las sucursales (o general)
+        if (rowProv === targetProv && (rowPunto === '' || rowPunto.indexOf('todas') !== -1 || rowPunto.indexOf('general') !== -1)) {
+          if (precioGeneralProv === null) precioGeneralProv = cleanP;
+        }
+
+        // Nivel 3: Coincidencia parcial de proveedor
+        if (precioParcial === null) {
+          if (targetProv.indexOf(rowProv) !== -1 || rowProv.indexOf(targetProv) !== -1) {
+            precioParcial = cleanP;
+          } else {
+            for (var k = 0; k < provKeywords.length; k++) {
+              if (rowProv.indexOf(provKeywords[k]) !== -1) {
+                precioParcial = cleanP;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (precioExactoPunto !== null) return precioExactoPunto;
+      if (precioGeneralProv !== null) return precioGeneralProv;
+      if (precioParcial !== null) return precioParcial;
+    }
+
+    // 2. SI NO ESTÁ EN TARIFAS (O AÚN ESTÁ PENDIENTE), BUSCAR EN EL HISTÓRICO DE RECOLECCIONES (FALLBACK SEGURO)
+    var sheetRec = ss.getSheetByName("Recolecciones");
+    if (sheetRec) {
+      return buscarPrecioHistorico(sheetRec, proveedor, punto, producto);
+    }
+
+    return '';
+  } catch (err) {
+    return '';
+  }
+}
+
+// ==============================================================================
+// MOTOR DE BÚSQUEDA DE PRECIO HISTÓRICO EN RECOLECCIONES (FALLBACK)
 // ==============================================================================
 function buscarPrecioHistorico(sheet, proveedor, punto, producto) {
   try {
@@ -702,6 +802,143 @@ function corregirKilosFechasSheet(ss) {
     }, null, 2)).setMimeType(ContentService.MimeType.JSON);
 
   } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ result: "error", error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==============================================================================
+// GESTOR DE HOJA DE TARIFAS (CENTRALIZACIÓN DE PRECIOS VIGENTES Y PENDIENTES)
+// ==============================================================================
+function inicializarPestanaTarifas(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    if (!sheetTarifas) {
+      sheetTarifas = ss.insertSheet("Tarifas");
+    }
+
+    var sheetRec = ss.getSheetByName("Recolecciones");
+    var mapTarifas = {};
+
+    // 1. Escaneo de todo el histórico de Recolecciones para extraer combinaciones y precios más recientes
+    if (sheetRec && sheetRec.getLastRow() > 1) {
+      var lastRow = sheetRec.getLastRow();
+      var lastCol = sheetRec.getLastColumn();
+      var headers = sheetRec.getRange(1, 1, 1, lastCol).getValues()[0];
+      
+      var colIdx = { prov: 4, punto: 5, prod: 6, precio: 10 };
+      for (var c = 0; c < headers.length; c++) {
+        var h = normalizarTexto(headers[c]);
+        if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+        else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+        else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+        else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+      }
+
+      var data = sheetRec.getRange(2, 1, lastRow - 1, lastCol).getValues();
+      for (var i = 0; i < data.length; i++) {
+        var prov = aNombrePropio(data[i][colIdx.prov]);
+        var punto = aNombrePropio(data[i][colIdx.punto]);
+        var prod = String(data[i][colIdx.prod] || '').trim().toUpperCase();
+        var rawPrecio = colIdx.precio < data[i].length ? data[i][colIdx.precio] : null;
+        var precioNum = parsePrecioMoneda(rawPrecio);
+
+        if (!prov || !prod) continue;
+        if (!punto) punto = "Todas las Sucursales";
+
+        var key = (prov + '|' + prod).toLowerCase();
+        if (!mapTarifas[key]) {
+          mapTarifas[key] = {
+            proveedor: prov,
+            punto: "Todas las Sucursales",
+            producto: prod,
+            precio: precioNum !== null && precioNum > 0 ? precioNum : "",
+            estado: precioNum !== null && precioNum > 0 ? "Activo" : "Pendiente Precio",
+            obs: ""
+          };
+        } else {
+          // Si encontramos un precio válido más reciente, actualizarlo
+          if (precioNum !== null && precioNum > 0) {
+            mapTarifas[key].precio = precioNum;
+            mapTarifas[key].estado = "Activo";
+          }
+        }
+      }
+    }
+
+    // 2. Revisar Puntos_Rutas para incorporar proveedores activos con productos comunes pendientes
+    var sheetPuntos = ss.getSheetByName("Puntos_Rutas");
+    if (sheetPuntos && sheetPuntos.getLastRow() > 1) {
+      var puntosData = sheetPuntos.getRange(2, 2, sheetPuntos.getLastRow() - 1, 1).getValues();
+      var provsEnPuntos = {};
+      for (var k = 0; k < puntosData.length; k++) {
+        var pr = aNombrePropio(puntosData[k][0]);
+        if (pr && pr.toLowerCase() !== 'proveedor') provsEnPuntos[pr] = true;
+      }
+      
+      var listaProvs = Object.keys(provsEnPuntos);
+      var prodsBasicos = ["DESPERDICIO", "GORDANA", "HUESO BLANCO", "HUESO DE CERDO", "SEBO EN RAMA"];
+      for (var lp = 0; lp < listaProvs.length; lp++) {
+        var provItem = listaProvs[lp];
+        for (var pb = 0; pb < prodsBasicos.length; pb++) {
+          var pItem = prodsBasicos[pb];
+          var keyCheck = (provItem + '|' + pItem).toLowerCase();
+          if (!mapTarifas[keyCheck]) {
+            mapTarifas[keyCheck] = {
+              proveedor: provItem,
+              punto: "Todas las Sucursales",
+              producto: pItem,
+              precio: "",
+              estado: "Pendiente Precio",
+              obs: "Pendiente definir tarifa por gerencia"
+            };
+          }
+        }
+      }
+    }
+
+    // 3. Convertir a matriz y ordenar alfabéticamente por Proveedor y Producto
+    var filasTarifas = [];
+    var keys = Object.keys(mapTarifas);
+    for (var m = 0; m < keys.length; m++) {
+      var t = mapTarifas[keys[m]];
+      filasTarifas.push([
+        t.proveedor,
+        t.punto,
+        t.producto,
+        t.precio !== "" ? t.precio : "",
+        t.estado,
+        t.obs
+      ]);
+    }
+
+    filasTarifas.sort(function(a, b) {
+      var c1 = a[0].localeCompare(b[0], 'es');
+      if (c1 !== 0) return c1;
+      return a[2].localeCompare(b[2], 'es');
+    });
+
+    // 4. Escribir encabezados y filas en la pestaña "Tarifas"
+    sheetTarifas.clearContents();
+    sheetTarifas.appendRow([
+      "Proveedor", "Punto_Sucursal", "Producto", "Precio_Kg", "Estado", "Observaciones"
+    ]);
+
+    if (filasTarifas.length > 0) {
+      sheetTarifas.getRange(2, 1, filasTarifas.length, 6).setValues(filasTarifas);
+    }
+
+    Logger.log("✅ Pestaña Tarifas configurada con " + filasTarifas.length + " filas (precios activos y pendientes para alimentar).");
+
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "success",
+      totalTarifas: filasTarifas.length,
+      mensaje: "Pestaña Tarifas configurada exitosamente con " + filasTarifas.length + " registros (activos y pendientes)."
+    }, null, 2)).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    Logger.log("Error inicializando tarifas: " + err.toString());
     return ContentService.createTextOutput(JSON.stringify({ result: "error", error: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }

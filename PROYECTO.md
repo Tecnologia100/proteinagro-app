@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.4.5`  
+> **Versión Actual:** `v=1.4.6`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,15 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.4.5` (Septiembre 2026) - Versión Actual
+### `v=1.4.6` (Septiembre 2026) - Versión Actual
+- **Módulo Centralizado de Tarifas Vigentes (`Tarifas`):**
+  - **Función de Auto-Poblado Dinámico (`inicializarPestanaTarifas`):** Recopila en vivo desde la hoja de cálculo todos los proveedores históricos y de catálogo, asignando su precio más reciente a los productos cotizados (`Activo`) y creando automáticamente todas las combinaciones restantes en blanco con estado `Pendiente Precio` para ser alimentadas por la administración.
+  - **Motor Híbrido de Liquidación Inmutable (`obtenerPrecioTarifa`):**
+    - Consulta primero la pestaña `Tarifas` por `Proveedor` + `Punto` específico o `Proveedor` + `Todas las Sucursales`.
+    - Si la tarifa está definida, estampa el valor monetario como dato plano e inmutable (sin fórmulas `BUSCARV`), protegiendo el histórico contable ante futuras renegociaciones.
+    - Si la tarifa aún está en blanco (`Pendiente Precio`), utiliza de forma transparente el buscador histórico de `Recolecciones` como respaldo de seguridad, garantizando cero interrupciones en la operación en campo.
+
+### `v=1.4.5` (Septiembre 2026)
 - **Blindaje y Restauración de Kilos en Google Sheets vs Soporte Oficial (Fix de Auto-Conversión a Fecha):**
   - **Diagnóstico y Corrección de Causa Raíz:** Se identificó y resolvió el fenómeno en Google Sheets / Excel con configuración regional de Colombia (`es_CO`), donde valores decimales de kilos con punto (ej. `28.2`, `24.9`, `23.5`, `3.4`) eran interpretados erróneamente por la hoja de cálculo como fechas (`28/02/2026`, `24/09/2026`), almacenándose como números de serie enteros (`46081`, `46289`) y mostrándose como `46.081,00`, corrompiendo la liquidación contable.
   - **Blindaje Numérico Estricto en `Code.gs` (`parseKilosNumero`):** Se implementó una función de coerción numérica obligatoria en el backend de Google Apps Script que garantiza que toda cantidad de kilos enviada desde la app sea convertida a un número primitivo flotante (`Number`) antes de ser insertada en la hoja con `appendRow`, impidiendo que Google Sheets auto-convierta el texto a fecha.
