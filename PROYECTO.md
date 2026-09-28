@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.4.4`  
+> **Versión Actual:** `v=1.4.5`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,14 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.4.4` (Septiembre 2026) - Versión Actual
+### `v=1.4.5` (Septiembre 2026) - Versión Actual
+- **Blindaje y Restauración de Kilos en Google Sheets vs Soporte Oficial (Fix de Auto-Conversión a Fecha):**
+  - **Diagnóstico y Corrección de Causa Raíz:** Se identificó y resolvió el fenómeno en Google Sheets / Excel con configuración regional de Colombia (`es_CO`), donde valores decimales de kilos con punto (ej. `28.2`, `24.9`, `23.5`, `3.4`) eran interpretados erróneamente por la hoja de cálculo como fechas (`28/02/2026`, `24/09/2026`), almacenándose como números de serie enteros (`46081`, `46289`) y mostrándose como `46.081,00`, corrompiendo la liquidación contable.
+  - **Blindaje Numérico Estricto en `Code.gs` (`parseKilosNumero`):** Se implementó una función de coerción numérica obligatoria en el backend de Google Apps Script que garantiza que toda cantidad de kilos enviada desde la app sea convertida a un número primitivo flotante (`Number`) antes de ser insertada en la hoja con `appendRow`, impidiendo que Google Sheets auto-convierta el texto a fecha.
+  - **Módulo de Reparación Masiva en `Code.gs` (`corregirKilosFechasSheet`):** Función de recuperación automatizada que examina toda la pestaña `Recolecciones`, detecta números de serie residuales de fechas en la columna `Kg` (rango 45000 a 48000), extrae matemáticamente los días y meses para restituir los kilos decimales originales exactos (`28.2`), y recalcula automáticamente la columna `Valor` (`kilos * precio`). Puede ejecutarse desde el editor de Google Apps Script o vía Webhook con `action=corregirKilosFechas`.
+  - **Consistencia Total Firestore vs Sheets:** El soporte oficial (que lee directamente de Firestore) se mantiene como la fuente de verdad absoluta y ahora coincide de forma 100% idéntica con los registros de Google Sheets.
+
+### `v=1.4.4` (Septiembre 2026)
 - **Módulo de Edición y Corrección de Recolecciones para Administrador (`✏️ Editar`):**
   - **Edición en Línea de Recolecciones:** Incorporación del botón `✏️ Editar` en cada fila de la tabla del panel administrativo. Permite corregir errores cometidos por los conductores al ingresar productos, kilos, ruta, conductor, fecha, proveedor, punto o sucursal y observaciones.
   - **Gestión Dinámica de Productos:** Permite añadir nuevos productos (`➕ Agregar Producto`), modificar productos existentes con selector desplegable oficial, editar los pesos en kilos y eliminar ítems erróneos con cálculo automático en vivo del Total de Kilos.

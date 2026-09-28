@@ -16,6 +16,11 @@ function doGet(e) {
       return actualizarRecoleccionSheet(ss, e.parameter.payload);
     }
 
+    // 0.08 Corrección masiva de Kilos convertidos erróneamente a fechas (46.xxx -> Kilos Reales)
+    if (e && e.parameter && e.parameter.action === 'corregirKilosFechas') {
+      return corregirKilosFechasSheet(ss);
+    }
+
     // 0.1 Diagnóstico en vivo de Precios y Recolecciones
     if (e && e.parameter && e.parameter.action === 'debugPrecios') {
       return diagnosticoPreciosSheet(ss, e.parameter.proveedor, e.parameter.producto);
@@ -245,7 +250,8 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     for (var p = 0; p < productos.length; p++) {
       var prodItem = productos[p];
       var prodNombre = (typeof prodItem === 'object' && prodItem.producto) ? prodItem.producto : String(prodItem);
-      var prodKilos = (typeof prodItem === 'object' && prodItem.kilos !== undefined) ? prodItem.kilos : (data.totalKilos || 0);
+      var rawKilos = (typeof prodItem === 'object' && prodItem.kilos !== undefined) ? prodItem.kilos : (data.totalKilos || 0);
+      var prodKilos = parseKilosNumero(rawKilos);
       
       // Evitar duplicados por ID + Producto
       if (id && prodNombre && existingRecordsMap[id + '|' + String(prodNombre).trim().toLowerCase()]) {
@@ -256,8 +262,8 @@ function guardarRecoleccionSheet(ss, rawPayload) {
       var precio = buscarPrecioHistorico(sheet, proveedor, punto, prodNombre);
       var valor = '';
       
-      if (precio !== '' && !isNaN(parseFloat(precio)) && !isNaN(parseFloat(prodKilos))) {
-        valor = Math.round(parseFloat(precio) * parseFloat(prodKilos) * 100) / 100;
+      if (precio !== '' && !isNaN(parseFloat(precio)) && prodKilos > 0) {
+        valor = Math.round(parseFloat(precio) * prodKilos * 100) / 100;
       }
       
       // Formato "Nombre Propio" automático (Title Case estilo =NOMPROPIO)
@@ -473,6 +479,21 @@ function parsePrecioMoneda(val) {
   return (!isNaN(num) && num > 0) ? num : null;
 }
 
+// Parser numérico estricto para kilos (garantiza que siempre sea Number y nunca String con riesgo de auto-conversión a fecha)
+function parseKilosNumero(val) {
+  if (val === null || val === undefined || val === '') return 0;
+  if (typeof val === 'number') {
+    return isNaN(val) ? 0 : Math.round(val * 100) / 100;
+  }
+  var s = String(val).trim();
+  if (!s) return 0;
+  if (s.indexOf(',') !== -1) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  }
+  var num = parseFloat(s);
+  return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+}
+
 // ==============================================================================
 // FUNCIONES DE FORMATO DE TEXTO (NOMBRE PROPIO / CAPITALIZACIÓN)
 // ==============================================================================
@@ -582,6 +603,110 @@ function diagnosticoPreciosSheet(ss, testProv, testProd) {
       precioEncontrado: testResult
     }
   }, null, 2)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ==============================================================================
+// CORRECCIÓN AUTOMÁTICA DE FILAS CORROMPIDAS POR FECHAS (46.xxx -> Kilos Reales)
+// ==============================================================================
+function corregirKilosFechasSheet(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) throw new Error("No existe la pestaña Recolecciones");
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow <= 1) {
+      Logger.log("Hoja vacía");
+      return ContentService.createTextOutput(JSON.stringify({ result: "info", message: "Hoja vacía" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colIdx = { id: 0, prod: 6, kg: 7, precio: 10, valor: 11 };
+    for (var c = 0; c < headers.length; c++) {
+      var h = normalizarTexto(headers[c]);
+      if (h.indexOf('id') !== -1) colIdx.id = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+      else if (h.indexOf('kg') !== -1 || h.indexOf('kilo') !== -1) colIdx.kg = c;
+      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+      else if (h.indexOf('valor') !== -1 || h.indexOf('total') !== -1) colIdx.valor = c;
+    }
+
+    var range = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    var values = range.getValues();
+    var corregidos = [];
+
+    for (var i = 0; i < values.length; i++) {
+      var cellVal = values[i][colIdx.kg];
+      var recoveredKg = null;
+
+      // Caso 1: Objeto Date nativo de Google Sheets
+      if (cellVal instanceof Date) {
+        var day = cellVal.getDate();
+        var month = cellVal.getMonth() + 1;
+        recoveredKg = parseFloat(day + '.' + month);
+      }
+      // Caso 2: Número de serie de fecha (rango 45000 a 48000 correspondientes a años 2023-2027)
+      else if (typeof cellVal === 'number' && cellVal >= 45000 && cellVal <= 48000) {
+        var d = new Date(1899, 11, 30 + Math.round(cellVal));
+        var day = d.getDate();
+        var month = d.getMonth() + 1;
+        recoveredKg = parseFloat(day + '.' + month);
+      }
+      // Caso 3: String formateado como "46.081,00"
+      else if (typeof cellVal === 'string') {
+        var cleanStr = cellVal.replace(/\./g, '').replace(',', '.').trim();
+        var num = parseFloat(cleanStr);
+        if (!isNaN(num) && num >= 45000 && num <= 48000) {
+          var d = new Date(1899, 11, 30 + Math.round(num));
+          var day = d.getDate();
+          var month = d.getMonth() + 1;
+          recoveredKg = parseFloat(day + '.' + month);
+        }
+      }
+
+      if (recoveredKg !== null && recoveredKg > 0) {
+        var oldVal = values[i][colIdx.kg];
+        values[i][colIdx.kg] = recoveredKg;
+
+        // Recalcular Valor si existe Precio
+        var rawPrecio = values[i][colIdx.precio];
+        var precio = parsePrecioMoneda(rawPrecio);
+        if (precio !== null && precio > 0) {
+          values[i][colIdx.valor] = Math.round(precio * recoveredKg * 100) / 100;
+        }
+
+        corregidos.push({
+          fila: i + 2,
+          id: values[i][colIdx.id],
+          producto: values[i][colIdx.prod],
+          valorAnterior: oldVal,
+          kilosCorregidos: recoveredKg,
+          nuevoValor: values[i][colIdx.valor]
+        });
+      }
+    }
+
+    if (corregidos.length > 0) {
+      range.setValues(values);
+      // Forzar formato de número estándar a la columna Kg
+      sheet.getRange(2, colIdx.kg + 1, lastRow - 1, 1).setNumberFormat("#,##0.00");
+    }
+
+    Logger.log("✅ Se corrigieron " + corregidos.length + " filas afectadas por fechas en Recolecciones.");
+
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "success",
+      totalAnalizadas: values.length,
+      totalCorregidas: corregidos.length,
+      corregidos: corregidos
+    }, null, 2)).setMimeType(ContentService.MimeType.JSON);
+
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ result: "error", error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function doPost(e) {
