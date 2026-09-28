@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.4.6`  
+> **Versión Actual:** `v=1.4.7`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,14 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.4.6` (Septiembre 2026) - Versión Actual
+### `v=1.4.7` (Septiembre 2026) - Versión Actual
+- **Organización Jerárquica por Rutas y Planta San Joaquín al Final:**
+  - **Orden Estricto de Rutas:** Se implementó `obtenerPesoRuta()` en `Code.gs` para estructurar tanto la pestaña `Puntos_Rutas` como `Tarifas` en orden numérico estricto: **Ruta 1**, **Ruta 2**, **Ruta 3**, **Ruta 4**, **Ruta 5**, **Ruta 6**, y dejando permanentemente a **PLANTA SAN JOAQUIN** en el bloque final de ambas tablas.
+  - **Catálogo Oficial Unificado de 122 Puntos:** Reintegración total de los 22 puntos y proveedores de entrega directa en planta (*Heber Gamboa, Milson González, Graxpro, Carlos Caicedo, etc.*) junto a los 100 puntos de las rutas de recolección en campo, asegurando 122 paradas operativas consistentes entre la PWA móvil y Google Sheets.
+  - **Protección y Restauración de Encabezados (9 Columnas):** Funciones `restaurarPlantaSanJoaquin()` y `restaurarEncabezadosPuntosRutas()` para blindar la fila 1 de `Puntos_Rutas` (`Ruta`, `Proveedor`, `Punto_Sucursal`, `Direccion`, `Telefono`, `Horario_Estimado`, `Frecuencia_Dias`, `Estado`, `Materias_Frecuentes`) con formato verde corporativo.
+  - **Tarifario sin Registros Genéricos:** Limpieza de filas comodín innecesarias (`"General"`), limitando la hoja `Tarifas` exclusivamente a puntos reales de cada ruta con precios fijos y soporte para estado `Pendiente Precio`.
+
+### `v=1.4.6` (Septiembre 2026)
 - **Módulo Centralizado de Tarifas Vigentes (`Tarifas`):**
   - **Función de Auto-Poblado Dinámico (`inicializarPestanaTarifas`):** Recopila en vivo desde la hoja de cálculo todos los proveedores históricos y de catálogo, asignando su precio más reciente a los productos cotizados (`Activo`) y creando automáticamente todas las combinaciones restantes en blanco con estado `Pendiente Precio` para ser alimentadas por la administración.
   - **Motor Híbrido de Liquidación Inmutable (`obtenerPrecioTarifa`):**
