@@ -690,8 +690,6 @@ function corregirKilosFechasSheet(ss) {
 
     if (corregidos.length > 0) {
       range.setValues(values);
-      // Forzar formato de número estándar a la columna Kg
-      sheet.getRange(2, colIdx.kg + 1, lastRow - 1, 1).setNumberFormat("#,##0.00");
     }
 
     Logger.log("✅ Se corrigieron " + corregidos.length + " filas afectadas por fechas en Recolecciones.");
