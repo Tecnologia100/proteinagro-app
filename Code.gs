@@ -965,33 +965,7 @@ function inicializarPestanaTarifas(ss) {
       }
     }
 
-    // 3. Agregar filas generales por Proveedor ("Todas las Sucursales") para fallback global
-    var provsKeys = Object.keys(provHistory);
-    for (var pr = 0; pr < provsKeys.length; pr++) {
-      var pObj = provHistory[provsKeys[pr]];
-      var pProds = Object.keys(pObj);
-      for (var pp = 0; pp < pProds.length; pp++) {
-        var itemP = pObj[pProds[pp]];
-        var provGenName = aNombrePropio(provsKeys[pr]);
-        var prodGenName = itemP.prodOriginal;
-        var pGenVal = itemP.precio;
-        var genKey = (provGenName + '|todas las sucursales|' + prodGenName).toLowerCase();
-        if (!mapClavesTarifas[genKey]) {
-          mapClavesTarifas[genKey] = true;
-          filasTarifas.push([
-            "General",
-            provGenName,
-            "Todas las Sucursales",
-            prodGenName,
-            pGenVal !== "" ? pGenVal : "",
-            pGenVal !== "" && pGenVal > 0 ? "Activo" : "Pendiente Precio",
-            "Tarifa General de Cadena"
-          ]);
-        }
-      }
-    }
-
-    // 4. Ordenar filas de Tarifas alfabéticamente
+    // 3. Ordenar filas de Tarifas alfabéticamente (por Proveedor, Punto y Producto)
     filasTarifas.sort(function(a, b) {
       var c1 = a[1].localeCompare(b[1], 'es'); // Proveedor
       if (c1 !== 0) return c1;
