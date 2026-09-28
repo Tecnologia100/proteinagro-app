@@ -812,6 +812,21 @@ function corregirKilosFechasSheet(ss) {
   }
 }
 
+// Función para calcular peso/orden de ruta: Ruta 1 a 6 primero, y PLANTA siempre de último
+function obtenerPesoRuta(nombreRuta) {
+  if (!nombreRuta) return 999;
+  var r = normalizarTexto(nombreRuta);
+  if (r.indexOf("ruta 1") !== -1) return 1;
+  if (r.indexOf("ruta 2") !== -1) return 2;
+  if (r.indexOf("ruta 3") !== -1) return 3;
+  if (r.indexOf("ruta 4") !== -1) return 4;
+  if (r.indexOf("ruta 5") !== -1) return 5;
+  if (r.indexOf("ruta 6") !== -1) return 6;
+  if (r.indexOf("ruta 7") !== -1) return 7;
+  if (r.indexOf("planta") !== -1) return 900; // Siempre al final
+  return 500;
+}
+
 // ==============================================================================
 // RESTAURADOR DE ENCABEZADOS DE PUNTOS_RUTAS (9 COLUMNAS OFICIALES)
 // ==============================================================================
@@ -870,8 +885,35 @@ function restaurarEncabezadosPuntosRutas(ss) {
     Logger.log("✅ Se restauraron " + aInsertar.length + " puntos de PLANTA SAN JOAQUIN en Puntos_Rutas.");
   }
 
-  Logger.log("✅ Encabezados y Planta San Joaquín restaurados exitosamente.");
-  return "Encabezados y Planta San Joaquín restaurados con éxito (" + aInsertar.length + " puntos agregados). Total puntos: " + (sheetPuntos.getLastRow() - 1);
+  // 4. Ordenar Puntos_Rutas: Ruta 1..6 primero y PLANTA siempre al final
+  var totalRowsP = sheetPuntos.getLastRow();
+  var totalColsP = Math.max(9, sheetPuntos.getLastColumn());
+  if (totalRowsP > 2) {
+    var rangeDataP = sheetPuntos.getRange(2, 1, totalRowsP - 1, totalColsP);
+    var allRowsP = rangeDataP.getValues();
+    allRowsP.sort(function(a, b) {
+      var wA = obtenerPesoRuta(a[0]);
+      var wB = obtenerPesoRuta(b[0]);
+      if (wA !== wB) return wA - wB;
+      var cProv = String(a[1] || "").localeCompare(String(b[1] || ""), "es");
+      if (cProv !== 0) return cProv;
+      return String(a[2] || "").localeCompare(String(b[2] || ""), "es");
+    });
+    rangeDataP.setValues(allRowsP);
+  }
+
+  // 5. Ordenar pestaña Rutas: Ruta 1..6 y PLANTA de último
+  if (sheetRutas && sheetRutas.getLastRow() > 2) {
+    var rRange = sheetRutas.getRange(2, 1, sheetRutas.getLastRow() - 1, 2);
+    var rRows = rRange.getValues();
+    rRows.sort(function(a, b) {
+      return obtenerPesoRuta(a[0]) - obtenerPesoRuta(b[0]);
+    });
+    rRange.setValues(rRows);
+  }
+
+  Logger.log("✅ Encabezados, Rutas y Planta San Joaquín (al final) organizados y restaurados exitosamente.");
+  return "Organizado por Rutas (Planta de último) y restaurado con éxito (" + aInsertar.length + " puntos agregados). Total puntos: " + (sheetPuntos.getLastRow() - 1);
 }
 
 function restaurarPlantaSanJoaquin(ss) {
@@ -1059,8 +1101,11 @@ function inicializarPestanaTarifas(ss) {
       }
     }
 
-    // 3. Ordenar filas de Tarifas alfabéticamente (por Proveedor, Punto y Producto)
+    // 3. Ordenar filas de Tarifas: Primero por orden de Ruta (Ruta 1..6 y Planta al final), luego por Proveedor, Punto y Producto
     filasTarifas.sort(function(a, b) {
+      var wA = obtenerPesoRuta(a[0]);
+      var wB = obtenerPesoRuta(b[0]);
+      if (wA !== wB) return wA - wB;
       var c1 = a[1].localeCompare(b[1], 'es'); // Proveedor
       if (c1 !== 0) return c1;
       var c2 = a[2].localeCompare(b[2], 'es'); // Punto
