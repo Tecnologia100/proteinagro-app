@@ -992,7 +992,28 @@ function inicializarPestanaTarifas(ss) {
       }
     }
 
-    // 2. Procesar Puntos_Rutas y cruzar con la data histórica
+    // 1.1 LEER Y MAPEAR TODAS LAS TARIFAS EXISTENTES EN HOJA "Tarifas" (PRESERVACIÓN 100% INMUTABLE)
+    var existingTarifasMap = {};
+    if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
+      var lastRowT = sheetTarifas.getLastRow();
+      var lastColT = sheetTarifas.getLastColumn();
+      var dataT = sheetTarifas.getRange(2, 1, lastRowT - 1, lastColT).getValues();
+      for (var t = 0; t < dataT.length; t++) {
+        var rRuta = dataT[t][0];
+        var rProv = dataT[t][1];
+        var rPunto = dataT[t][2];
+        var rProd = dataT[t][3];
+        var rPrecio = dataT[t][4];
+        var rEstado = dataT[t][5];
+        var rObs = dataT[t][6];
+        if (rProv && rPunto && rProd) {
+          var keyT = (String(rProv).trim() + '|' + String(rPunto).trim() + '|' + String(rProd).trim()).toLowerCase();
+          existingTarifasMap[keyT] = [rRuta, rProv, rPunto, rProd, rPrecio, rEstado, rObs];
+        }
+      }
+    }
+
+    // 2. Procesar Puntos_Rutas y cruzar con la data histórica (respetando precios existentes)
     var filasTarifas = [];
     var materiasPorFilaPuntos = []; // Para actualizar Col 9 de Puntos_Rutas
     var mapClavesTarifas = {};
@@ -1054,15 +1075,20 @@ function inicializarPestanaTarifas(ss) {
             var tKey = (prov + '|' + punto + '|' + prodName).toLowerCase();
             if (!mapClavesTarifas[tKey]) {
               mapClavesTarifas[tKey] = true;
-              filasTarifas.push([
-                ruta,
-                prov,
-                punto,
-                prodName,
-                precioVal !== "" ? precioVal : "",
-                precioVal !== "" && precioVal > 0 ? "Activo" : "Pendiente Precio",
-                precioVal !== "" && precioVal > 0 ? "Tarifa cruzada con histórico" : "Pendiente definir por gerencia"
-              ]);
+              if (existingTarifasMap[tKey]) {
+                // Conservar 100% intacta la tarifa existente con su precio configurado
+                filasTarifas.push(existingTarifasMap[tKey]);
+              } else {
+                filasTarifas.push([
+                  ruta,
+                  prov,
+                  punto,
+                  prodName,
+                  precioVal !== "" && precioVal !== null ? precioVal : "",
+                  precioVal !== "" && precioVal > 0 ? "Activo" : "Pendiente Precio",
+                  precioVal !== "" && precioVal > 0 ? "Tarifa cruzada con histórico" : "Pendiente cotizar"
+                ]);
+              }
             }
           }
         } else {
@@ -1073,21 +1099,36 @@ function inicializarPestanaTarifas(ss) {
             var tKey = (prov + '|' + punto + '|' + sProd).toLowerCase();
             if (!mapClavesTarifas[tKey]) {
               mapClavesTarifas[tKey] = true;
-              filasTarifas.push([
-                ruta,
-                prov,
-                punto,
-                sProd,
-                "",
-                "Pendiente Precio",
-                "Punto sin histórico - Pendiente cotizar"
-              ]);
+              if (existingTarifasMap[tKey]) {
+                // Conservar 100% intacta la tarifa existente con su precio configurado
+                filasTarifas.push(existingTarifasMap[tKey]);
+              } else {
+                filasTarifas.push([
+                  ruta,
+                  prov,
+                  punto,
+                  sProd,
+                  "",
+                  "Pendiente Precio",
+                  "Punto sin histórico - Pendiente cotizar"
+                ]);
+              }
             }
           }
           listaNombresProds = ["Desperdicio", "Gordana", "Hueso Blanco", "Hueso De Cerdo", "Sebo En Rama"];
         }
 
         materiasPorFilaPuntos.push([listaNombresProds.join(", ")]);
+      }
+
+      // Reincorporar cualquier tarifa preexistente que estuviese en Tarifas y no coincida con los puntos iterados
+      var allExKeys = Object.keys(existingTarifasMap);
+      for (var ek = 0; ek < allExKeys.length; ek++) {
+        var exK = allExKeys[ek];
+        if (!mapClavesTarifas[exK]) {
+          mapClavesTarifas[exK] = true;
+          filasTarifas.push(existingTarifasMap[exK]);
+        }
       }
 
       // Actualizar columna 9 en Puntos_Rutas con las materias frecuentes
