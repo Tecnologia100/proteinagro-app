@@ -21,6 +21,11 @@ function doGet(e) {
       return corregirKilosFechasSheet(ss);
     }
 
+    // 0.082 Liquidar masivamente celdas vacías de Precio y Valor en Recolecciones
+    if (e && e.parameter && e.parameter.action === 'liquidarRecolecciones') {
+      return liquidarRecoleccionesPendientes(ss);
+    }
+
     // 0.085 Restaurar encabezados de Puntos_Rutas
     if (e && e.parameter && e.parameter.action === 'restaurarEncabezados') {
       return restaurarEncabezadosPuntosRutasHttp(ss);
@@ -807,6 +812,170 @@ function corregirKilosFechasSheet(ss) {
     }, null, 2)).setMimeType(ContentService.MimeType.JSON);
 
   } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ result: "error", error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==============================================================================
+// LIQUIDADOR DE RECOLECCIONES PENDIENTES (PRECIO DESDE TARIFAS + VALOR = KG * PRECIO)
+// ==============================================================================
+function liquidarRecoleccionesPendientes(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetRec = ss.getSheetByName("Recolecciones");
+    if (!sheetRec) throw new Error("No existe la pestaña Recolecciones");
+
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    var mapExacto = {};
+    var mapPuntoProd = {};
+    var mapProvProd = {};
+
+    // 1. Cargar catálogo de Tarifas vigentes
+    if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
+      var lastRowT = sheetTarifas.getLastRow();
+      var lastColT = sheetTarifas.getLastColumn();
+      var dataT = sheetTarifas.getRange(2, 1, lastRowT - 1, lastColT).getValues();
+
+      for (var t = 0; t < dataT.length; t++) {
+        var tProv = normalizarTexto(dataT[t][1]);
+        var tPunto = normalizarTexto(dataT[t][2]);
+        var tProd = normalizarTexto(dataT[t][3]);
+        var tPrecio = parsePrecioMoneda(dataT[t][4]);
+        var tEstado = normalizarTexto(dataT[t][5]);
+
+        if (tPrecio !== null && tPrecio > 0 && tEstado !== 'inactivo') {
+          if (tProv && tPunto && tProd) mapExacto[tProv + '|' + tPunto + '|' + tProd] = tPrecio;
+          if (tPunto && tProd) mapPuntoProd[tPunto + '|' + tProd] = tPrecio;
+          if (tProv && tProd) mapProvProd[tProv + '|' + tProd] = tPrecio;
+        }
+      }
+    }
+
+    var lastRow = sheetRec.getLastRow();
+    var lastCol = sheetRec.getLastColumn();
+    if (lastRow <= 1) {
+      return ContentService.createTextOutput(JSON.stringify({ result: "info", message: "Hoja Recolecciones vacía" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var headers = sheetRec.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colIdx = { id: 0, prov: 4, punto: 5, prod: 6, kg: 7, precio: 10, valor: 11 };
+    for (var c = 0; c < headers.length; c++) {
+      var h = normalizarTexto(headers[c]);
+      if (h.indexOf('id') !== -1) colIdx.id = c;
+      else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+      else if (h.indexOf('kg') !== -1 || h.indexOf('kilo') !== -1) colIdx.kg = c;
+      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+      else if (h.indexOf('valor') !== -1 || h.indexOf('total') !== -1) colIdx.valor = c;
+    }
+
+    // 2. Cargar histórico interno de Recolecciones para fallback inteligente
+    var histPuntoProd = {};
+    var histProvProd = {};
+    var range = sheetRec.getRange(2, 1, lastRow - 1, lastCol);
+    var values = range.getValues();
+
+    for (var h = 0; h < values.length; h++) {
+      var exPrecio = parsePrecioMoneda(values[h][colIdx.precio]);
+      if (exPrecio !== null && exPrecio > 0) {
+        var exProv = normalizarTexto(values[h][colIdx.prov]);
+        var exPunto = normalizarTexto(values[h][colIdx.punto]);
+        var exProd = normalizarTexto(values[h][colIdx.prod]);
+        if (exPunto && exProd && !histPuntoProd[exPunto + '|' + exProd]) histPuntoProd[exPunto + '|' + exProd] = exPrecio;
+        if (exProv && exProd && !histProvProd[exProv + '|' + exProd]) histProvProd[exProv + '|' + exProd] = exPrecio;
+      }
+    }
+
+    // 3. Procesar filas que tengan Precio vacío o 0
+    var actualizadas = [];
+    var sinTarifa = [];
+
+    for (var i = 0; i < values.length; i++) {
+      var currPrecio = parsePrecioMoneda(values[i][colIdx.precio]);
+      // Si ya tiene precio válido, RESPETAR 100% Y NO TOCAR
+      if (currPrecio !== null && currPrecio > 0) continue;
+
+      var rowProv = normalizarTexto(values[i][colIdx.prov]);
+      var rowPunto = normalizarTexto(values[i][colIdx.punto]);
+      var rowProd = normalizarTexto(values[i][colIdx.prod]);
+      var rowKg = parseKilosNumero(values[i][colIdx.kg]);
+
+      if (!rowProd) continue;
+
+      // Cascada de búsqueda de precio:
+      // 1. Tarifas (Prov + Punto + Prod)
+      // 2. Tarifas (Punto + Prod)
+      // 3. Tarifas (Prov + Prod)
+      // 4. Histórico Recolecciones (Punto + Prod)
+      // 5. Histórico Recolecciones (Prov + Prod)
+      var foundPrecio = null;
+      var origenTarifa = '';
+
+      if (rowProv && rowPunto && mapExacto[rowProv + '|' + rowPunto + '|' + rowProd]) {
+        foundPrecio = mapExacto[rowProv + '|' + rowPunto + '|' + rowProd];
+        origenTarifa = 'Tarifas (Exacta)';
+      } else if (rowPunto && mapPuntoProd[rowPunto + '|' + rowProd]) {
+        foundPrecio = mapPuntoProd[rowPunto + '|' + rowProd];
+        origenTarifa = 'Tarifas (Punto)';
+      } else if (rowProv && mapProvProd[rowProv + '|' + rowProd]) {
+        foundPrecio = mapProvProd[rowProv + '|' + rowProd];
+        origenTarifa = 'Tarifas (Proveedor)';
+      } else if (rowPunto && histPuntoProd[rowPunto + '|' + rowProd]) {
+        foundPrecio = histPuntoProd[rowPunto + '|' + rowProd];
+        origenTarifa = 'Histórico Recolecciones (Punto)';
+      } else if (rowProv && histProvProd[rowProv + '|' + rowProd]) {
+        foundPrecio = histProvProd[rowProv + '|' + rowProd];
+        origenTarifa = 'Histórico Recolecciones (Proveedor)';
+      }
+
+      if (foundPrecio !== null && foundPrecio > 0) {
+        var nuevoValor = Math.round(foundPrecio * rowKg * 100) / 100;
+        values[i][colIdx.precio] = foundPrecio;
+        values[i][colIdx.valor] = nuevoValor;
+
+        actualizadas.push({
+          fila: i + 2,
+          id: values[i][colIdx.id],
+          proveedor: values[i][colIdx.prov],
+          punto: values[i][colIdx.punto],
+          producto: values[i][colIdx.prod],
+          kilos: rowKg,
+          precioAsignado: foundPrecio,
+          valorCalculado: nuevoValor,
+          fuente: origenTarifa
+        });
+      } else {
+        sinTarifa.push({
+          fila: i + 2,
+          proveedor: values[i][colIdx.prov],
+          punto: values[i][colIdx.punto],
+          producto: values[i][colIdx.prod],
+          kilos: rowKg
+        });
+      }
+    }
+
+    // 4. Escribir cambios a la hoja
+    if (actualizadas.length > 0) {
+      range.setValues(values);
+    }
+
+    Logger.log("✅ Se liquidaron con éxito " + actualizadas.length + " recolecciones pendientes.");
+
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "success",
+      totalFilas: values.length,
+      totalLiquidadas: actualizadas.length,
+      totalPendientesSinTarifa: sinTarifa.length,
+      muestraLiquidadas: actualizadas.slice(0, 15),
+      pendientesSinTarifa: sinTarifa.slice(0, 10)
+    }, null, 2)).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    Logger.log("Error liquidando recolecciones: " + err.toString());
     return ContentService.createTextOutput(JSON.stringify({ result: "error", error: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
