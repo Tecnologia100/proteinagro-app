@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.4.7`  
+> **Versión Actual:** `v=1.4.8`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,17 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.4.7` (Septiembre 2026) - Versión Actual
+### `v=1.4.8` (Septiembre 2026) - Versión Actual
+- **Desacople de Formato Tabla y Estandarización de Catálogos:**
+  - **Resolución de incompatibilidad con Tablas nativas:** Retiro del formato tabla en `Productos` y `Puntos_Rutas`, evitando la absorción de la fila 1 y restaurando la cuadrícula de celdas estándar 100% compatible con Google Apps Script.
+  - **Catálogo de Productos Ampliado:** Activación de 21 materias primas oficiales (*Mantequilla, Orejas de Cerdo, Pulmón de Cerdo, Calambombos, Tráqueas, Leña, Pieles, etc.*) con filtrado estricto de productos inactivos.
+  - **Matriz de Puntos Completa (126 Puntos):** Restauración de los 11 puntos oficiales de la Ruta 1 (*Bodega Santa Elena, Garay, Cavasa, etc.*) y balanceo integral de 126 puntos distribuidos entre Ruta 1 a 7 y Planta San Joaquín.
+- **Blindaje Inmutable de Tarifas y Precios Manuales:**
+  - `inicializarPestanaTarifas()` lee previamente todas las tarifas existentes y las preserva al 100%, garantizando que ningún precio manual asignado por gerencia sea sobreescrito ni reseteado.
+- **Liquidador Masivo de Recolecciones Pendientes:**
+  - Creación de `liquidarRecoleccionesPendientes()` en `Code.gs`: escaneo y cálculo automático de `Precio` (cruce jerárquico con `Tarifas` y fallback histórico) y `Valor = Kg * Precio` para todas las filas vacías de `Recolecciones`, manteniendo intactos los registros ya costeados.
+
+### `v=1.4.7` (Septiembre 2026)
 - **Organización Jerárquica por Rutas y Planta San Joaquín al Final:**
   - **Orden Estricto de Rutas:** Se implementó `obtenerPesoRuta()` en `Code.gs` para estructurar tanto la pestaña `Puntos_Rutas` como `Tarifas` en orden numérico estricto: **Ruta 1**, **Ruta 2**, **Ruta 3**, **Ruta 4**, **Ruta 5**, **Ruta 6**, y dejando permanentemente a **PLANTA SAN JOAQUIN** en el bloque final de ambas tablas.
   - **Catálogo Oficial Unificado de 122 Puntos:** Reintegración total de los 22 puntos y proveedores de entrega directa en planta (*Heber Gamboa, Milson González, Graxpro, Carlos Caicedo, etc.*) junto a los 100 puntos de las rutas de recolección en campo, asegurando 122 paradas operativas consistentes entre la PWA móvil y Google Sheets.

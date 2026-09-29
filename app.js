@@ -2509,7 +2509,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.4.7&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.4.8&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -3493,12 +3493,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.4.7 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.4.8 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.4.7')
+            navigator.serviceWorker.register('/sw.js?v=1.4.8')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.4.7 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.4.8 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));
