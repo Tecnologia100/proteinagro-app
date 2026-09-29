@@ -2641,7 +2641,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.5.0&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.5.1&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -3631,23 +3631,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.5.0 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.5.1 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.5.0')
+        const registrarSW = () => {
+            navigator.serviceWorker.register('/sw.js?v=1.5.1')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.5.0 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.5.1 activo (PWA instalable):', reg.scope);
                     reg.update();
+                    
+                    reg.onupdatefound = () => {
+                        const installingWorker = reg.installing;
+                        if (installingWorker) {
+                            installingWorker.onstatechange = () => {
+                                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('🔄 Nueva versión v1.5.1 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.5.1&t=' + Date.now();
+                                }
+                            };
+                        }
+                    };
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));
+        };
+
+        if (document.readyState === 'complete') {
+            registrarSW();
+        } else {
+            window.addEventListener('load', registrarSW);
+        }
+
+        // Al cambiar de pestaña y volver a la app en PC, comprobar si hay actualización
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && navigator.onLine) {
+                navigator.serviceWorker.getRegistration().then(reg => {
+                    if (reg) reg.update();
+                }).catch(() => {});
+            }
         });
 
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (!refreshing) {
                 refreshing = true;
-                console.log('🔄 Nuevo Service Worker detectado, recargando página...');
-                window.location.reload();
+                console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.5.1&t=' + Date.now();
             }
         });
 
@@ -3656,7 +3683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.reload();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.5.1&t=' + Date.now();
                 }
             }
         });

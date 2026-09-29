@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.5.0`  
+> **Versión Actual:** `v=1.5.1`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,17 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.5.0` (Septiembre 2026) - Versión Actual
+### `v=1.5.1` (Septiembre 2026) - Versión Actual
+- **Blindaje Total de Actualización Inmediata en Navegadores de PC:**
+  - **Cabeceras Anti-Caché en Vercel (`vercel.json`):** Configuración explícita de `Cache-Control: no-cache, no-store, must-revalidate` para `/sw.js` e `index.html`. Evita que Chrome y Edge en Windows retengan el Service Worker viejo en la caché de disco HTTP.
+  - **Recarga Anti-Caché en Service Worker:** En `controllerchange` y `message RELOAD_PAGE`, se reemplazó el reload convencional por recarga con bypass forzado de caché `?v=1.5.1&t=Date.now()`.
+  - **Detección Automática de Actualización al Enfocar Pestaña:** Se agregó un listener a `visibilitychange` en `app.js` para que cada vez que el usuario vuelva a la pestaña de ProteinAgro en su PC, el navegador verifique en segundo plano si hay una nueva versión (`reg.update()`).
+  - **Botones de Actualización Universal (Acceso en 1 Clic):**
+    - En la **Pantalla de Login** (Conductor y Administrador): badge interactivo `🔄 v1.5.1` y enlace auxiliar *"¿En PC o celular y no ves cambios? Clic aquí"*.
+    - En la **Cabecera del Panel Administrativo**: badge interactivo `🔄 v1.5.1`.
+    - En el **Formulario de Conductor**: badge en cabecera y botón de pie de formulario.
+
+### `v=1.5.0` (Septiembre 2026)
 - **Transmisión Redundante Blindada POST + GET (`enviarAGoogleSheets`):**
   - Cambio a canal prioritario `POST` con cabecera `application/x-www-form-urlencoded` y cuerpo `payload=...` en `app.js`.
   - Inmune a interferencias de vistas HTML en `doGet` (como la colisión generada por `Conciliador_Admin.gs`).

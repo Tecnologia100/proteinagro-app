@@ -3,7 +3,7 @@
 // Cache del App Shell con estrategia Network-First y Fallback a Cache Offline
 // ==============================================================================
 
-const CACHE_NAME = 'proteinagro-v1.5.0';
+const CACHE_NAME = 'proteinagro-v1.5.1';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -20,7 +20,7 @@ const APP_SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-cacheando App Shell de ProteinAgro v1.5.0');
+      console.log('[SW] Pre-cacheando App Shell de ProteinAgro v1.5.1');
       return cache.addAll(APP_SHELL).catch((err) => {
         console.warn('[SW] Advertencia pre-cacheando recursos:', err);
       });
@@ -74,9 +74,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Estrategia Network-First para App Shell y assets locales
+  // Estrategia Network-First para App Shell y assets locales (anti-caché de disco en PC)
+  const networkFetch = (url.origin === self.location.origin) 
+    ? fetch(req, { cache: 'no-cache' }).catch(() => fetch(req)) 
+    : fetch(req);
+
   event.respondWith(
-    fetch(req)
+    networkFetch
       .then((networkResponse) => {
         // Si la respuesta es válida y del mismo origen, actualizar la caché
         if (networkResponse && networkResponse.status === 200 && url.origin === self.location.origin) {
