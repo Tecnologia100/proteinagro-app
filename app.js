@@ -1800,11 +1800,11 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
 });
 
 
-// === ENVIAR A GOOGLE SHEETS (Envío Único en Segundo Plano) ===
+// === ENVIAR A GOOGLE SHEETS (Doble Envío Blindado POST + GET) ===
 async function enviarAGoogleSheets(data) {
     if (!GOOGLE_SHEETS_WEBHOOK_URL) return;
 
-    // Crear objeto ligero sin imágenes base64 pesadas para el envío a Sheets vía URL
+    // Crear objeto ligero sin imágenes base64 pesadas para el envío a Sheets
     const dataLight = { ...data };
     if (dataLight.firma && dataLight.firma.length > 300 && !dataLight.firma.startsWith('http')) {
         dataLight.firma = "Firma Registrada";
@@ -1813,15 +1813,60 @@ async function enviarAGoogleSheets(data) {
         dataLight.foto = "Foto Evidencia Registrada";
     }
 
+    const payloadParam = encodeURIComponent(JSON.stringify(dataLight));
+    const actionType = (dataLight.tipo === 'Novedad' || String(dataLight.id || '').startsWith('NOV-')) ? 'saveNovedad' : 'saveRecoleccion';
+
+    // 1. Envío prioritario vía POST (Inmune a interferencias de vistas doGet)
     try {
-        const payloadParam = encodeURIComponent(JSON.stringify(dataLight));
-        const getUrl = GOOGLE_SHEETS_WEBHOOK_URL + '?action=saveRecoleccion&payload=' + payloadParam;
+        await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `action=${actionType}&payload=${payloadParam}`
+        });
+        console.log("✅ Datos de recolección/novedad enviados a Google Sheets vía POST.");
+    } catch (ePost) {
+        console.warn("⚠️ Falló POST a Google Sheets, procediendo con GET:", ePost);
+    }
+
+    // 2. Envío secundario redundante vía GET
+    try {
+        const getUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=${actionType}&payload=${payloadParam}`;
         await fetch(getUrl, { method: 'GET', mode: 'no-cors' });
-        console.log("✅ Datos de recolección enviados a Google Sheets correctamente.");
-    } catch (e) {
-        console.warn("⚠️ Error enviando a Google Sheets:", e);
+        console.log("✅ Datos de recolección/novedad enviados a Google Sheets vía GET.");
+    } catch (eGet) {
+        console.warn("⚠️ Falló GET redundante a Google Sheets:", eGet);
     }
 }
+
+// === RESINCRONIZAR REGISTROS LOCALES A GOOGLE SHEETS ===
+async function resincronizarTodoAGoogleSheets() {
+    if (!GOOGLE_SHEETS_WEBHOOK_URL) {
+        alert("⚠️ No está configurada la URL de Google Sheets.");
+        return;
+    }
+    const backupList = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+    if (backupList.length === 0) {
+        alert("ℹ️ No hay registros en la memoria de este dispositivo para re-sincronizar.");
+        return;
+    }
+
+    const confirmar = confirm(`¿Desea re-enviar los ${backupList.length} registros respaldados localmente a Google Sheets?\n(El sistema previene duplicados automáticamente)`);
+    if (!confirmar) return;
+
+    let enviados = 0;
+    for (const item of backupList) {
+        try {
+            await enviarAGoogleSheets(item);
+            enviados++;
+            await new Promise(r => setTimeout(r, 200));
+        } catch(e) {
+            console.warn("Error re-sincronizando ítem:", item.id, e);
+        }
+    }
+    alert(`✅ Se han re-enviado ${enviados} registros a Google Sheets exitosamente.`);
+}
+window.resincronizarTodoAGoogleSheets = resincronizarTodoAGoogleSheets;
 
 
 // === SISTEMA DE RUTAS Y PROVEEDORES DINÁMICOS ===
@@ -2596,7 +2641,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.4.9&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.5.0&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -3193,9 +3238,15 @@ function initAdminEditModal() {
                 }
             } catch(e) {}
 
-            // 4. Sincronizar actualización con Google Sheets en segundo plano
+            // 4. Sincronizar actualización con Google Sheets en segundo plano (Doble envío POST + GET)
             if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== '') {
-                const payloadParam = encodeURIComponent(JSON.stringify({ ...updatedData, id: localId || docId }));
+                const payloadParam = encodeURIComponent(JSON.stringify({ ...updatedData, id: localId || docId, action: 'updateRecoleccion' }));
+                fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `action=updateRecoleccion&payload=${payloadParam}`
+                }).catch(err => console.warn("Sync Sheets edit POST err:", err));
                 fetch(GOOGLE_SHEETS_WEBHOOK_URL + '?action=updateRecoleccion&payload=' + payloadParam, { method: 'GET', mode: 'no-cors' }).catch(err => console.warn("Sync Sheets edit err:", err));
             }
 
@@ -3580,12 +3631,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.4.9 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.5.0 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.4.9')
+            navigator.serviceWorker.register('/sw.js?v=1.5.0')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.4.9 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.5.0 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

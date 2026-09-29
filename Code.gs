@@ -15,8 +15,13 @@ function doGet(e) {
     }
 
     // 0.1 Si viene una petición de guardado vía GET (Garantía 100% anti-bloqueos)
-    if (e && e.parameter && (e.parameter.action === 'saveRecoleccion' || (e.parameter.payload && !e.parameter.t))) {
+    if (e && e.parameter && (e.parameter.action === 'saveRecoleccion' || e.parameter.action === 'saveNovedad' || (e.parameter.payload && !e.parameter.t))) {
       return guardarRecoleccionSheet(ss, e.parameter.payload);
+    }
+
+    // 0.04 Si viene una petición de eliminación por ID
+    if (e && e.parameter && e.parameter.action === 'deleteRecoleccion' && e.parameter.id) {
+      return eliminarRecoleccionSheet(ss, e.parameter.id);
     }
 
     // 0.05 Si viene una petición de actualización/edición de recolección
@@ -272,17 +277,33 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     
     for (var p = 0; p < productos.length; p++) {
       var prodItem = productos[p];
-      var prodNombre = (typeof prodItem === 'object' && prodItem.producto) ? prodItem.producto : String(prodItem);
+      var prodNombre = '';
+      if (typeof prodItem === 'object' && prodItem !== null) {
+        prodNombre = String(prodItem.producto || '').trim();
+      } else {
+        prodNombre = String(prodItem || '').trim();
+      }
       var rawKilos = (typeof prodItem === 'object' && prodItem.kilos !== undefined) ? prodItem.kilos : (data.totalKilos || 0);
       var prodKilos = parseKilosNumero(rawKilos);
       
+      // Manejo especial de Novedad / Visita Fallida (0 Kg)
+      var esNovedad = (data.tipo === 'Novedad' || String(id).startsWith('NOV-') || prodNombre.toLowerCase().indexOf('visita fallida') !== -1 || prodNombre.toLowerCase().indexOf('novedad') !== -1);
+      if (esNovedad && !prodNombre) {
+        prodNombre = 'Visita Fallida: ' + (data.causal || 'Novedad');
+      }
+
+      // Evitar registrar filas fantasmas vacías sin producto ni kilos
+      if (!prodNombre && prodKilos === 0 && !esNovedad) {
+        continue;
+      }
+
       // Evitar duplicados por ID + Producto
       if (id && prodNombre && existingRecordsMap[id + '|' + String(prodNombre).trim().toLowerCase()]) {
         continue;
       }
 
       // Búsqueda inteligente de tarifa: Primero en hoja "Tarifas", y fallback a histórico de Recolecciones
-      var precio = obtenerPrecioTarifa(ss, proveedor, punto, prodNombre);
+      var precio = esNovedad ? 0 : obtenerPrecioTarifa(ss, proveedor, punto, prodNombre);
       var valor = '';
       
       if (precio !== '' && !isNaN(parseFloat(precio)) && prodKilos > 0) {
@@ -345,6 +366,36 @@ function actualizarRecoleccionSheet(ss, rawPayload) {
 
     // Re-insertar filas corregidas con cálculo de precio/valor automático
     return guardarRecoleccionSheet(ss, data);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==============================================================================
+// ELIMINAR RECOLECCIÓN POR ID (v1.4.9)
+// ==============================================================================
+function eliminarRecoleccionSheet(ss, idTarget) {
+  try {
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) throw new Error("No existe la pestaña Recolecciones.");
+    idTarget = String(idTarget || '').trim();
+    if (!idTarget) throw new Error("ID inválido");
+    
+    var lastRow = sheet.getLastRow();
+    var deletedCount = 0;
+    if (lastRow > 1) {
+      var idColData = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var r = idColData.length - 1; r >= 0; r--) {
+        var currentId = String(idColData[r][0] || '').trim();
+        if (currentId === idTarget) {
+          sheet.deleteRow(r + 2);
+          deletedCount++;
+        }
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({"result": "success", "deleted": deletedCount}))
+      .setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
@@ -1361,6 +1412,8 @@ function doPost(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var payload = null;
+    var action = (e && e.parameter && e.parameter.action) || 'saveRecoleccion';
+    
     if (e && e.parameter && e.parameter.payload) {
       payload = e.parameter.payload;
     } else if (e && e.postData && e.postData.contents) {
@@ -1371,6 +1424,24 @@ function doPost(e) {
         payload = raw;
       }
     }
+
+    // Si viene la acción dentro del JSON del payload
+    if (payload && typeof payload === 'string' && payload.indexOf('"action"') !== -1) {
+      try {
+        var parsed = JSON.parse(payload);
+        if (parsed.action) action = parsed.action;
+      } catch(ignore) {}
+    }
+
+    if (action === 'deleteRecoleccion' && ((e && e.parameter && e.parameter.id) || (payload && typeof payload === 'object' && payload.id))) {
+      var targetId = (e && e.parameter && e.parameter.id) || payload.id;
+      return eliminarRecoleccionSheet(ss, targetId);
+    }
+
+    if (action === 'updateRecoleccion') {
+      return actualizarRecoleccionSheet(ss, payload);
+    }
+    
     return guardarRecoleccionSheet(ss, payload);
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": error.toString()}))

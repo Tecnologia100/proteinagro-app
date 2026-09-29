@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.4.9`  
+> **Versión Actual:** `v=1.5.0`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,22 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.4.9` (Septiembre 2026) - Versión Actual
+### `v=1.5.0` (Septiembre 2026) - Versión Actual
+- **Transmisión Redundante Blindada POST + GET (`enviarAGoogleSheets`):**
+  - Cambio a canal prioritario `POST` con cabecera `application/x-www-form-urlencoded` y cuerpo `payload=...` en `app.js`.
+  - Inmune a interferencias de vistas HTML en `doGet` (como la colisión generada por `Conciliador_Admin.gs`).
+  - Envío secundario redundante vía `GET` para garantizar entrega en proxies corporativos o entornos restrictivos.
+- **Soporte Integral para Novedades (`saveNovedad`):**
+  - Manejo explícito de la acción `saveNovedad` tanto en `doGet` como en `doPost` en `Code.gs`.
+  - Inserción correcta de `Visita Fallida: Causal` con 0 Kg, geolocalización, observaciones y estado en la hoja `Recolecciones`.
+- **Botón de Re-sincronización Masiva en Panel Administrador:**
+  - Incorporación del botón `🔄 Re-sincronizar Sheets` (`resincronizarTodoAGoogleSheets()`) en el panel de administración de `index.html`. Permite reenviar con un clic todos los registros locales (`recolecciones_backup`) que se hayan acumulado sin riesgo de duplicidad gracias a la deduplicación nativa de `Code.gs`.
+- **Deduplicación y Filtrado Antifantasmas en `Code.gs`:**
+  - Prevención de filas fantasmas `[object Object]` mediante verificación segura del tipo de producto y omitiendo registros vacíos sin producto ni kilos a menos que sean novedades declaradas.
+- **Acción de Eliminación por ID (`deleteRecoleccion`):**
+  - Incorporación de `eliminarRecoleccionSheet()` en `Code.gs` para depurar o limpiar filas de prueba por su ID.
+
+### `v=1.4.9` (Septiembre 2026)
 - **Sincronización Directa de Catálogos Anti-Fallo (Google Sheets Gviz):**
   - Implementación de `sincronizarCatalogosDesdeGviz()` en `app.js`: consulta directa a Google Sheets vía CDN/Gviz CSV para cargar Productos y Puntos_Rutas con 0ms de latencia, asegurando que la App nunca se quede sin actualizar aunque el Webhook de Apps Script devuelva HTML o sufra bloqueos de despliegue.
   - Parseo seguro de respuestas HTTP protegiendo la lectura de JSON contra respuestas HTML imprevistas.
