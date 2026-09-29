@@ -421,7 +421,7 @@ function obtenerPrecioTarifa(ss, proveedor, punto, producto) {
       var lastCol = sheetTarifas.getLastColumn();
       var headers = sheetTarifas.getRange(1, 1, 1, lastCol).getValues()[0];
       
-      var colIdx = { prov: 0, punto: 1, prod: 2, precio: 3, estado: 4 };
+      var colIdx = { prov: -1, punto: -1, prod: -1, precio: -1, estado: -1 };
       for (var c = 0; c < headers.length; c++) {
         var h = normalizarTexto(headers[c]);
         if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
@@ -440,19 +440,19 @@ function obtenerPrecioTarifa(ss, proveedor, punto, producto) {
 
       for (var i = 0; i < tarifasData.length; i++) {
         var row = tarifasData[i];
-        var rowEstado = normalizarTexto(colIdx.estado < row.length ? row[colIdx.estado] : 'activo');
+        var rowEstado = normalizarTexto(colIdx.estado !== -1 && colIdx.estado < row.length ? row[colIdx.estado] : 'activo');
         if (rowEstado === 'inactivo') continue;
 
-        var rowProd = normalizarTexto(colIdx.prod < row.length ? row[colIdx.prod] : '');
+        var rowProd = normalizarTexto(colIdx.prod !== -1 && colIdx.prod < row.length ? row[colIdx.prod] : '');
         var coincideProd = (rowProd === targetProd || rowProd.indexOf(targetProd) !== -1 || targetProd.indexOf(rowProd) !== -1);
         if (!coincideProd) continue;
 
-        var rawPrice = colIdx.precio < row.length ? row[colIdx.precio] : null;
+        var rawPrice = colIdx.precio !== -1 && colIdx.precio < row.length ? row[colIdx.precio] : null;
         var cleanP = parsePrecioMoneda(rawPrice);
         if (cleanP === null || cleanP <= 0) continue;
 
-        var rowProv = normalizarTexto(colIdx.prov < row.length ? row[colIdx.prov] : '');
-        var rowPunto = normalizarTexto(colIdx.punto < row.length ? row[colIdx.punto] : '');
+        var rowProv = normalizarTexto(colIdx.prov !== -1 && colIdx.prov < row.length ? row[colIdx.prov] : '');
+        var rowPunto = normalizarTexto(colIdx.punto !== -1 && colIdx.punto < row.length ? row[colIdx.punto] : '');
 
         // Nivel 1: Proveedor exacto + Punto exacto
         if (rowProv === targetProv && targetPunto !== '' && (rowPunto === targetPunto || rowPunto.indexOf(targetPunto) !== -1)) {
