@@ -572,6 +572,8 @@ const DEFAULT_PRODUCTOS = [
     "DESPERDICIO",
     "EMPELLA",
     "GORDANA",
+    "HARINA CARNE",
+    "HARINA DE HUESO VAPORIZADA",
     "HUESO BLANCO",
     "HUESO DE CERDO",
     "HUESO PROMOCION",
@@ -582,7 +584,9 @@ const DEFAULT_PRODUCTOS = [
     "MARGARINA",
     "OREJAS DE CERDO",
     "PIEL POLLO",
+    "PIELES",
     "PULMON DE CERDO",
+    "SEBO",
     "SEBO EN RAMA",
     "TRAQUEAS"
 ];
@@ -630,6 +634,7 @@ const PRODUCT_DISPLAY_MAP = {
     "OREJAS DE CERDO": { emoji: "🐷", label: "OREJAS CERDO" },
     "OREJAS CERDO": { emoji: "🐷", label: "OREJAS CERDO" },
     "PIEL POLLO": { emoji: "🐔", label: "PIEL POLLO" },
+    "PIELES": { emoji: "📦", label: "PIELES" },
     "PULMON DE CERDO": { emoji: "🫁", label: "PULMON CERDO" },
     "PULMON CERDO": { emoji: "🫁", label: "PULMON CERDO" },
     "SEBO": { emoji: "🧈", label: "SEBO" },
@@ -987,6 +992,82 @@ async function sincronizarCredencialesDesdeGviz() {
     }
 }
 
+// Sincronización directa de Productos y Puntos_Rutas vía Google Sheets Gviz (Alta disponibilidad anti-fallos)
+async function sincronizarCatalogosDesdeGviz() {
+    try {
+        const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+        
+        // 1. Sincronizar Productos directamente vía Gviz CSV
+        try {
+            const prodUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Productos&t=${Date.now()}`;
+            const resProd = await fetch(prodUrl);
+            if (resProd.ok) {
+                const csvProd = await resProd.text();
+                const lines = csvProd.split(/\r?\n/).filter(l => l.trim().length > 0);
+                const gvizProductos = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const row = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+                    const pName = row[0];
+                    const pEstado = (row[1] || 'Activo').toLowerCase();
+                    if (pName && pEstado !== 'inactivo') {
+                        gvizProductos.push(pName);
+                    }
+                }
+                if (gvizProductos.length > 0) {
+                    renderDynamicProducts(gvizProductos);
+                    console.log("✅ Productos sincronizados directamente desde Google Sheets (Gviz):", gvizProductos.length);
+                }
+            }
+        } catch(eProd) {
+            console.warn("Aviso Gviz Productos:", eProd);
+        }
+
+        // 2. Sincronizar Puntos_Rutas directamente vía Gviz CSV
+        try {
+            const puntosUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Puntos_Rutas&t=${Date.now()}`;
+            const resPuntos = await fetch(puntosUrl);
+            if (resPuntos.ok) {
+                const csvPuntos = await resPuntos.text();
+                const lines = csvPuntos.split(/\r?\n/).filter(l => l.trim().length > 0);
+                const gvizPuntos = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = [];
+                    let cur = '';
+                    let inQuotes = false;
+                    for (let j = 0; j < lines[i].length; j++) {
+                        const char = lines[i][j];
+                        if (char === '"') inQuotes = !inQuotes;
+                        else if (char === ',' && !inQuotes) { cols.push(cur.trim()); cur = ''; }
+                        else cur += char;
+                    }
+                    cols.push(cur.trim());
+                    const r = cols.map(c => c.replace(/^"|"$/g, '').trim());
+                    if (r[0] && r[1] && r[2] && (r[7] || 'Activo').toLowerCase() !== 'inactivo') {
+                        gvizPuntos.push({
+                            ruta: r[0],
+                            proveedor: r[1],
+                            punto: r[2],
+                            direccion: r[3] || '',
+                            telefono: r[4] || '',
+                            horario: r[5] || '',
+                            frecuencia: r[6] || '',
+                            estado: 'Activo'
+                        });
+                    }
+                }
+                if (gvizPuntos.length > 0) {
+                    procesarPuntosRutasDinamicos(gvizPuntos);
+                    console.log("✅ Puntos_Rutas sincronizados directamente desde Google Sheets (Gviz):", gvizPuntos.length);
+                }
+            }
+        } catch(ePuntos) {
+            console.warn("Aviso Gviz Puntos_Rutas:", ePuntos);
+        }
+    } catch(err) {
+        console.warn("Aviso en sincronización Gviz global:", err);
+    }
+}
+
 async function cargarCatalogosDinamicos() {
     // Eliminar cachés obsoletas para garantizar sincronicidad 100% en vivo con Google Sheets
     try {
@@ -998,16 +1079,21 @@ async function cargarCatalogosDinamicos() {
     // Sincronizar credenciales en vivo directamente desde Google Sheets Gviz
     await sincronizarCredencialesDesdeGviz();
 
-    // 1. Obtener catálogos en vivo desde Google Sheets (evitando caché HTTP con timestamp)
+    // Sincronizar Productos y Puntos_Rutas directamente desde Google Sheets Gviz (Garantía 100% anti-fallo)
+    await sincronizarCatalogosDesdeGviz();
+
+    // 1. Obtener catálogos en vivo desde Google Sheets Webhook (si retorna JSON válido)
     if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
         try {
             const cacheBusterUrl = GOOGLE_SHEETS_WEBHOOK_URL + (GOOGLE_SHEETS_WEBHOOK_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
             const res = await fetch(cacheBusterUrl);
             if (res.ok) {
-                const data = await res.json();
-                if (data && data.productos && data.productos.length > 0) {
-                    if (data.puntos_rutas && data.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(data.puntos_rutas);
-                    renderDynamicProducts(data.productos);
+                const text = await res.text();
+                if (text && (text.trim().startsWith('{') || text.trim().startsWith('['))) {
+                    const data = JSON.parse(text);
+                    if (data && data.productos && data.productos.length > 0) {
+                        if (data.puntos_rutas && data.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(data.puntos_rutas);
+                        renderDynamicProducts(data.productos);
                     if (data.conductores && data.conductores.length > 0) {
                         renderDynamicDrivers(data.conductores);
                         try {
@@ -1042,6 +1128,7 @@ async function cargarCatalogosDinamicos() {
                     return;
                 }
             }
+        }
         } catch (err) {
             console.warn("⚠️ No se pudo obtener catálogos en vivo desde Sheets, se usan datos locales:", err);
         }
@@ -2509,7 +2596,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.4.8&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.4.9&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -3493,12 +3580,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.4.8 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.4.9 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=1.4.8')
+            navigator.serviceWorker.register('/sw.js?v=1.4.9')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.4.8 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.4.9 activo (PWA instalable):', reg.scope);
                     reg.update();
                 })
                 .catch(err => console.warn('⚠️ Error registrando Service Worker:', err));

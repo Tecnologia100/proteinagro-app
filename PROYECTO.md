@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.4.8`  
+> **Versión Actual:** `v=1.4.9`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,17 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.4.8` (Septiembre 2026) - Versión Actual
+### `v=1.4.9` (Septiembre 2026) - Versión Actual
+- **Sincronización Directa de Catálogos Anti-Fallo (Google Sheets Gviz):**
+  - Implementación de `sincronizarCatalogosDesdeGviz()` en `app.js`: consulta directa a Google Sheets vía CDN/Gviz CSV para cargar Productos y Puntos_Rutas con 0ms de latencia, asegurando que la App nunca se quede sin actualizar aunque el Webhook de Apps Script devuelva HTML o sufra bloqueos de despliegue.
+  - Parseo seguro de respuestas HTTP protegiendo la lectura de JSON contra respuestas HTML imprevistas.
+- **Catálogo Completo de 24 Productos:**
+  - Inclusión de los 24 productos en `DEFAULT_PRODUCTOS` y en la grilla visual de `index.html` (incorporando `PIELES`, `HARINA CARNE`, `HARINA DE HUESO VAPORIZADA` y `SEBO`).
+  - Mapeo de íconos en `PRODUCT_DISPLAY_MAP` para `PIELES` (📦).
+- **Resolución de Colisión de `doGet` en Google Apps Script:**
+  - Centralización del handler en `Code.gs` con soporte para `view=conciliador` (retornando la interfaz del Conciliador de forma integrada) y renombrado en `Conciliador_Admin.gs` para evitar colisiones que anulaban la API móvil de conductores.
+
+### `v=1.4.8` (Septiembre 2026)
 - **Desacople de Formato Tabla y Estandarización de Catálogos:**
   - **Resolución de incompatibilidad con Tablas nativas:** Retiro del formato tabla en `Productos` y `Puntos_Rutas`, evitando la absorción de la fila 1 y restaurando la cuadrícula de celdas estándar 100% compatible con Google Apps Script.
   - **Catálogo de Productos Ampliado:** Activación de 21 materias primas oficiales (*Mantequilla, Orejas de Cerdo, Pulmón de Cerdo, Calambombos, Tráqueas, Leña, Pieles, etc.*) con filtrado estricto de productos inactivos.

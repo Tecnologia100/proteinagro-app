@@ -6,7 +6,15 @@ function doGet(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // 0. Si viene una petición de guardado vía GET (Garantía 100% anti-bloqueos)
+    // 0. Si se solicita la vista del Conciliador / Dashboard (soporte integrado sin conflicto)
+    if (e && e.parameter && (e.parameter.view === 'conciliador' || e.parameter.view === 'dashboard')) {
+      return HtmlService.createHtmlOutputFromFile('CONCILIADOR')
+        .setTitle('Conciliador de Materias y Proveedores')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+    }
+
+    // 0.1 Si viene una petición de guardado vía GET (Garantía 100% anti-bloqueos)
     if (e && e.parameter && (e.parameter.action === 'saveRecoleccion' || (e.parameter.payload && !e.parameter.t))) {
       return guardarRecoleccionSheet(ss, e.parameter.payload);
     }
