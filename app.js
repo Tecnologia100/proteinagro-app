@@ -129,6 +129,10 @@ function updateNetworkStatus() {
         networkStatus.classList.remove('offline');
         networkStatus.classList.add('online');
         networkStatus.querySelector('.text').textContent = 'Conectado';
+        // Auto-sincronización automática de registros pendientes en segundo plano al recuperar señal
+        if (typeof sincronizarPendientesAGoogleSheets === 'function') {
+            sincronizarPendientesAGoogleSheets();
+        }
     } else {
         networkStatus.classList.remove('online');
         networkStatus.classList.add('offline');
@@ -1483,14 +1487,33 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
 
         // 1. Guardar en respaldo local (LocalStorage) de inmediato
         let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
-        const dataForBackup = { ...data, firma: firmaURL, id: recordId };
+        const dataForBackup = { 
+            ...data, 
+            firma: firmaURL, 
+            id: recordId,
+            sync_sheets: false,
+            sync_sheets_at: null
+        };
         // El backup local guarda URL o base64 para factibilidad futura
         savedBackup.unshift(dataForBackup);
         localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
 
         // 2. Sincronizar inmediatamente con Google Sheets (vía webhook sin bloquear) - con URL de firma
         if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== "") {
-            enviarAGoogleSheets({ ...data, firma: firmaURL, id: recordId });
+            enviarAGoogleSheets({ ...data, firma: firmaURL, id: recordId }).then(ok => {
+                if (ok) {
+                    try {
+                        let curBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+                        const idx = curBackup.findIndex(r => r.id === recordId);
+                        if (idx !== -1) {
+                            curBackup[idx].sync_sheets = true;
+                            curBackup[idx].sync_sheets_at = Date.now();
+                            curBackup[idx].estado = 'Sincronizado';
+                            localStorage.setItem('recolecciones_backup', JSON.stringify(curBackup));
+                        }
+                    } catch(e) {}
+                }
+            }).catch(e => console.warn("Error en envío inmediato a Sheets (se reintentará en auto-sync):", e));
         }
 
         // 3. Intentar guardar en Firebase con un tiempo límite de 4 segundos
@@ -1849,7 +1872,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
 
 // === ENVIAR A GOOGLE SHEETS (Doble Envío Blindado POST + GET) ===
 async function enviarAGoogleSheets(data) {
-    if (!GOOGLE_SHEETS_WEBHOOK_URL) return;
+    if (!GOOGLE_SHEETS_WEBHOOK_URL) return false;
 
     // Crear objeto ligero sin imágenes base64 pesadas para el envío a Sheets
     const dataLight = { ...data };
@@ -1861,7 +1884,9 @@ async function enviarAGoogleSheets(data) {
     }
 
     const payloadParam = encodeURIComponent(JSON.stringify(dataLight));
-    const actionType = (dataLight.tipo === 'Novedad' || String(dataLight.id || '').startsWith('NOV-')) ? 'saveNovedad' : 'saveRecoleccion';
+    const actionType = (dataLight.tipo === 'Novedad' || String(dataLight.id || '').startsWith('NOV-')) ? 'saveNovedad' : (dataLight.action || 'saveRecoleccion');
+
+    let enviadoExitoso = false;
 
     // 1. Envío prioritario vía POST (Inmune a interferencias de vistas doGet)
     try {
@@ -1872,21 +1897,163 @@ async function enviarAGoogleSheets(data) {
             body: `action=${actionType}&payload=${payloadParam}`
         });
         console.log("✅ Datos de recolección/novedad enviados a Google Sheets vía POST.");
+        enviadoExitoso = true;
     } catch (ePost) {
         console.warn("⚠️ Falló POST a Google Sheets, procediendo con GET:", ePost);
+        // 2. Envío secundario redundante vía GET
+        try {
+            const getUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=${actionType}&payload=${payloadParam}`;
+            await fetch(getUrl, { method: 'GET', mode: 'no-cors' });
+            console.log("✅ Datos de recolección/novedad enviados a Google Sheets vía GET.");
+            enviadoExitoso = true;
+        } catch (eGet) {
+            console.warn("⚠️ Falló GET redundante a Google Sheets:", eGet);
+            enviadoExitoso = false;
+        }
     }
 
-    // 2. Envío secundario redundante vía GET
-    try {
-        const getUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=${actionType}&payload=${payloadParam}`;
-        await fetch(getUrl, { method: 'GET', mode: 'no-cors' });
-        console.log("✅ Datos de recolección/novedad enviados a Google Sheets vía GET.");
-    } catch (eGet) {
-        console.warn("⚠️ Falló GET redundante a Google Sheets:", eGet);
-    }
+    return enviadoExitoso;
 }
 
-// === RESINCRONIZAR REGISTROS LOCALES A GOOGLE SHEETS ===
+// === SISTEMA DE AUTO-SINCRONIZACIÓN AUTOMÁTICA EN SEGUNDO PLANO (CADA 5 MINUTOS) ===
+let isAutoSyncRunning = false;
+
+async function sincronizarPendientesAGoogleSheets(silent = true) {
+    if (isAutoSyncRunning) return;
+    if (!navigator.onLine) {
+        if (!silent) console.log("ℹ️ [Auto-Sync] Dispositivo offline. Se reintentará en el próximo ciclo.");
+        return;
+    }
+    if (!GOOGLE_SHEETS_WEBHOOK_URL || GOOGLE_SHEETS_WEBHOOK_URL.trim() === '') {
+        return;
+    }
+
+    let backupList = [];
+    try {
+        backupList = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+    } catch (e) {
+        console.error("Error leyendo recolecciones_backup para auto-sync:", e);
+        return;
+    }
+
+    if (!Array.isArray(backupList) || backupList.length === 0) return;
+
+    // Detectar registros pendientes de sincronizar con Google Sheets
+    // Un registro está pendiente si:
+    // 1. sync_sheets === false
+    // 2. O estado === 'Offline'
+    // 3. O no tiene sync_sheets definido y no está marcado explícitamente como 'Sincronizado'
+    const pendingIndices = [];
+    backupList.forEach((item, idx) => {
+        const isSynced = (item.sync_sheets === true) || (item.estado === 'Sincronizado' && item.sync_sheets !== false);
+        if (!isSynced) {
+            pendingIndices.push(idx);
+        }
+    });
+
+    if (pendingIndices.length === 0) {
+        if (!silent) console.log("✅ [Auto-Sync] Todos los registros locales están sincronizados con Google Sheets.");
+        return;
+    }
+
+    isAutoSyncRunning = true;
+    console.log(`🔄 [Auto-Sync] Se encontraron ${pendingIndices.length} registro(s) pendiente(s) en localStorage. Sincronizando con Google Sheets automáticamente...`);
+
+    let syncSuccessCount = 0;
+    for (const idx of pendingIndices) {
+        const item = backupList[idx];
+        if (!navigator.onLine) {
+            console.warn("[Auto-Sync] Conexión interrumpida durante sincronización.");
+            break;
+        }
+
+        try {
+            const ok = await enviarAGoogleSheets(item);
+            if (ok) {
+                backupList[idx].sync_sheets = true;
+                backupList[idx].sync_sheets_at = Date.now();
+                if (backupList[idx].estado === 'Offline') {
+                    backupList[idx].estado = (backupList[idx].tipo === 'Novedad' || String(backupList[idx].id || '').startsWith('NOV-')) ? 'Visita Fallida' : 'Sincronizado';
+                }
+                syncSuccessCount++;
+            } else {
+                backupList[idx].sync_sheets_attempts = (backupList[idx].sync_sheets_attempts || 0) + 1;
+            }
+        } catch (err) {
+            console.warn(`[Auto-Sync] Error sincronizando ${item.id}:`, err);
+            backupList[idx].sync_sheets_attempts = (backupList[idx].sync_sheets_attempts || 0) + 1;
+        }
+
+        // Pausa de 250ms entre envíos para no saturar Apps Script
+        await new Promise(r => setTimeout(r, 250));
+    }
+
+    if (syncSuccessCount > 0) {
+        try {
+            localStorage.setItem('recolecciones_backup', JSON.stringify(backupList));
+        } catch (e) {
+            console.error("Error guardando respaldo tras auto-sync:", e);
+        }
+        console.log(`✅ [Auto-Sync] ${syncSuccessCount} registro(s) sincronizado(s) exitosamente con Google Sheets.`);
+        mostrarToastAutoSync(`✅ ${syncSuccessCount} recolección(es) pendiente(s) sincronizada(s) con Google Sheets`);
+    }
+
+    isAutoSyncRunning = false;
+}
+window.sincronizarPendientesAGoogleSheets = sincronizarPendientesAGoogleSheets;
+
+// Notificación visual flotante no invasiva
+function mostrarToastAutoSync(mensaje) {
+    try {
+        let toast = document.getElementById('proteinagro-sync-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'proteinagro-sync-toast';
+            toast.style.position = 'fixed';
+            toast.style.bottom = '20px';
+            toast.style.right = '20px';
+            toast.style.zIndex = '99999';
+            toast.style.backgroundColor = '#065f46';
+            toast.style.color = '#ffffff';
+            toast.style.padding = '12px 18px';
+            toast.style.borderRadius = '10px';
+            toast.style.boxShadow = '0 6px 16px rgba(0,0,0,0.25)';
+            toast.style.fontFamily = 'Segoe UI, Roboto, sans-serif';
+            toast.style.fontSize = '14px';
+            toast.style.fontWeight = '600';
+            toast.style.display = 'flex';
+            toast.style.alignItems = 'center';
+            toast.style.gap = '8px';
+            toast.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            document.body.appendChild(toast);
+        }
+        toast.innerHTML = `<span>🔄</span> <span>${mensaje}</span>`;
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+        toast.style.display = 'flex';
+
+        setTimeout(() => {
+            if (toast) {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                setTimeout(() => { if (toast) toast.style.display = 'none'; }, 400);
+            }
+        }, 4000);
+    } catch(e) {}
+}
+
+// Configuración del intervalo recurrente: Cada 5 minutos (300.000 ms)
+const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+setInterval(() => {
+    sincronizarPendientesAGoogleSheets(true);
+}, AUTO_SYNC_INTERVAL_MS);
+
+// Ejecución inicial 4 segundos después de abrir la aplicación
+setTimeout(() => {
+    sincronizarPendientesAGoogleSheets(true);
+}, 4000);
+
+// === RESINCRONIZAR MANUALMENTE REGISTROS LOCALES A GOOGLE SHEETS ===
 async function resincronizarTodoAGoogleSheets() {
     if (!GOOGLE_SHEETS_WEBHOOK_URL) {
         alert("⚠️ No está configurada la URL de Google Sheets.");
@@ -1902,15 +2069,26 @@ async function resincronizarTodoAGoogleSheets() {
     if (!confirmar) return;
 
     let enviados = 0;
-    for (const item of backupList) {
+    for (let i = 0; i < backupList.length; i++) {
+        const item = backupList[i];
         try {
-            await enviarAGoogleSheets(item);
-            enviados++;
+            const ok = await enviarAGoogleSheets(item);
+            if (ok) {
+                backupList[i].sync_sheets = true;
+                backupList[i].sync_sheets_at = Date.now();
+                if (backupList[i].estado === 'Offline') {
+                    backupList[i].estado = 'Sincronizado';
+                }
+                enviados++;
+            }
             await new Promise(r => setTimeout(r, 200));
         } catch(e) {
             console.warn("Error re-sincronizando ítem:", item.id, e);
         }
     }
+    try {
+        localStorage.setItem('recolecciones_backup', JSON.stringify(backupList));
+    } catch(e) {}
     alert(`✅ Se han re-enviado ${enviados} registros a Google Sheets exitosamente.`);
 }
 window.resincronizarTodoAGoogleSheets = resincronizarTodoAGoogleSheets;
@@ -2811,7 +2989,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.5.2&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.5.3&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -3719,12 +3897,30 @@ function initNovedadesModal() {
 
             // 1. Guardar en respaldo local (LocalStorage)
             let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
-            savedBackup.unshift({ ...dataNovedad });
+            const dataNovedadBackup = {
+                ...dataNovedad,
+                sync_sheets: false,
+                sync_sheets_at: null
+            };
+            savedBackup.unshift(dataNovedadBackup);
             localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
 
             // 2. Enviar a Google Sheets vía webhook en segundo plano
             if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== '') {
-                enviarAGoogleSheets({ ...dataNovedad });
+                enviarAGoogleSheets({ ...dataNovedad }).then(ok => {
+                    if (ok) {
+                        try {
+                            let curBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+                            const idx = curBackup.findIndex(r => r.id === dataNovedad.id);
+                            if (idx !== -1) {
+                                curBackup[idx].sync_sheets = true;
+                                curBackup[idx].sync_sheets_at = Date.now();
+                                curBackup[idx].estado = 'Visita Fallida';
+                                localStorage.setItem('recolecciones_backup', JSON.stringify(curBackup));
+                            }
+                        } catch(e) {}
+                    }
+                }).catch(e => console.warn("Error enviando novedad a Sheets (se reintentará en auto-sync):", e));
             }
 
             // 3. Guardar en Firestore con timeout de 4 segundos
