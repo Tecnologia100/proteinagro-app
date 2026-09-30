@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.5.1`  
+> **Versión Actual:** `v=1.5.2`  
 > **Última Actualización:** Septiembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,18 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.5.1` (Septiembre 2026) - Versión Actual
+### `v=1.5.2` (Septiembre 2026) - Versión Actual
+- **Integración Oficial de Rutas 6 y 7:**
+  - **`RUTA 6: Oriente/Sur`:** 9 paradas de recolección operativas (*Mercaunión, Cañaveral Ingenio, Cañaveral Limonar, Cañaveral Pasoancho, Sevillana Pasoancho, La Montaña Pasoancho, Orlando Martínez, Distribuidora Millán, La Esperanza*). Frecuencia: Miércoles y Sábados.
+  - **`RUTA 7: Yumbo/Belalcazar`:** 8 sedes exclusivas de Belalcázar (*B1-Principal, B2-Galería, B3-Planta Belomo, B5-Guacanda, B6-Rozo, B8-Bolívar, B9-Uribe, B11-Guabinas*). Frecuencia: Jueves.
+- **Sincronización en Vivo de Rutas vía Gviz CSV:**
+  - Consulta directa de la pestaña `Rutas` en tiempo real con orden jerárquico estricto (Rutas 1 a 7 y Planta San Joaquín fija al final).
+  - Consulta de `Puntos_Rutas` con parámetro `&headers=1` para impedir la absorción de los primeros registros de la Ruta 1.
+- **Matriz Completa de 126 Puntos Offline-First:**
+  - Actualización de `CATALOGO_PUNTOS_RUTAS_DEFAULT` en `app.js` con los 126 puntos oficiales del tarifario auditado 2026.
+  - Actualización del itinerario semanal de recolección (`actualizarItinerarioDelDia()`) y modal de edición administrativa.
+
+### `v=1.5.1` (Septiembre 2026)
 - **Blindaje Total de Actualización Inmediata en Navegadores de PC:**
   - **Cabeceras Anti-Caché en Vercel (`vercel.json`):** Configuración explícita de `Cache-Control: no-cache, no-store, must-revalidate` para `/sw.js` e `index.html`. Evita que Chrome y Edge en Windows retengan el Service Worker viejo en la caché de disco HTTP.
   - **Recarga Anti-Caché en Service Worker:** En `controllerchange` y `message RELOAD_PAGE`, se reemplazó el reload convencional por recarga con bypass forzado de caché `?v=1.5.1&t=Date.now()`.
@@ -456,6 +467,18 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Actualizaciones de Catálogos (Conductores, Rutas, Puntos):** 100% inmediatas al consultar Google Sheets en vivo con parámetro anti-caché. No requieren compilación ni descarga.
 - **Actualizaciones de Código (Lógica y Diseño):** Se gestionan mediante la estrategia **Network-First** del Service Worker (`sw.js`). Al detectar una nueva versión en Vercel, el teléfono descarga los archivos modificados en segundo plano y los reemplaza automáticamente sin requerir intervención manual del conductor ni aprobaciones de tiendas de aplicaciones.
 - **Modo Offline:** Si el dispositivo se encuentra sin cobertura en el momento de una actualización, continúa operando normalmente con la versión en caché hasta recuperar señal de red.
+
+---
+
+## 📌 9. Stand-by / Roadmap Prioritario: Módulo de Tarifas Programadas y Re-liquidación Retroactiva
+> **Documento de Especificación Completo:** Consulte [`TARIFAS_PROGRAMADAS_PLAN.md`](./TARIFAS_PROGRAMADAS_PLAN.md) para ver la arquitectura técnica detallada y el checklist de ejecución paso a paso.
+
+- **Problema que resuelve:** Evita que cambios futuros de tarifas (ej. renegociación acordada con antelación) afecten las liquidaciones del mes en curso, y elimina el riesgo de que la administración olvide actualizar la tarifa el día exacto de entrada en vigencia.
+- **Mecanismo:**
+  1. Columna `Vigente_Desde` en la hoja `Tarifas`.
+  2. Motor de búsqueda de precios en `Code.gs` que evalúa la fecha histórica del servicio contra la fecha de vigencia.
+  3. Módulo de rescate para re-liquidar automáticamente periodos específicos si se olvidó programar la tarifa a tiempo.
+- **Activación:** Este requerimiento se encuentra en pausa por decisión de gerencia. Para ponerlo en marcha en cualquier momento, basta con solicitar al asistente: *"Activar el plan de tarifas programadas"* o *"Hacer lo de las tarifas en stand-by"*.
 
 ---
 
