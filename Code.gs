@@ -199,7 +199,8 @@ function doGet(e) {
         "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance",
         "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá",
         "RUTA 5: Palmira / Villagorgona / Carmelo",
-        "RUTA 6: Belalcázar / Yumbo"
+        "RUTA 6: Oriente/Sur",
+        "RUTA 7: Yumbo/Belalcazar"
       ];
     }
 
@@ -1481,8 +1482,10 @@ function inicializarTablasYCatalogos() {
     ["RUTA 1: Santa Elena / Cavasa", "Activo"],
     ["RUTA 2: Cali (Norte / Centro / Sur / Oriente)", "Activo"],
     ["RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance", "Activo"],
-    ["RUTA 4: Buga / Roldanillo / Zarzal / Tuluá/yumbo/Rozo", "Activo"],
+    ["RUTA 4: Buga / Roldanillo / Zarzal / Tuluá", "Activo"],
     ["RUTA 5: Palmira / Villagorgona / Carmelo", "Activo"],
+    ["RUTA 6: Oriente/Sur", "Activo"],
+    ["RUTA 7: Yumbo/Belalcazar", "Activo"],
     ["PLANTA SAN JOAQUIN", "Activo"]
   ];
   sheetRutas.getRange(2, 1, defaultRutas.length, 2).setValues(defaultRutas);
