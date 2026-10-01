@@ -532,6 +532,47 @@ function parseKilosFloat(str) {
     return isNaN(num) ? 0 : Math.round(num * 100) / 100;
 }
 
+// ==============================================================================
+// HOMOLOGACIÓN ESTÁNDAR DE RUTAS (v1.5.6)
+// ==============================================================================
+function homologarRuta(texto) {
+    if (!texto) return 'Sin Ruta Asignada';
+    const s = String(texto).trim();
+    const clean = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    
+    if (clean.includes('RUTA 1') || clean.includes('SANTA ELENA') || clean.includes('CAVASA')) {
+        return 'RUTA 1: Santa Elena / Cavasa';
+    }
+    if (clean.includes('RUTA 2') || clean.includes('CALI')) {
+        if (clean.includes('SUR') && clean.includes('ORIENTE') && !clean.includes('NORTE')) {
+            return 'RUTA 2: Cali Sur / Oriente/ Juanchito)';
+        }
+        return 'RUTA 2: Cali (Norte / Sur / Oriente juanchito)';
+    }
+    if (clean.includes('RUTA 3') || clean.includes('PUERTO TEJADA') || clean.includes('JAMUNDI')) {
+        return 'RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance';
+    }
+    if (clean.includes('RUTA 4') || clean.includes('BUGA') || clean.includes('TULUA')) {
+        return 'RUTA 4: Buga / Roldanillo / Zarzal / Tuluá';
+    }
+    if (clean.includes('RUTA 5') || clean.includes('PALMIRA') || clean.includes('VILLAGORGONA')) {
+        return 'RUTA 5: Palmira / Villagorgona / Carmelo';
+    }
+    if (clean.includes('RUTA 7') || clean.includes('BELALCAZAR')) {
+        return 'RUTA 7: Yumbo/Belalcazar';
+    }
+    if (clean.includes('PLANTA') || clean.includes('SAN JOAQUIN')) {
+        return 'PLANTA SAN JOAQUIN';
+    }
+    if (clean.includes('RUTA 6') || clean.includes('ORIENTE/SUR') || clean.includes('OLIMPICA') || clean.includes('RUTA DEL SUR') || clean.includes('RUTA SUR')) {
+        return 'RUTA 6: Oriente/Sur';
+    }
+    if (clean.includes('BUENAVENTURA')) {
+        return 'Buenaventura';
+    }
+    return s;
+}
+
 // Formatea el valor mientras el conductor escribe en el campo #kilos conservando el cursor
 function formatKilosInputLive(inputEl) {
     if (!inputEl) return;
@@ -1495,7 +1536,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         id: recordId,
         timestamp: tsNow,
         conductor: conductorName,
-        ruta: rutaName,
+        ruta: homologarRuta(rutaName),
         proveedor: proveedorName,
         sucursal: sucursalName,
         punto: sucursalName,
@@ -1792,7 +1833,7 @@ function renderRecordsInTable(records, tbody) {
         const badgeClass = isNovedad ? 'badge-novedad' : (data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline');
         const badgeText = isNovedad ? '⚠️ Visita Fallida' : (data.estado || 'Sincronizado');
         const badgeStyle = isNovedad ? 'style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 700;"' : '';
-        const ruta = data.ruta ? data.ruta.replace('_', ' ') : 'N/A';
+        const ruta = data.ruta ? homologarRuta(data.ruta) : 'N/A';
         const obsText = data.observaciones ? data.observaciones : '-';
 
         const provDisplay = data.proveedor || 'N/A';
@@ -1926,29 +1967,39 @@ async function enviarAGoogleSheets(data) {
         dataLight.foto = "Foto Evidencia Registrada";
     }
 
+    if (dataLight.ruta) {
+        dataLight.ruta = homologarRuta(dataLight.ruta);
+    }
     const payloadParam = encodeURIComponent(JSON.stringify(dataLight));
     const actionType = (dataLight.tipo === 'Novedad' || String(dataLight.id || '').startsWith('NOV-')) ? 'saveNovedad' : (dataLight.action || 'saveRecoleccion');
 
     let enviadoExitoso = false;
 
-    // 1. Envío prioritario vía POST (Inmune a interferencias de vistas doGet)
+    // 1. Envío prioritario vía POST
     try {
-        await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+        const response = await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
             method: 'POST',
-            mode: 'no-cors',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: `action=${actionType}&payload=${payloadParam}`
         });
-        console.log("✅ Datos de recolección/novedad enviados a Google Sheets vía POST.");
-        enviadoExitoso = true;
+        if (response.ok || response.type === 'opaque') {
+            console.log("✅ Datos enviados a Google Sheets vía POST.");
+            enviadoExitoso = true;
+        } else {
+            throw new Error(`HTTP Error ${response.status}`);
+        }
     } catch (ePost) {
         console.warn("⚠️ Falló POST a Google Sheets, procediendo con GET:", ePost);
         // 2. Envío secundario redundante vía GET
         try {
             const getUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=${actionType}&payload=${payloadParam}`;
-            await fetch(getUrl, { method: 'GET', mode: 'no-cors' });
-            console.log("✅ Datos de recolección/novedad enviados a Google Sheets vía GET.");
-            enviadoExitoso = true;
+            const getResponse = await fetch(getUrl, { method: 'GET' });
+            if (getResponse.ok || getResponse.type === 'opaque') {
+                console.log("✅ Datos enviados a Google Sheets vía GET.");
+                enviadoExitoso = true;
+            } else {
+                throw new Error(`HTTP Error ${getResponse.status}`);
+            }
         } catch (eGet) {
             console.warn("⚠️ Falló GET redundante a Google Sheets:", eGet);
             enviadoExitoso = false;
@@ -3597,7 +3648,7 @@ function initAdminEditModal() {
         try {
             const updatedData = {
                 conductor: aNombrePropio(conductor),
-                ruta: ruta,
+                ruta: homologarRuta(ruta),
                 proveedor: aNombrePropio(proveedor),
                 punto: aNombrePropio(punto),
                 sucursal: aNombrePropio(punto),
@@ -3634,11 +3685,11 @@ function initAdminEditModal() {
                 const payloadParam = encodeURIComponent(JSON.stringify({ ...updatedData, id: localId || docId, action: 'updateRecoleccion' }));
                 fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
+                    
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: `action=updateRecoleccion&payload=${payloadParam}`
                 }).catch(err => console.warn("Sync Sheets edit POST err:", err));
-                fetch(GOOGLE_SHEETS_WEBHOOK_URL + '?action=updateRecoleccion&payload=' + payloadParam, { method: 'GET', mode: 'no-cors' }).catch(err => console.warn("Sync Sheets edit err:", err));
+                fetch(GOOGLE_SHEETS_WEBHOOK_URL + '?action=updateRecoleccion&payload=' + payloadParam, { method: 'GET' }).catch(err => console.warn("Sync Sheets edit err:", err));
             }
 
             // 5. Re-renderizar tabla de Administrador
@@ -3920,7 +3971,7 @@ function initNovedadesModal() {
                 timestamp: tsNow,
                 tipo: 'Novedad',
                 conductor: conductorName,
-                ruta: rutaName,
+                ruta: homologarRuta(rutaName),
                 proveedor: provName,
                 sucursal: puntoName,
                 punto: puntoName,

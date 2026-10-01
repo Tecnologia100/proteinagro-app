@@ -207,7 +207,32 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.5.2` (Septiembre 2026) - Versión Actual
+### `v=1.5.6` (Octubre 2026) - Versión Actual
+- **Resolución de Pérdida Silenciosa de Datos por `mode: no-cors`:**
+  - Se eliminó el modo ciego `no-cors` de las peticiones `fetch` en `enviarAGoogleSheets` (`app.js`).
+  - Ahora la PWA evalúa de forma estricta la respuesta real (`response.ok`). Si Google Sheets experimenta saturación o error 500, la app detecta el fallo, mantiene el registro como pendiente y permite que el motor de Auto-Sync en segundo plano (cada 5 minutos) lo reintente hasta lograr entrega garantizada.
+- **Homologación Oficial Estricta de Rutas:**
+  - Implementación de `homologarRuta(texto)` sincronizada tanto en el cliente (`app.js`) como en el servidor (`Code.gs`).
+  - Fusión de 27 variantes dispares (por diferencias de mayúsculas, tildes o paradas añadidas) bajo el catálogo oficial de 9 rutas:
+    - `RUTA 1: Santa Elena / Cavasa`
+    - `RUTA 2: Cali (Norte / Sur / Oriente juanchito)`
+    - `RUTA 2: Cali Sur / Oriente/ Juanchito)`
+    - `RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance`
+    - `RUTA 4: Buga / Roldanillo / Zarzal / Tuluá`
+    - `RUTA 5: Palmira / Villagorgona / Carmelo`
+    - `RUTA 6: Oriente/Sur`
+    - `RUTA 7: Yumbo/Belalcazar`
+    - `PLANTA SAN JOAQUIN`
+    - *(Especial: `Buenaventura`)*
+  - Aplicación automática en formulario de recolección, módulo de novedades y edición administrativa.
+- **Prevención de Salto Fantasma de Filas en Sheets (Fix de `appendRow` ciego):**
+  - Corrección en `Code.gs`: se reemplazó `sheet.appendRow()` (que saltaba al final absoluto de la hoja al encontrar huecos o filas vacías como la fila 5142) por un escaneo dinámico de la columna B (`Fecha_Hora`).
+  - Las nuevas recolecciones se insertan de forma contigua e ininterrumpida exactamente en la fila siguiente (`targetRow = lastRow + 1`).
+- **Reparación de Kilos Anómalos y Base Consolidada:**
+  - Detección y corrección de 16 registros corruptos con pesos en notación científica (> 50.000 kg o billones) de agosto y septiembre, restituyendo sus pesos reales a partir del desglose de productos.
+  - Consolidación del archivo maestro `DB_App_Conductores_HOMOLOGADO_2134.xlsx` con exactamente 2.134 registros limpios, 12 columnas oficiales de Google Sheets, IDs estándar `REC-timestamp` y separación estricta de productos y kilos.
+
+### `v=1.5.2` (Septiembre 2026)
 - **Integración Oficial de Rutas 6 y 7:**
   - **`RUTA 6: Oriente/Sur`:** 9 paradas de recolección operativas (*Mercaunión, Cañaveral Ingenio, Cañaveral Limonar, Cañaveral Pasoancho, Sevillana Pasoancho, La Montaña Pasoancho, Orlando Martínez, Distribuidora Millán, La Esperanza*). Frecuencia: Miércoles y Sábados.
   - **`RUTA 7: Yumbo/Belalcazar`:** 8 sedes exclusivas de Belalcázar (*B1-Principal, B2-Galería, B3-Planta Belomo, B5-Guacanda, B6-Rozo, B8-Bolívar, B9-Uribe, B11-Guabinas*). Frecuencia: Jueves.

@@ -30,6 +30,11 @@ function doGet(e) {
     }
 
     // 0.08 Corrección masiva de Kilos convertidos erróneamente a fechas (46.xxx -> Kilos Reales)
+    // 0.081 Homologar masivamente nombres de rutas y limpiar Kilos anómalos
+    if (e && e.parameter && e.parameter.action === 'homologarRutas') {
+      return homologarRutasYLimpiarSheet(ss);
+    }
+
     if (e && e.parameter && e.parameter.action === 'corregirKilosFechas') {
       return corregirKilosFechasSheet(ss);
     }
@@ -276,6 +281,17 @@ function guardarRecoleccionSheet(ss, rawPayload) {
       }
     }
     
+    // Determinar la última fila real con datos (basada en Columna B 'Fecha_Hora') para evitar saltos por filas vacías
+    var targetRow = 1;
+    var maxRows = Math.max(sheet.getLastRow(), 2);
+    var colBValues = sheet.getRange(1, 2, maxRows, 1).getValues();
+    for (var r = colBValues.length - 1; r >= 0; r--) {
+      if (colBValues[r][0] !== "" && colBValues[r][0] !== null) {
+        targetRow = r + 1;
+        break;
+      }
+    }
+
     for (var p = 0; p < productos.length; p++) {
       var prodItem = productos[p];
       var prodNombre = '';
@@ -312,17 +328,18 @@ function guardarRecoleccionSheet(ss, rawPayload) {
       }
       
       // Formato "Nombre Propio" automático (Title Case estilo =NOMPROPIO)
-      var rutaFinal = aNombrePropio(ruta);
+      var rutaFinal = homologarRuta(ruta);
       var conductorFinal = aNombrePropio(conductor);
       var proveedorFinal = aNombrePropio(proveedor);
       var puntoFinal = aNombrePropio(punto);
       var prodNombreFinal = aNombrePropio(prodNombre);
       var observacionesFinal = capitalizarOracion(observaciones);
       
-      sheet.appendRow([
+      targetRow++;
+      sheet.getRange(targetRow, 1, 1, 12).setValues([[
         id, fecha, rutaFinal, conductorFinal, proveedorFinal, puntoFinal,
         prodNombreFinal, prodKilos, observacionesFinal, ubicacionGps, precio, valor
-      ]);
+      ]]);
     }
 
     return ContentService.createTextOutput(JSON.stringify({"result": "success", "message": "Guardado exitosamente"}))
@@ -667,6 +684,116 @@ function parseKilosNumero(val) {
 // ==============================================================================
 // FUNCIONES DE FORMATO DE TEXTO (NOMBRE PROPIO / CAPITALIZACIÓN)
 // ==============================================================================
+
+// ==============================================================================
+// HOMOLOGACIÓN ESTÁNDAR DE RUTAS (v1.5.6)
+// ==============================================================================
+function homologarRuta(texto) {
+  if (!texto) return 'Sin Ruta Asignada';
+  var s = String(texto).trim();
+  var clean = normalizarTexto(s);
+  
+  if (clean.indexOf('RUTA 1') !== -1 || clean.indexOf('SANTA ELENA') !== -1 || clean.indexOf('CAVASA') !== -1) {
+    return 'RUTA 1: Santa Elena / Cavasa';
+  }
+  if (clean.indexOf('RUTA 2') !== -1 || clean.indexOf('CALI') !== -1) {
+    if (clean.indexOf('SUR') !== -1 && clean.indexOf('ORIENTE') !== -1 && clean.indexOf('NORTE') === -1) {
+      return 'RUTA 2: Cali Sur / Oriente/ Juanchito)';
+    }
+    return 'RUTA 2: Cali (Norte / Sur / Oriente juanchito)';
+  }
+  if (clean.indexOf('RUTA 3') !== -1 || clean.indexOf('PUERTO TEJADA') !== -1 || clean.indexOf('JAMUNDI') !== -1) {
+    return 'RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance';
+  }
+  if (clean.indexOf('RUTA 4') !== -1 || clean.indexOf('BUGA') !== -1 || clean.indexOf('TULUA') !== -1) {
+    return 'RUTA 4: Buga / Roldanillo / Zarzal / Tuluá';
+  }
+  if (clean.indexOf('RUTA 5') !== -1 || clean.indexOf('PALMIRA') !== -1 || clean.indexOf('VILLAGORGONA') !== -1) {
+    return 'RUTA 5: Palmira / Villagorgona / Carmelo';
+  }
+  if (clean.indexOf('RUTA 7') !== -1 || clean.indexOf('BELALCAZAR') !== -1) {
+    return 'RUTA 7: Yumbo/Belalcazar';
+  }
+  if (clean.indexOf('PLANTA') !== -1 || clean.indexOf('SAN JOAQUIN') !== -1) {
+    return 'PLANTA SAN JOAQUIN';
+  }
+  if (clean.indexOf('RUTA 6') !== -1 || clean.indexOf('ORIENTE/SUR') !== -1 || clean.indexOf('OLIMPICA') !== -1 || clean.indexOf('RUTA DEL SUR') !== -1 || clean.indexOf('RUTA SUR') !== -1) {
+    return 'RUTA 6: Oriente/Sur';
+  }
+  if (clean.indexOf('BUENAVENTURA') !== -1) {
+    return 'Buenaventura';
+  }
+  return s;
+}
+
+// Homologar masivamente todas las rutas de la hoja 'Recolecciones' y corregir pesos anómalos
+function homologarRutasYLimpiarSheet(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet || sheet.getLastRow() <= 1) {
+      return ContentService.createTextOutput(JSON.stringify({ result: "info", message: "Hoja vacía o no encontrada" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    var range = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    var values = range.getValues();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    
+    var colIdx = { ruta: 2, kg: 7, prod: 6 };
+    for (var c = 0; c < headers.length; c++) {
+      var h = normalizarTexto(headers[c]);
+      if (h.indexOf('ruta') !== -1) colIdx.ruta = c;
+      else if (h.indexOf('kg') !== -1 || h.indexOf('kilo') !== -1) colIdx.kg = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+    }
+    
+    var updatedRutas = 0;
+    var correctedKilos = 0;
+    
+    for (var i = 0; i < values.length; i++) {
+      // 1. Homologar Ruta
+      if (colIdx.ruta !== -1 && values[i][colIdx.ruta]) {
+        var rutaOriginal = String(values[i][colIdx.ruta]).trim();
+        var rutaHomologada = homologarRuta(rutaOriginal);
+        if (rutaOriginal !== rutaHomologada) {
+          values[i][colIdx.ruta] = rutaHomologada;
+          updatedRutas++;
+        }
+      }
+      
+      // 2. Corregir Kilos anómalos (> 50.000 kg por error de decimal o concatenación)
+      if (colIdx.kg !== -1 && values[i][colIdx.kg]) {
+        var rawKg = values[i][colIdx.kg];
+        var numKg = typeof rawKg === 'number' ? rawKg : parseFloat(String(rawKg).replace(/\./g, '').replace(',', '.'));
+        if (!isNaN(numKg) && numKg > 50000) {
+          if (numKg > 1000000000) {
+            // Ejemplo 6110999999999990 -> 611.1
+            values[i][colIdx.kg] = Math.round((numKg / 10000000000000) * 100) / 100;
+            correctedKilos++;
+          } else if (numKg > 100000) {
+            // Ejemplo 2918622 -> 2918.62
+            values[i][colIdx.kg] = Math.round((numKg / 1000) * 100) / 100;
+            correctedKilos++;
+          }
+        }
+      }
+    }
+    
+    range.setValues(values);
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "success",
+      totalFilas: lastRow - 1,
+      rutasHomologadas: updatedRutas,
+      kilosCorregidos: correctedKilos
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ result: "error", error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
 
 // Convierte texto a formato "Nombre Propio" (Title Case estilo =NOMPROPIO() de Excel)
 // Soportando caracteres con tildes, eñes y delimitadores comunes (-, /, (, ), etc.)

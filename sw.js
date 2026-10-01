@@ -3,7 +3,7 @@
 // Cache del App Shell con estrategia Network-First y Fallback a Cache Offline
 // ==============================================================================
 
-const CACHE_NAME = 'proteinagro-v1.5.5';
+const CACHE_NAME = 'proteinagro-v1.5.6';
 const APP_SHELL = [
   '/',
   '/index.html',
