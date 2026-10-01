@@ -79,23 +79,43 @@ async function subirEvidenciaNovedadAStorage(dataUrl, recordId) {
     }
 }
 
+let ULTIMA_UBICACION_GPS = "0";
+
+// Captura GPS en segundo plano totalmente asíncrona (0 milisegundos de bloqueo)
+function capturarGpsEnSegundoPlano() {
+    if (!navigator.geolocation) return;
+    try {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                if (pos && pos.coords) {
+                    ULTIMA_UBICACION_GPS = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+                }
+            },
+            () => {},
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+        );
+    } catch(e) {}
+}
+try { capturarGpsEnSegundoPlano(); } catch(e) {}
+
 // Función auxiliar para capturar coordenadas GPS en vivo con fallback rápido
 function obtenerUbicacionGpsActual() {
     return new Promise((resolve) => {
         if (!navigator.geolocation) {
-            resolve("0");
+            resolve(ULTIMA_UBICACION_GPS || "0");
             return;
         }
-        const timeoutId = setTimeout(() => resolve("0"), 3500);
+        const timeoutId = setTimeout(() => resolve(ULTIMA_UBICACION_GPS || "0"), 3500);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 clearTimeout(timeoutId);
                 const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+                ULTIMA_UBICACION_GPS = coords;
                 resolve(coords);
             },
             () => {
                 clearTimeout(timeoutId);
-                resolve("0");
+                resolve(ULTIMA_UBICACION_GPS || "0");
             },
             { enableHighAccuracy: true, timeout: 3000, maximumAge: 60000 }
         );
@@ -291,11 +311,9 @@ const entrarComoConductor = (nombre = null) => {
         }
     }
 
-    // Pre-calentar captura GPS en segundo plano (para respuesta inmediata al guardar sin demoras)
+    // Disparar captura GPS en segundo plano totalmente asíncrona
     try {
-        if (typeof obtenerUbicacionGpsActual === 'function') {
-            obtenerUbicacionGpsActual().catch(() => {});
-        }
+        capturarGpsEnSegundoPlano();
     } catch (e) {}
 };
 
@@ -1470,13 +1488,8 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     const recordId = 'REC-' + Date.now();
     const tsNow = Date.now();
 
-    // Capturar coordenadas GPS reales en vivo (con fallback a "0" si no hay señal o permiso)
-    let ubicacionGps = "0";
-    try {
-        ubicacionGps = await obtenerUbicacionGpsActual();
-    } catch (gpsErr) {
-        console.warn("⚠️ No se pudo capturar GPS en recolección, usando fallback:", gpsErr);
-    }
+    // Coordenada GPS en segundo plano (0 ms de espera, 100% inmediato y sin demoras)
+    const ubicacionGps = ULTIMA_UBICACION_GPS || "0";
 
     const data = {
         id: recordId,
