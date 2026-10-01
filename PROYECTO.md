@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.5.5`  
+> **Versión Actual:** `v=1.6.0`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -521,6 +521,28 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   1. **Fórmulas de Hoja y Formato Condicional (Semáforo Rojo):** Columnas M (`ID_Clave`) y N (`Alerta`) con `ARRAYFORMULA` que evalúan la unicidad y colorean de rojo pastel toda la fila duplicada.
   2. **Apps Script Reactivo (`Duplicados.gs`):** Activador `onEdit(e)` que vigila la digitación manual y operaciones de copiado/pegado de filas completas, alertando a la administrativa mediante un cuadro emergente modal con los datos del registro original.
 - **Inmunidad de la App Móvil:** Las peticiones desde conductores vía Webhook (`appendRow`) no activan eventos de UI (`onEdit`), garantizando cero impacto en la operación de campo.
+
+## 📊 11. Módulo de Cierre Diario y Auditoría de Cobertura de Rutas (`v1.6.0`)
+> **Fecha de Implementación:** 01 de Octubre de 2026  
+> **Ubicación:** Panel Administrativo (`index.html` y `app.js`)  
+> **Objetivo:** Auditar al final de la jornada el cumplimiento físico de los conductores contra la matriz programada, verificando en tiempo real que los datos hayan aterrizado directamente en la base contable de Google Sheets.
+
+- **Mecanismo de Auditoría Directa en Google Sheets (Gviz CSV):**
+  - El botón **"Generar Cierre"** no depende de cachés ni de la memoria rápida de Firebase.
+  - Realiza una consulta directa e instantánea a la pestaña `Recolecciones` de Google Sheets (`DB_App_Conductores.gsheet`) vía CDN Gviz (`tqx=out:csv`).
+  - Extrae y normaliza las marcas de fecha de forma numérica estricta (`día/mes/año`), garantizando total compatibilidad frente a variaciones de formato con o sin ceros a la izquierda (ej: `1/10/2026` vs `01/10/2026`).
+  - Aplica comparación de texto tolerante a tildes y diacríticos (ej: *Cañaveral*, *Martínez*, *Villagorgona*) para el cruce exacto entre `Proveedor` y `Punto_Sucursal`.
+
+- **Lógica de Cobertura y Checklist Semafórico:**
+  - **Puntos Asignados a la Ruta:** Filtra la matriz matriz de 126 puntos según la ruta seleccionada.
+  - **🟢 Éxito (`Auditado en Base`):** Se confirma que el conductor realizó la visita y los kilos ya están registrados y liquidados en Google Sheets. Suma positivamente al avance.
+  - **🟡 Novedad (`Visita Fallida`):** Se confirma que el conductor acudió al punto pero reportó una causa justificada (establecimiento cerrado, 0 kg, etc.). Cuenta positivamente como punto cubierto de la ruta.
+  - **🔴 Pendiente (`No ha llegado a la Data`):** Alerta a gerencia de que no existe ningún registro el día de hoy en Google Sheets para ese punto (fuga de ruta o registro retenido offline).
+  - **Barra de Progreso Dinámica:**
+    - `Verde (100%)`: Cobertura perfecta de la ruta.
+    - `Naranja (80% - 99%)`: Cobertura aceptable con paradas pendientes.
+    - `Rojo (< 80%)`: Incumplimiento crítico de la ruta.
+  - **Consolidado de Kilos:** Muestra en tiempo real la sumatoria de todos los kilogramos recolectados en esa ruta específica durante la jornada.
 
 ---
 
