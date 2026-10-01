@@ -4250,28 +4250,55 @@ async function generarCierreDiarioAdmin() {
     btn.innerHTML = 'Generando...';
 
     try {
-        // Parse the target date bounds
-        const [year, month, day] = fechaStr.split('-').map(Number);
-        const startOfDay = new Date(year, month - 1, day, 0, 0, 0).getTime();
-        const endOfDay = new Date(year, month - 1, day, 23, 59, 59).getTime();
+        // Formatear la fecha 'YYYY-MM-DD' a 'DD/MM/YYYY' para buscarla en Google Sheets
+        const [year, month, day] = fechaStr.split('-');
+        const targetDate = `${day}/${month}/${year}`;
 
-        // Query Firestore for this specific date range
-        // Evitamos usar where('ruta') junto con (>= <=) para no requerir un índice compuesto en Firebase
-        const snapshot = await db.collection('recolecciones')
-            .where('timestamp', '>=', startOfDay)
-            .where('timestamp', '<=', endOfDay)
-            .get();
+        // 1. Descargar la pestaña Recolecciones directamente de Google Sheets (Fuente de Verdad)
+        const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+        const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Recolecciones&t=${Date.now()}`;
+        
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("No se pudo conectar con Google Sheets.");
+        const csvText = await res.text();
 
-        const recoleccionesDelDia = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            // Filtramos la ruta localmente para evitar el error de Firebase
-            if (data.ruta === rutaStr) {
-                recoleccionesDelDia.push(data);
+        // 2. Parseador CSV robusto (para leer comas dentro de textos)
+        const parseCSVRow = (row) => {
+            const result = [];
+            let insideQuote = false, currentWord = '';
+            for (let i = 0; i < row.length; i++) {
+                const char = row[i];
+                if (char === '"' && row[i+1] === '"') { currentWord += '"'; i++; } 
+                else if (char === '"') { insideQuote = !insideQuote; } 
+                else if (char === ',' && !insideQuote) { result.push(currentWord); currentWord = ''; } 
+                else { currentWord += char; }
             }
-        });
+            result.push(currentWord);
+            return result;
+        };
 
-        // Obtain assigned points for this route
+        const rows = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
+        const recoleccionesDelDia = [];
+        
+        for (let i = 1; i < rows.length; i++) {
+            const cols = parseCSVRow(rows[i]);
+            // Columnas de Google Sheets Recolecciones:
+            // 0:ID, 1:Fecha_Hora, 2:Ruta, 3:Conductor, 4:Proveedor, 5:Punto, 6:Materia, 7:Kg, 8:Observaciones
+            const fechaHora = cols[1] || '';
+            const ruta = cols[2] || '';
+            
+            // Si la fecha coincide exactamente y la ruta es la seleccionada, lo contabilizamos
+            if (fechaHora.startsWith(targetDate) && ruta === rutaStr) {
+                recoleccionesDelDia.push({
+                    proveedor: cols[4] || '',
+                    sucursal: cols[5] || '',
+                    totalKilos: parseFloat((cols[7] || '0').replace(',', '.')) || 0,
+                    observaciones: cols[8] || ''
+                });
+            }
+        }
+
+        // 3. Obtener puntos asignados en el catálogo para esta ruta
         const puntosAsignados = MATRIZ_PUNTOS_RUTAS.filter(p => p.ruta === rutaStr && p.estado.toLowerCase() !== 'inactivo');
         
         let visitadosExito = 0;
@@ -4284,8 +4311,7 @@ async function generarCierreDiarioAdmin() {
             checklistHTML = '<tr><td colspan="4" style="text-align: center;">No hay puntos asignados a esta ruta.</td></tr>';
         } else {
             puntosAsignados.forEach(puntoInfo => {
-                // Find if the driver visited this point today
-                // Match by exact Proveedor and Punto/Sucursal
+                // Buscar si este punto tiene registros HOY en Google Sheets
                 const registrosVisita = recoleccionesDelDia.filter(r => 
                     r.proveedor === puntoInfo.proveedor && r.sucursal === puntoInfo.punto
                 );
@@ -4295,14 +4321,12 @@ async function generarCierreDiarioAdmin() {
                 let bgColor = '';
 
                 if (registrosVisita.length > 0) {
-                    // Check if it was a Novedad (0 Kg and starts with Visita Fallida)
-                    // Or if there was at least one successful collection
                     let esNovedad = true;
                     let kilosPunto = 0;
                     let novedadStr = '';
 
                     registrosVisita.forEach(r => {
-                        const ks = Number(r.totalKilos) || 0;
+                        const ks = r.totalKilos;
                         if (ks > 0) {
                             esNovedad = false;
                             kilosPunto += ks;
@@ -4316,7 +4340,7 @@ async function generarCierreDiarioAdmin() {
                         visitadosExito++;
                         kilosTotalesRuta += kilosPunto;
                         estadoHtml = '<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">✅ ÉXITO</span>';
-                        kilosNovedadStr = `<strong>${formatKilosDisplay(kilosPunto)} kg</strong>`;
+                        kilosNovedadStr = `<span style="color:#1e293b;">Auditado en Base:</span> <strong>${formatKilosDisplay(kilosPunto)} kg</strong>`;
                     } else {
                         visitadosNovedad++;
                         estadoHtml = '<span style="background:#fef9c3; color:#854d0e; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">⚠️ NOVEDAD</span>';
@@ -4326,7 +4350,7 @@ async function generarCierreDiarioAdmin() {
                 } else {
                     pendientes++;
                     estadoHtml = '<span style="background:#fee2e2; color:#991b1b; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">❌ PENDIENTE</span>';
-                    kilosNovedadStr = '<span style="color:#94a3b8; font-size:13px;">Sin visita registrada</span>';
+                    kilosNovedadStr = '<span style="color:#ef4444; font-size:13px; font-weight: 600;">No ha llegado a la Data</span>';
                     bgColor = 'background-color: #fff1f2;';
                 }
 
@@ -4365,8 +4389,8 @@ async function generarCierreDiarioAdmin() {
         document.getElementById('cierre-checklist-body').innerHTML = checklistHTML;
 
     } catch (error) {
-        console.error("Error al generar cierre diario:", error);
-        alert("Ocurrió un error al consultar los datos. Verifique su conexión.");
+        console.error("Error al generar cierre diario desde Google Sheets:", error);
+        alert("Ocurrió un error al auditar los datos contra Google Sheets. Verifique su conexión.");
     } finally {
         btn.disabled = false;
         btn.innerHTML = 'Generar Cierre';
