@@ -482,4 +482,22 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 ---
 
+## 🚦 10. Sistema de Protección Anti-Duplicados y Semáforo Visual (`Duplicados.gs`)
+> **Fecha de Implementación:** 01 de Octubre de 2026  
+> **Archivo Asociado:** [`Duplicados.gs`](./Duplicados.gs)  
+> **Objetivo:** Prevenir que la digitación manual administrativa duplique recolecciones previamente enviadas por los conductores.
+
+- **Criterio de Duplicidad:** Coincidencia simultánea de:
+  1. `Fecha` (normalizada a nivel día calendario `YYYY-MM-DD`, descartando horas).
+  2. `Proveedor` (Columna E).
+  3. `Materia_Producto` (Columna G).
+  4. `Kg` (Columna H, comparado numéricamente).
+- **Mecanismo Dual de Protección:**
+  1. **Fórmulas de Hoja y Formato Condicional (Semáforo Rojo):** Columnas M (`ID_Clave`) y N (`Alerta`) con `ARRAYFORMULA` que evalúan la unicidad y colorean de rojo pastel toda la fila duplicada.
+  2. **Apps Script Reactivo (`Duplicados.gs`):** Activador `onEdit(e)` que vigila la digitación manual y operaciones de copiado/pegado de filas completas, alertando a la administrativa mediante un cuadro emergente modal con los datos del registro original.
+- **Inmunidad de la App Móvil:** Las peticiones desde conductores vía Webhook (`appendRow`) no activan eventos de UI (`onEdit`), garantizando cero impacto en la operación de campo.
+
+---
+
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
+
