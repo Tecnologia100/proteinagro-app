@@ -153,6 +153,17 @@ function aNombrePropio(texto) {
     });
 }
 
+// Función de sanitización para prevenir XSS en vistas HTML
+function escapeHtml(texto) {
+    if (texto === null || texto === undefined) return '';
+    return String(texto)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // === ESTADO DE AUTENTICACIÓN Y ROLES ===
 const DEFAULT_CONDUCTORES_AUTH = {
     "Ricardo Sepulveda": "1649",
@@ -279,6 +290,13 @@ const entrarComoConductor = (nombre = null) => {
             headerBadge.style.display = 'inline-flex';
         }
     }
+
+    // Pre-calentar captura GPS en segundo plano (para respuesta inmediata al guardar sin demoras)
+    try {
+        if (typeof obtenerUbicacionGpsActual === 'function') {
+            obtenerUbicacionGpsActual().catch(() => {});
+        }
+    } catch (e) {}
 };
 
 // Login de Conductor con clave individual
@@ -368,8 +386,8 @@ const handleAdminLogin = async (e) => {
     // 2. Validación de clave de Administrador
     const userLower = userInput.toLowerCase();
     const esUsuarioAdmin = (userLower === 'admin' || userLower === 'administrador' || userLower === '');
-    const pinAdminValido = (ADMIN_CLAVE_CONFIG && pin === ADMIN_CLAVE_CONFIG) || 
-                           (pin === '0000' || pin === 'admin' || pin === '1234');
+    const expectedAdminPin = (ADMIN_CLAVE_CONFIG && ADMIN_CLAVE_CONFIG.trim() !== '') ? ADMIN_CLAVE_CONFIG.trim() : '0000';
+    const pinAdminValido = pin !== '' && (pin === expectedAdminPin || pin === '0000');
 
     if (esUsuarioAdmin && pinAdminValido) {
         entrarComoAdmin();
@@ -1251,7 +1269,7 @@ function renderAddedProducts() {
                 <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
                     <span style="font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
                         <span style="font-size: 1.1rem;">${getEmojiForProduct(p.producto)}</span>
-                        <span>${p.producto}</span>
+                        <span>${escapeHtml(p.producto)}</span>
                     </span>
                     <span style="display: flex; align-items: center; gap: 10px;">
                         <strong style="color: #0284c7;">${formatKilosDisplay(p.kilos)} kg</strong>
@@ -1452,6 +1470,14 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     const recordId = 'REC-' + Date.now();
     const tsNow = Date.now();
 
+    // Capturar coordenadas GPS reales en vivo (con fallback a "0" si no hay señal o permiso)
+    let ubicacionGps = "0";
+    try {
+        ubicacionGps = await obtenerUbicacionGpsActual();
+    } catch (gpsErr) {
+        console.warn("⚠️ No se pudo capturar GPS en recolección, usando fallback:", gpsErr);
+    }
+
     const data = {
         id: recordId,
         timestamp: tsNow,
@@ -1463,7 +1489,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         productos: collectedProducts,
         totalKilos: totalKilos,
         observaciones: observacionesVal,
-        ubicacionGps: "0",
+        ubicacionGps: ubicacionGps,
         firma: firmaDataUrl,
         fecha: (() => {
             const now = new Date();
@@ -1765,15 +1791,19 @@ function renderRecordsInTable(records, tbody) {
 
         const tr = document.createElement('tr');
         if (isNovedad) tr.style.background = '#fffdfa';
+        const gpsLink = (data.ubicacionGps && data.ubicacionGps !== '0') 
+            ? `<br><a href="https://www.google.com/maps?q=${encodeURIComponent(data.ubicacionGps)}" target="_blank" rel="noopener noreferrer" style="font-size: 0.72rem; color: #059669; text-decoration: none; font-weight: 600;">📍 Ver mapa</a>` 
+            : '';
+
         tr.innerHTML = `
-            <td style="font-weight: 500; white-space: nowrap;">${fechaTexto}</td>
-            <td style="text-transform: capitalize;">${aNombrePropio(data.conductor || '-')}</td>
-            <td style="text-transform: capitalize;">${ruta}</td>
-            <td style="text-transform: capitalize;">${provDisplay}</td>
-            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${sucDisplay}</td>
+            <td style="font-weight: 500; white-space: nowrap;">${escapeHtml(fechaTexto)}</td>
+            <td style="text-transform: capitalize;">${escapeHtml(aNombrePropio(data.conductor || '-'))}</td>
+            <td style="text-transform: capitalize;">${escapeHtml(ruta)}</td>
+            <td style="text-transform: capitalize;">${escapeHtml(provDisplay)}</td>
+            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${escapeHtml(sucDisplay)}${gpsLink}</td>
             <td style="font-weight: bold;">${cleanTotalKg}</td>
-            <td style="max-width: 200px; font-size: 0.85rem; color: #475569;">${obsText}</td>
-            <td><span class="badge ${badgeClass}" ${badgeStyle}>${badgeText}</span></td>
+            <td style="max-width: 200px; font-size: 0.85rem; color: #475569; word-break: break-word;">${escapeHtml(obsText)}</td>
+            <td><span class="badge ${badgeClass}" ${badgeStyle}>${escapeHtml(badgeText)}</span></td>
             <td>
                 ${photoOrSign ? `<img src="${photoOrSign}" style="height: 32px; width: 32px; border: 1px solid #ccc; background: white; border-radius: 4px; object-fit: cover; cursor: pointer;" alt="${isNovedad ? 'Foto Evidencia' : 'Firma'}" title="Clic para ver completa" onclick="window.open('${photoOrSign}', '_blank')">` : '-'}
             </td>
@@ -2880,7 +2910,7 @@ function mostrarComprobanteDigital(data) {
         prodsSorted.forEach(p => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #1e293b;">${getEmojiForProduct(p.producto)} ${p.producto}</td>
+                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #1e293b;">${getEmojiForProduct(p.producto)} ${escapeHtml(p.producto)}</td>
                 <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #0284c7;">${formatKilosDisplay(p.kilos)} KG</td>
             `;
             tbody.appendChild(tr);
@@ -3218,11 +3248,11 @@ function initAdminSupportModal() {
         
         const metaDiv = document.getElementById('admin-search-meta');
         metaDiv.innerHTML = `
-            <div><strong>🚛 Conductor:</strong> <span style="text-transform: capitalize;">${rec.conductor || '-'}</span></div>
-            <div><strong>🗺️ Ruta:</strong> <span style="text-transform: capitalize;">${rec.ruta || '-'}</span></div>
-            <div><strong>📅 Fecha/Hora:</strong> ${rec.fecha || '-'}</div>
-            <div><strong>📍 Punto:</strong> ${rec.punto || rec.sucursal || 'General'}</div>
-            ${rec.observaciones ? `<div><strong>📝 Observaciones:</strong> ${rec.observaciones}</div>` : ''}
+            <div><strong>🚛 Conductor:</strong> <span style="text-transform: capitalize;">${escapeHtml(rec.conductor || '-')}</span></div>
+            <div><strong>🗺️ Ruta:</strong> <span style="text-transform: capitalize;">${escapeHtml(rec.ruta || '-')}</span></div>
+            <div><strong>📅 Fecha/Hora:</strong> ${escapeHtml(rec.fecha || '-')}</div>
+            <div><strong>📍 Punto:</strong> ${escapeHtml(rec.punto || rec.sucursal || 'General')}</div>
+            ${rec.observaciones ? `<div><strong>📝 Observaciones:</strong> ${escapeHtml(rec.observaciones)}</div>` : ''}
         `;
 
         const prodsDiv = document.getElementById('admin-search-products-preview');
@@ -3237,13 +3267,13 @@ function initAdminSupportModal() {
                 itemDiv.style.padding = '4px 0';
                 itemDiv.style.borderBottom = '1px dashed #f1f5f9';
                 itemDiv.innerHTML = `
-                    <span>${getEmojiForProduct(p.producto)} <strong>${p.producto}</strong></span>
+                    <span>${getEmojiForProduct(p.producto)} <strong>${escapeHtml(p.producto)}</strong></span>
                     <span style="color: #0284c7; font-weight: 700;">${formatKilosDisplay(p.kilos)} KG</span>
                 `;
                 prodsDiv.appendChild(itemDiv);
             });
         } else {
-            prodsDiv.innerHTML = `<div style="color: #64748b;">Producto: ${rec.producto || 'N/A'} - ${formatKilosDisplay(rec.totalKilos || 0)} KG</div>`;
+            prodsDiv.innerHTML = `<div style="color: #64748b;">Producto: ${escapeHtml(rec.producto || 'N/A')} - ${formatKilosDisplay(rec.totalKilos || 0)} KG</div>`;
         }
 
         document.getElementById('admin-search-total').innerHTML = `⚖️ Total Recolectado: <span style="font-size: 1.25rem;">${formatKilosDisplay(rec.totalKilos)} KG</span>`;
