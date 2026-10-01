@@ -4250,9 +4250,12 @@ async function generarCierreDiarioAdmin() {
     btn.innerHTML = 'Generando...';
 
     try {
-        // Formatear la fecha 'YYYY-MM-DD' a 'DD/MM/YYYY' para buscarla en Google Sheets
-        const [year, month, day] = fechaStr.split('-');
-        const targetDate = `${day}/${month}/${year}`;
+        // Helper para normalizar texto (sin tildes, minúsculas, sin espacios extra)
+        const normTexto = (t) => String(t || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+        // Extraer componentes numéricos de la fecha seleccionada
+        const [targetYear, targetMonth, targetDay] = fechaStr.split('-').map(Number);
+        const rutaHomologadaBuscada = typeof homologarRuta === 'function' ? homologarRuta(rutaStr) : rutaStr;
 
         // 1. Descargar la pestaña Recolecciones directamente de Google Sheets (Fuente de Verdad)
         const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
@@ -4287,19 +4290,34 @@ async function generarCierreDiarioAdmin() {
             const fechaHora = cols[1] || '';
             const ruta = cols[2] || '';
             
-            // Si la fecha coincide exactamente y la ruta es la seleccionada, lo contabilizamos
-            if (fechaHora.startsWith(targetDate) && ruta === rutaStr) {
+            // Comparación de fecha numérica (1/10/2026 coincide con 01/10/2026)
+            const fechaPart = fechaHora.split(' ')[0] || '';
+            const fParts = fechaPart.split('/');
+            let matchFecha = false;
+            if (fParts.length === 3) {
+                const rD = parseInt(fParts[0], 10);
+                const rM = parseInt(fParts[1], 10);
+                const rY = parseInt(fParts[2], 10);
+                matchFecha = (rD === targetDay && rM === targetMonth && rY === targetYear);
+            }
+
+            const matchRuta = (ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(ruta) === rutaHomologadaBuscada));
+            
+            if (matchFecha && matchRuta) {
                 recoleccionesDelDia.push({
                     proveedor: cols[4] || '',
                     sucursal: cols[5] || '',
-                    totalKilos: parseFloat((cols[7] || '0').replace(',', '.')) || 0,
+                    totalKilos: parseFloat(String(cols[7] || '0').replace('.', '').replace(',', '.')) || 0,
                     observaciones: cols[8] || ''
                 });
             }
         }
 
         // 3. Obtener puntos asignados en el catálogo para esta ruta
-        const puntosAsignados = MATRIZ_PUNTOS_RUTAS.filter(p => p.ruta === rutaStr && p.estado.toLowerCase() !== 'inactivo');
+        const puntosAsignados = MATRIZ_PUNTOS_RUTAS.filter(p => 
+            (p.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(p.ruta) === rutaHomologadaBuscada)) && 
+            p.estado.toLowerCase() !== 'inactivo'
+        );
         
         let visitadosExito = 0;
         let visitadosNovedad = 0;
@@ -4311,10 +4329,17 @@ async function generarCierreDiarioAdmin() {
             checklistHTML = '<tr><td colspan="4" style="text-align: center;">No hay puntos asignados a esta ruta.</td></tr>';
         } else {
             puntosAsignados.forEach(puntoInfo => {
-                // Buscar si este punto tiene registros HOY en Google Sheets
-                const registrosVisita = recoleccionesDelDia.filter(r => 
-                    r.proveedor === puntoInfo.proveedor && r.sucursal === puntoInfo.punto
-                );
+                // Buscar si este punto tiene registros HOY en Google Sheets con coincidencia flexible
+                const registrosVisita = recoleccionesDelDia.filter(r => {
+                    const provR = normTexto(r.proveedor);
+                    const provP = normTexto(puntoInfo.proveedor);
+                    const puntR = normTexto(r.sucursal);
+                    const puntP = normTexto(puntoInfo.punto);
+
+                    const matchProv = (provR === provP || provR.includes(provP) || provP.includes(provR));
+                    const matchPunt = (puntR === puntP || puntR.includes(puntP) || puntP.includes(puntR));
+                    return matchProv && matchPunt;
+                });
 
                 let estadoHtml = '';
                 let kilosNovedadStr = '';
