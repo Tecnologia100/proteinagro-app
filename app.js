@@ -4187,3 +4187,201 @@ window.addEventListener('appinstalled', () => {
     console.log('🎉 ProteinAgro instalada con éxito como PWA nativa');
     document.querySelectorAll('#btn-pwa-install, #btn-pwa-install-header').forEach(b => b.style.display = 'none');
 });
+
+
+// ==============================================================================
+// MODULO: CIERRE DIARIO Y EFICIENCIA DE RUTAS (ADMIN)
+// ==============================================================================
+
+function inicializarModuloCierreDiario() {
+    const fechaInput = document.getElementById('cierre-fecha');
+    const rutaSelect = document.getElementById('cierre-ruta');
+    const btnGenerar = document.getElementById('btn-generar-cierre');
+
+    if (!fechaInput || !rutaSelect || !btnGenerar) return;
+
+    // Set today as default
+    const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+    fechaInput.value = localISOTime;
+
+    btnGenerar.addEventListener('click', generarCierreDiarioAdmin);
+}
+
+function actualizarSelectRutasCierre() {
+    const rutaSelect = document.getElementById('cierre-ruta');
+    if (!rutaSelect) return;
+    
+    // Extract unique routes from MATRIZ_PUNTOS_RUTAS
+    const rutasUnicas = [...new Set(MATRIZ_PUNTOS_RUTAS.map(p => p.ruta))].filter(Boolean);
+    rutasUnicas.sort((a, b) => {
+        if (a.toLowerCase().includes('planta') && !b.toLowerCase().includes('planta')) return 1;
+        if (!a.toLowerCase().includes('planta') && b.toLowerCase().includes('planta')) return -1;
+        return a.localeCompare(b);
+    });
+
+    // Guardar selección actual
+    const currentVal = rutaSelect.value;
+    
+    rutaSelect.innerHTML = '<option value="">Seleccione una ruta para evaluar...</option>';
+    rutasUnicas.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r;
+        rutaSelect.appendChild(opt);
+    });
+    
+    if (currentVal && rutasUnicas.includes(currentVal)) {
+        rutaSelect.value = currentVal;
+    }
+}
+
+async function generarCierreDiarioAdmin() {
+    const fechaStr = document.getElementById('cierre-fecha').value;
+    const rutaStr = document.getElementById('cierre-ruta').value;
+
+    if (!fechaStr || !rutaStr) {
+        alert("Por favor seleccione una fecha y una ruta.");
+        return;
+    }
+
+    const btn = document.getElementById('btn-generar-cierre');
+    btn.disabled = true;
+    btn.innerHTML = 'Generando...';
+
+    try {
+        // Parse the target date bounds
+        const [year, month, day] = fechaStr.split('-').map(Number);
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0).getTime();
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59).getTime();
+
+        // Query Firestore for this specific date range
+        // Evitamos usar where('ruta') junto con (>= <=) para no requerir un índice compuesto en Firebase
+        const snapshot = await db.collection('recolecciones')
+            .where('timestamp', '>=', startOfDay)
+            .where('timestamp', '<=', endOfDay)
+            .get();
+
+        const recoleccionesDelDia = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            // Filtramos la ruta localmente para evitar el error de Firebase
+            if (data.ruta === rutaStr) {
+                recoleccionesDelDia.push(data);
+            }
+        });
+
+        // Obtain assigned points for this route
+        const puntosAsignados = MATRIZ_PUNTOS_RUTAS.filter(p => p.ruta === rutaStr && p.estado.toLowerCase() !== 'inactivo');
+        
+        let visitadosExito = 0;
+        let visitadosNovedad = 0;
+        let pendientes = 0;
+        let kilosTotalesRuta = 0;
+        let checklistHTML = '';
+
+        if (puntosAsignados.length === 0) {
+            checklistHTML = '<tr><td colspan="4" style="text-align: center;">No hay puntos asignados a esta ruta.</td></tr>';
+        } else {
+            puntosAsignados.forEach(puntoInfo => {
+                // Find if the driver visited this point today
+                // Match by exact Proveedor and Punto/Sucursal
+                const registrosVisita = recoleccionesDelDia.filter(r => 
+                    r.proveedor === puntoInfo.proveedor && r.sucursal === puntoInfo.punto
+                );
+
+                let estadoHtml = '';
+                let kilosNovedadStr = '';
+                let bgColor = '';
+
+                if (registrosVisita.length > 0) {
+                    // Check if it was a Novedad (0 Kg and starts with Visita Fallida)
+                    // Or if there was at least one successful collection
+                    let esNovedad = true;
+                    let kilosPunto = 0;
+                    let novedadStr = '';
+
+                    registrosVisita.forEach(r => {
+                        const ks = Number(r.totalKilos) || 0;
+                        if (ks > 0) {
+                            esNovedad = false;
+                            kilosPunto += ks;
+                        }
+                        if (ks === 0 && r.observaciones) {
+                            novedadStr = r.observaciones;
+                        }
+                    });
+
+                    if (!esNovedad) {
+                        visitadosExito++;
+                        kilosTotalesRuta += kilosPunto;
+                        estadoHtml = '<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">✅ ÉXITO</span>';
+                        kilosNovedadStr = `<strong>${formatKilosDisplay(kilosPunto)} kg</strong>`;
+                    } else {
+                        visitadosNovedad++;
+                        estadoHtml = '<span style="background:#fef9c3; color:#854d0e; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">⚠️ NOVEDAD</span>';
+                        kilosNovedadStr = `<span style="color:#854d0e; font-size:13px;">${novedadStr || 'Visita Fallida (0 kg)'}</span>`;
+                        bgColor = 'background-color: #fefce8;';
+                    }
+                } else {
+                    pendientes++;
+                    estadoHtml = '<span style="background:#fee2e2; color:#991b1b; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">❌ PENDIENTE</span>';
+                    kilosNovedadStr = '<span style="color:#94a3b8; font-size:13px;">Sin visita registrada</span>';
+                    bgColor = 'background-color: #fff1f2;';
+                }
+
+                checklistHTML += `<tr style="${bgColor}">
+                    <td>${estadoHtml}</td>
+                    <td style="font-weight: 600;">${puntoInfo.proveedor}</td>
+                    <td>${puntoInfo.punto}</td>
+                    <td>${kilosNovedadStr}</td>
+                </tr>`;
+            });
+        }
+
+        const totalPuntos = puntosAsignados.length;
+        const totalCubiertos = visitadosExito + visitadosNovedad;
+        const porcentaje = totalPuntos > 0 ? Math.round((totalCubiertos / totalPuntos) * 100) : 0;
+
+        // Render UI
+        document.getElementById('cierre-resultados').style.display = 'block';
+        document.getElementById('cierre-porcentaje').textContent = porcentaje + '%';
+        
+        const progressBar = document.getElementById('cierre-progress-bar');
+        progressBar.style.width = porcentaje + '%';
+        if (porcentaje === 100) {
+            progressBar.style.backgroundColor = '#10b981'; // Green
+            document.getElementById('cierre-porcentaje').style.color = '#10b981';
+        } else if (porcentaje >= 80) {
+            progressBar.style.backgroundColor = '#f59e0b'; // Yellow/Orange
+            document.getElementById('cierre-porcentaje').style.color = '#f59e0b';
+        } else {
+            progressBar.style.backgroundColor = '#ef4444'; // Red
+            document.getElementById('cierre-porcentaje').style.color = '#ef4444';
+        }
+
+        document.getElementById('cierre-kilos-totales').textContent = formatKilosDisplay(kilosTotalesRuta) + ' kg';
+        document.getElementById('cierre-total-puntos').textContent = `${totalCubiertos} / ${totalPuntos}`;
+        document.getElementById('cierre-checklist-body').innerHTML = checklistHTML;
+
+    } catch (error) {
+        console.error("Error al generar cierre diario:", error);
+        alert("Ocurrió un error al consultar los datos. Verifique su conexión.");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Generar Cierre';
+    }
+}
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', () => {
+    inicializarModuloCierreDiario();
+    setTimeout(actualizarSelectRutasCierre, 2000); 
+});
+
+// Interceptar procesarPuntosRutasDinamicos para recargar el select cuando lleguen de Sheets
+const _original_procesarPuntosRutasDinamicos_cierre = procesarPuntosRutasDinamicos;
+procesarPuntosRutasDinamicos = function(puntosArray) {
+    _original_procesarPuntosRutasDinamicos_cierre(puntosArray);
+    actualizarSelectRutasCierre();
+};
