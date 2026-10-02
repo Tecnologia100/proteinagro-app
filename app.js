@@ -497,8 +497,12 @@ let collectedProducts = [];
 function formatKilosDisplay(number) {
     if (number === null || number === undefined || isNaN(number)) return "0";
     const num = Number(number);
-    return num.toLocaleString('es-CO', {
-        minimumFractionDigits: (num % 1 !== 0) ? (String(num).split('.')[1]?.length || 1) : 0,
+    // Redondear a 2 decimales para evitar artefactos de punto flotante de JavaScript (ej. 81.60000000000001)
+    const rounded = Math.round(num * 100) / 100;
+    const hasDecimals = (rounded % 1 !== 0);
+    const decCount = hasDecimals ? Math.min(2, Math.max(1, (String(rounded).split('.')[1]?.length || 0))) : 0;
+    return rounded.toLocaleString('es-CO', {
+        minimumFractionDigits: decCount,
         maximumFractionDigits: 2
     });
 }
@@ -3109,7 +3113,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.3&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.4&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -4117,12 +4121,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.6.3 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.6.4 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.6.3')
+            navigator.serviceWorker.register('/sw.js?v=1.6.4')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.6.3 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.6.4 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -4130,8 +4134,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.6.3 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.3&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.6.4 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.4&t=' + Date.now();
                                 }
                             };
                         }
@@ -4160,7 +4164,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.6.3&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.6.4&t=' + Date.now();
             }
         });
 
@@ -4169,7 +4173,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.3&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.4&t=' + Date.now();
                 }
             }
         });

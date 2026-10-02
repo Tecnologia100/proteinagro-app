@@ -1,5 +1,5 @@
 # 📘 Manual de Usuario: Módulo de Cierre Diario y Auditoría de Rutas
-**ProteinAgro S.A.S. — Versión del Sistema:** `v1.6.3`  
+**ProteinAgro S.A.S. — Versión del Sistema:** `v1.6.4`  
 **Destinatarios:** Administración, Coordinación Logística y Gerencia de Operaciones
 
 ---
