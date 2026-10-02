@@ -544,7 +544,28 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
     - `Rojo (< 80%)`: Incumplimiento crítico de la ruta.
   - **Consolidado de Kilos:** Muestra en tiempo real la sumatoria de todos los kilogramos recolectados en esa ruta específica durante la jornada.
 
+## 🛡️ 12. Sistema Inteligente de Re-sincronización y Blindaje Anti-Duplicados Integral (`v1.6.2`)
+> **Fecha de Implementación:** 02 de Octubre de 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`Code.gs`](./Code.gs)  
+> **Objetivo:** Erradicar la duplicación accidental de recolecciones y visitas fallidas en Google Sheets al usar el botón "🔄 Re-sincronizar Sheets", garantizando que únicamente viajen registros verdaderamente pendientes y que el servidor rechace cualquier duplicidad histórica.
+
+- **Diagnóstico del Problema Previo:**
+  1. **Envío Ciego en la App Móvil/Web:** El botón `resincronizarTodoAGoogleSheets()` tomaba todos los elementos alojados en `localStorage.recolecciones_backup` (por ejemplo, 6 registros) y los re-enviaba en bucle a Google Sheets, sin validar previamente si ya estaban marcados como `sync_sheets === true` o `Sincronizado`.
+  2. **Ventana Ciega de Detección en Apps Script:** En `Code.gs`, la función `guardarRecoleccionSheet()` únicamente examinaba las últimas 200 filas (`lastRowData - 200`). Al tener la base contable más de 2.000 filas y fórmulas de matriz `ARRAYFORMULA`, los registros anteriores quedaban fuera del rango de comprobación y se insertaban nuevamente, activando el semáforo `🚨 DUPLICADO` en la hoja de cálculo.
+
+- **Solución Dual Implementada:**
+  1. **Filtro Inteligente de Pendientes en Cliente ([`app.js`](./app.js)):**
+     - La función inspecciona `recolecciones_backup` y filtra estrictamente los registros con `!item.sync_sheets` o `estado === 'Offline'`.
+     - **Si 0 registros están pendientes:** Informa inmediatamente con alerta preventiva: *"✅ Todos los registros respaldados localmente ya están sincronizados con Google Sheets. Para evitar generar filas duplicadas, no es necesario volver a enviarlos"*, cancelando el envío redundante.
+     - **Si existen registros pendientes (ej. 1 de 6):** Notifica con precisión: *"Se detectaron 1 registro(s) pendiente(s) de sincronizar (de 6 en total)"* y transmite **exclusivamente** los registros pendientes.
+     - Al confirmar el webhook, actualiza `sync_sheets = true`, `sync_sheets_at = Date.now()` y `estado = 'Sincronizado'`.
+  2. **Blindaje de Escaneo Total en Servidor ([`Code.gs`](./Code.gs) v1.4.2):**
+     - Se eliminó la ventana restrictiva de 200 filas. Ahora lee y mapea en memoria Columna A (`ID_Recoleccion`) y Columna G (`Materia_Producto`) desde la fila 2 hasta la última fila con datos de `Recolecciones`.
+     - Valida `existingRecordsMap[id + '|' + producto]` para materias primas y `existingIdsMap[id]` para novedades (`NOV-`).
+     - Si un registro ya existe en Google Sheets, el servidor lo omite en el acto (`Logger.log`), retornando confirmación exitosa sin agregar filas duplicadas a la contabilidad.
+
 ---
 
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
+
 

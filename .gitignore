@@ -6,3 +6,6 @@
 *.jpeg
 app-recolecciones/
 *.zip
+__pycache__/
+PROTEINAGRO_Backup_*/
+*.csv
