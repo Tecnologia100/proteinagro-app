@@ -210,7 +210,7 @@ function doGet(e) {
     }
 
     var output = {
-      version: "1.4.1-nombre-propio",
+      version: "1.4.2-anti-duplicados",
       productos: productos,
       conductores: conductores,
       conductores_detalle: conductoresDetalle,
@@ -267,16 +267,21 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     
     var lastRowData = sheet.getLastRow();
     var existingRecordsMap = {};
+    var existingIdsMap = {};
 
     if (lastRowData > 1) {
-      var startCheckRow = Math.max(2, lastRowData - 200);
-      var numRowsToCheck = lastRowData - startCheckRow + 1;
-      var existingData = sheet.getRange(startCheckRow, 1, numRowsToCheck, Math.min(sheet.getLastColumn(), 7)).getValues();
-      for (var ex = 0; ex < existingData.length; ex++) {
-        var exId = String(existingData[ex][0] || '').trim();
-        var exProd = String(existingData[ex][6] || '').trim();
-        if (exId && exProd) {
-          existingRecordsMap[exId + '|' + exProd.toLowerCase()] = true;
+      // Escaneo integral de TODA la hoja Recolecciones (sin límite ciego de 200 filas)
+      var numRows = lastRowData - 1;
+      var idColValues = sheet.getRange(2, 1, numRows, 1).getValues();
+      var prodColValues = sheet.getRange(2, 7, numRows, 1).getValues();
+      for (var ex = 0; ex < numRows; ex++) {
+        var exId = String(idColValues[ex][0] || '').trim();
+        var exProd = String(prodColValues[ex][0] || '').trim().toLowerCase();
+        if (exId) {
+          existingIdsMap[exId] = true;
+          if (exProd) {
+            existingRecordsMap[exId + '|' + exProd] = true;
+          }
         }
       }
     }
@@ -314,8 +319,14 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         continue;
       }
 
-      // Evitar duplicados por ID + Producto
-      if (id && prodNombre && existingRecordsMap[id + '|' + String(prodNombre).trim().toLowerCase()]) {
+      // Evitar duplicados por ID + Producto o ID de Novedad
+      var prodKey = id + '|' + String(prodNombre).trim().toLowerCase();
+      if (id && prodNombre && existingRecordsMap[prodKey]) {
+        Logger.log("Registro duplicado omitido por ID + Producto: " + prodKey);
+        continue;
+      }
+      if (esNovedad && id && existingIdsMap[id]) {
+        Logger.log("Novedad duplicada omitida por ID: " + id);
         continue;
       }
 
@@ -340,6 +351,8 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         id, fecha, rutaFinal, conductorFinal, proveedorFinal, puntoFinal,
         prodNombreFinal, prodKilos, observacionesFinal, ubicacionGps, precio, valor
       ]]);
+      existingRecordsMap[prodKey] = true;
+      existingIdsMap[id] = true;
     }
 
     return ContentService.createTextOutput(JSON.stringify({"result": "success", "message": "Guardado exitosamente"}))

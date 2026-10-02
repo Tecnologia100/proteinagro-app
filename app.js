@@ -2159,19 +2159,45 @@ async function resincronizarTodoAGoogleSheets() {
         return;
     }
 
-    const confirmar = confirm(`¿Desea re-enviar los ${backupList.length} registros respaldados localmente a Google Sheets?\n(El sistema previene duplicados automáticamente)`);
-    if (!confirmar) return;
+    // 1. Identificar registros que realmente están pendientes de sincronizar
+    const pendingIndices = [];
+    backupList.forEach((item, idx) => {
+        const isSynced = (item.sync_sheets === true) || (item.estado === 'Sincronizado' && item.sync_sheets !== false);
+        if (!isSynced) {
+            pendingIndices.push(idx);
+        }
+    });
+
+    let indicesAEnviar = [];
+
+    if (pendingIndices.length === 0) {
+        // Todos los registros ya están sincronizados
+        const forzar = confirm(`✅ Todos los ${backupList.length} registros respaldados localmente ya están sincronizados con Google Sheets.\n\nPara evitar generar filas duplicadas en el archivo de Sheets, no es necesario volver a enviarlos.\n\n¿Desea FORZAR el re-envío de todos modos? (Seleccione Cancelar para mantener la base de datos limpia)`);
+        if (!forzar) return;
+        // Si el usuario fuerza conscientemente:
+        for (let i = 0; i < backupList.length; i++) {
+            indicesAEnviar.push(i);
+        }
+    } else {
+        const confirmar = confirm(`Se detectaron ${pendingIndices.length} registro(s) pendiente(s) de sincronizar (de un total de ${backupList.length} guardados localmente).\n\n¿Desea enviar los registros pendientes a Google Sheets ahora?`);
+        if (!confirmar) return;
+        indicesAEnviar = pendingIndices;
+    }
 
     let enviados = 0;
-    for (let i = 0; i < backupList.length; i++) {
-        const item = backupList[i];
+    for (const idx of indicesAEnviar) {
+        const item = backupList[idx];
+        if (!navigator.onLine) {
+            alert("⚠️ Se perdió la conexión a Internet durante la sincronización.");
+            break;
+        }
         try {
             const ok = await enviarAGoogleSheets(item);
             if (ok) {
-                backupList[i].sync_sheets = true;
-                backupList[i].sync_sheets_at = Date.now();
-                if (backupList[i].estado === 'Offline') {
-                    backupList[i].estado = 'Sincronizado';
+                backupList[idx].sync_sheets = true;
+                backupList[idx].sync_sheets_at = Date.now();
+                if (backupList[idx].estado === 'Offline') {
+                    backupList[idx].estado = (backupList[idx].tipo === 'Novedad' || String(backupList[idx].id || '').startsWith('NOV-')) ? 'Visita Fallida' : 'Sincronizado';
                 }
                 enviados++;
             }
@@ -2183,7 +2209,7 @@ async function resincronizarTodoAGoogleSheets() {
     try {
         localStorage.setItem('recolecciones_backup', JSON.stringify(backupList));
     } catch(e) {}
-    alert(`✅ Se han re-enviado ${enviados} registros a Google Sheets exitosamente.`);
+    alert(`✅ Se sincronizaron ${enviados} registro(s) con Google Sheets exitosamente.`);
 }
 window.resincronizarTodoAGoogleSheets = resincronizarTodoAGoogleSheets;
 
