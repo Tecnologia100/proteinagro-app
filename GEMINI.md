@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.6.2)  
+> **Última Actualización:** Octubre 2026 (Versión 1.6.3)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -26,8 +26,13 @@
 - **Regla en Servidor (`Code.gs`):** `guardarRecoleccionSheet` debe escanear **TODA** la hoja `Recolecciones` (desde la fila 2 hasta la última fila real con datos) indexando `id` y `id + '|' + producto`. Jamás restringir la búsqueda a ventanas fijas (ej. últimas 200 filas), ya que las fórmulas `ARRAYFORMULA` extienden el conteo de filas de la hoja. Si un ID o par ID/Producto ya existe, debe omitirse silenciosamente (`Logger.log`) y no insertar filas duplicadas.
 - **Semáforo en Hoja:** Columnas M (`ID_Clave`) y N (`Alerta`) evalúan duplicados históricos con `COUNTIF > 1` (`🚨 DUPLICADO` / `✅ OK`).
 
-### 2. Módulo de Cierre Diario y Cobertura de Rutas (`v1.6.0`)
-- Consulta en vivo mediante **Gviz CSV** (`tqx=out:csv`) a la hoja `Recolecciones`.
+### 2. Módulo de Cierre Diario y Cobertura de Rutas (`v1.6.3`)
+- **Arquitectura de Auditoría en 4 Capas Anti-Fallo:**
+  1. *Capa 1 (Google Sheets GViz CSV):* Consulta directa en vivo. En `sw.js`, `docs.google.com` está explícitamente excluido del interceptor para evitar errores 503 o bloqueos de caché.
+  2. *Capa 2 (Webhook Google Apps Script):* Acción `action=getRecolecciones&fecha=...` en `Code.gs` para eludir 100% ad-blockers, extensiones de privacidad o bloqueos CORS de Google Visualization.
+  3. *Capa 3 (Firebase Firestore):* Consulta directa a la colección `recolecciones` en la nube si Google Sheets no responde.
+  4. *Capa 4 (LocalStorage Offline):* Consulta a `recolecciones_backup` en memoria del dispositivo si no hay red disponible.
+- **Badge Semafórico de Fuente:** La interfaz muestra en tiempo real la procedencia de los datos auditados (`Google Sheets (En Vivo)`, `Google Sheets (Webhook)`, `Firestore (Nube)`, `Memoria Local (Offline)`).
 - **Normalización de Fechas:** Estricta sin ceros a la izquierda (ej. `1/10/2026` vs `01/10/2026`), convirtiendo siempre a `D/M/YYYY` numérico.
 - **Tolerancia a Diacríticos:** Comparación de nombres de proveedores y sucursales insensible a tildes (ej. *Cañaveral*, *Martínez*, *Villagorgona*) para evitar discrepancias con la hoja `Puntos_Rutas`.
 - **Estados Semafóricos del Checklist:**

@@ -19,6 +19,11 @@ function doGet(e) {
       return guardarRecoleccionSheet(ss, e.parameter.payload);
     }
 
+    // 0.03 Obtener recolecciones para Cierre Diario y Auditoría (Garantía anti-fallo para GViz)
+    if (e && e.parameter && e.parameter.action === 'getRecolecciones') {
+      return obtenerRecoleccionesHttp(ss, e.parameter.fecha, e.parameter.ruta);
+    }
+
     // 0.04 Si viene una petición de eliminación por ID
     if (e && e.parameter && e.parameter.action === 'deleteRecoleccion' && e.parameter.id) {
       return eliminarRecoleccionSheet(ss, e.parameter.id);
@@ -224,6 +229,111 @@ function doGet(e) {
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ error: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// Función de consulta directa para Cierre Diario y Auditoría (Respaldo 100% anti-fallo para GViz)
+function obtenerRecoleccionesHttp(ss, fechaFiltro, rutaFiltro) {
+  try {
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet || sheet.getLastRow() <= 1) {
+      return ContentService.createTextOutput(JSON.stringify({
+        result: 'success',
+        recolecciones: []
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var lastRow = sheet.getLastRow();
+    // Leer columnas A hasta I (ID, Fecha_Hora, Ruta, Conductor, Proveedor, Punto, Materia, Kg, Observaciones)
+    var numCols = Math.min(sheet.getLastColumn(), 9);
+    var data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
+    var resultado = [];
+
+    // Si viene fechaFiltro en formato YYYY-MM-DD
+    var targetD = null, targetM = null, targetY = null;
+    if (fechaFiltro) {
+      var fParts = String(fechaFiltro).trim().split('-');
+      if (fParts.length === 3) {
+        targetY = parseInt(fParts[0], 10);
+        targetM = parseInt(fParts[1], 10);
+        targetD = parseInt(fParts[2], 10);
+      }
+    }
+
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var rawFecha = row[1];
+      var rowRuta = String(row[2] || '').trim();
+
+      // Parsear fecha
+      var rD = null, rM = null, rY = null;
+      if (rawFecha instanceof Date) {
+        rD = rawFecha.getDate();
+        rM = rawFecha.getMonth() + 1;
+        rY = rawFecha.getFullYear();
+      } else if (rawFecha) {
+        var strF = String(rawFecha).trim().split(' ')[0] || '';
+        if (strF.indexOf('/') !== -1) {
+          var p = strF.split('/');
+          if (p.length === 3) {
+            rD = parseInt(p[0], 10);
+            rM = parseInt(p[1], 10);
+            rY = parseInt(p[2], 10);
+          }
+        } else if (strF.indexOf('-') !== -1) {
+          var p = strF.split('-');
+          if (p.length === 3) {
+            if (p[0].length === 4) {
+              rY = parseInt(p[0], 10);
+              rM = parseInt(p[1], 10);
+              rD = parseInt(p[2], 10);
+            } else {
+              rD = parseInt(p[0], 10);
+              rM = parseInt(p[1], 10);
+              rY = parseInt(p[2], 10);
+            }
+          }
+        }
+      }
+
+      if (targetD !== null && targetM !== null && targetY !== null) {
+        if (rD !== targetD || rM !== targetM || rY !== targetY) {
+          continue;
+        }
+      }
+
+      var rawKg = row[7];
+      var numKg = 0;
+      if (typeof rawKg === 'number') {
+        numKg = rawKg;
+      } else if (rawKg) {
+        numKg = parseFloat(String(rawKg).replace(/\./g, '').replace(',', '.')) || 0;
+      }
+
+      resultado.push({
+        id: String(row[0] || ''),
+        fechaHora: rawFecha instanceof Date ? Utilities.formatDate(rawFecha, "GMT-5", "d/M/yyyy HH:mm:ss") : String(rawFecha || ''),
+        ruta: rowRuta,
+        conductor: String(row[3] || ''),
+        proveedor: String(row[4] || ''),
+        sucursal: String(row[5] || ''),
+        materia: String(row[6] || ''),
+        totalKilos: numKg,
+        observaciones: String(row[8] || '')
+      });
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      result: 'success',
+      total: resultado.length,
+      recolecciones: resultado
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      result: 'error',
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 

@@ -4265,6 +4265,13 @@ function actualizarSelectRutasCierre() {
 async function generarCierreDiarioAdmin() {
     const fechaStr = document.getElementById('cierre-fecha').value;
     const rutaStr = document.getElementById('cierre-ruta').value;
+    const alertaInfo = document.getElementById('cierre-alerta-info');
+    const badgeFuente = document.getElementById('cierre-fuente-badge');
+
+    if (alertaInfo) {
+        alertaInfo.style.display = 'none';
+        alertaInfo.innerHTML = '';
+    }
 
     if (!fechaStr || !rutaStr) {
         alert("Por favor seleccione una fecha y una ruta.");
@@ -4273,76 +4280,221 @@ async function generarCierreDiarioAdmin() {
 
     const btn = document.getElementById('btn-generar-cierre');
     btn.disabled = true;
-    btn.innerHTML = 'Generando...';
+    btn.innerHTML = 'Auditando...';
 
     try {
         // Helper para normalizar texto (sin tildes, minúsculas, sin espacios extra)
         const normTexto = (t) => String(t || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-        // Extraer componentes numéricos de la fecha seleccionada
+        // Extraer componentes numéricos de la fecha seleccionada (YYYY-MM-DD)
         const [targetYear, targetMonth, targetDay] = fechaStr.split('-').map(Number);
         const rutaHomologadaBuscada = typeof homologarRuta === 'function' ? homologarRuta(rutaStr) : rutaStr;
 
-        // 1. Descargar la pestaña Recolecciones directamente de Google Sheets (Fuente de Verdad)
-        const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
-        const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Recolecciones&t=${Date.now()}`;
-        
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("No se pudo conectar con Google Sheets.");
-        const csvText = await res.text();
+        let recoleccionesDelDia = [];
+        let fuenteDatos = '';
+        let badgeColor = { bg: '#dcfce7', text: '#166534' };
 
-        // 2. Parseador CSV robusto (para leer comas dentro de textos)
-        const parseCSVRow = (row) => {
-            const result = [];
-            let insideQuote = false, currentWord = '';
-            for (let i = 0; i < row.length; i++) {
-                const char = row[i];
-                if (char === '"' && row[i+1] === '"') { currentWord += '"'; i++; } 
-                else if (char === '"') { insideQuote = !insideQuote; } 
-                else if (char === ',' && !insideQuote) { result.push(currentWord); currentWord = ''; } 
-                else { currentWord += char; }
+        // Helper para parsear y verificar si una fecha coincide con el día objetivo
+        const coincideFecha = (rawFechaStr) => {
+            if (!rawFechaStr) return false;
+            const strF = String(rawFechaStr).trim().split(' ')[0] || '';
+            if (strF.includes('/')) {
+                const parts = strF.split('/');
+                if (parts.length === 3) {
+                    const rD = parseInt(parts[0], 10);
+                    const rM = parseInt(parts[1], 10);
+                    const rY = parseInt(parts[2], 10);
+                    return (rD === targetDay && rM === targetMonth && rY === targetYear);
+                }
+            } else if (strF.includes('-')) {
+                const parts = strF.split('-');
+                if (parts.length === 3) {
+                    if (parts[0].length === 4) {
+                        return (parseInt(parts[0], 10) === targetYear && parseInt(parts[1], 10) === targetMonth && parseInt(parts[2], 10) === targetDay);
+                    } else {
+                        return (parseInt(parts[0], 10) === targetDay && parseInt(parts[1], 10) === targetMonth && parseInt(parts[2], 10) === targetYear);
+                    }
+                }
             }
-            result.push(currentWord);
-            return result;
+            return false;
         };
 
-        const rows = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
-        const recoleccionesDelDia = [];
-        
-        for (let i = 1; i < rows.length; i++) {
-            const cols = parseCSVRow(rows[i]);
-            // Columnas de Google Sheets Recolecciones:
-            // 0:ID, 1:Fecha_Hora, 2:Ruta, 3:Conductor, 4:Proveedor, 5:Punto, 6:Materia, 7:Kg, 8:Observaciones
-            const fechaHora = cols[1] || '';
-            const ruta = cols[2] || '';
+        // =========================================================================
+        // CAPA 1: Intento directo vía Google Sheets GViz CSV
+        // =========================================================================
+        try {
+            const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+            const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Recolecciones&t=${Date.now()}`;
             
-            // Comparación de fecha numérica (1/10/2026 coincide con 01/10/2026)
-            const fechaPart = fechaHora.split(' ')[0] || '';
-            const fParts = fechaPart.split('/');
-            let matchFecha = false;
-            if (fParts.length === 3) {
-                const rD = parseInt(fParts[0], 10);
-                const rM = parseInt(fParts[1], 10);
-                const rY = parseInt(fParts[2], 10);
-                matchFecha = (rD === targetDay && rM === targetMonth && rY === targetYear);
-            }
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 7000);
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
 
-            const matchRuta = (ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(ruta) === rutaHomologadaBuscada));
-            
-            if (matchFecha && matchRuta) {
-                recoleccionesDelDia.push({
-                    proveedor: cols[4] || '',
-                    sucursal: cols[5] || '',
-                    totalKilos: parseFloat(String(cols[7] || '0').replace('.', '').replace(',', '.')) || 0,
-                    observaciones: cols[8] || ''
-                });
+            if (res.ok) {
+                const csvText = await res.text();
+                // Validar que no sea página de error HTML o redirección
+                if (csvText && !csvText.trim().startsWith('<!DOCTYPE') && !csvText.trim().startsWith('<html')) {
+                    const parseCSVRow = (row) => {
+                        const result = [];
+                        let insideQuote = false, currentWord = '';
+                        for (let i = 0; i < row.length; i++) {
+                            const char = row[i];
+                            if (char === '"' && row[i+1] === '"') { currentWord += '"'; i++; } 
+                            else if (char === '"') { insideQuote = !insideQuote; } 
+                            else if (char === ',' && !insideQuote) { result.push(currentWord); currentWord = ''; } 
+                            else { currentWord += char; }
+                        }
+                        result.push(currentWord);
+                        return result;
+                    };
+
+                    const rows = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
+                    for (let i = 1; i < rows.length; i++) {
+                        const cols = parseCSVRow(rows[i]);
+                        const fechaHora = cols[1] || '';
+                        const ruta = cols[2] || '';
+                        
+                        const matchFecha = coincideFecha(fechaHora);
+                        const matchRuta = (ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(ruta) === rutaHomologadaBuscada));
+                        
+                        if (matchFecha && matchRuta) {
+                            recoleccionesDelDia.push({
+                                proveedor: cols[4] || '',
+                                sucursal: cols[5] || '',
+                                totalKilos: parseKilosFloat(cols[7] || '0'),
+                                observaciones: cols[8] || ''
+                            });
+                        }
+                    }
+                    fuenteDatos = 'Google Sheets (En Vivo)';
+                    badgeColor = { bg: '#dcfce7', text: '#166534' };
+                    console.log("✅ Cierre auditado exitosamente vía Google Sheets GViz:", recoleccionesDelDia.length);
+                }
             }
+        } catch (eGviz) {
+            console.warn("⚠️ GViz CSV no disponible o bloqueado por navegador/adblocker, activando fallback Apps Script...", eGviz);
+        }
+
+        // =========================================================================
+        // CAPA 2: Fallback vía Webhook Apps Script (Immune a AdBlockers y CORS)
+        // =========================================================================
+        if (fuenteDatos === '' && GOOGLE_SHEETS_WEBHOOK_URL) {
+            try {
+                const webhookUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=getRecolecciones&fecha=${fechaStr}&t=${Date.now()}`;
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
+                const resW = await fetch(webhookUrl, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (resW.ok) {
+                    const jsonRes = await resW.json();
+                    if (jsonRes && jsonRes.result === 'success' && Array.isArray(jsonRes.recolecciones)) {
+                        jsonRes.recolecciones.forEach(r => {
+                            const matchRuta = (r.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(r.ruta) === rutaHomologadaBuscada));
+                            if (matchRuta) {
+                                recoleccionesDelDia.push({
+                                    proveedor: r.proveedor || '',
+                                    sucursal: r.sucursal || '',
+                                    totalKilos: typeof r.totalKilos === 'number' ? r.totalKilos : parseKilosFloat(r.totalKilos),
+                                    observaciones: r.observaciones || ''
+                                });
+                            }
+                        });
+                        fuenteDatos = 'Google Sheets (Webhook)';
+                        badgeColor = { bg: '#dbeafe', text: '#1e40af' };
+                        console.log("✅ Cierre auditado exitosamente vía Apps Script Webhook:", recoleccionesDelDia.length);
+                    }
+                }
+            } catch (eWebhook) {
+                console.warn("⚠️ Webhook Apps Script no respondió, activando fallback Firestore...", eWebhook);
+            }
+        }
+
+        // =========================================================================
+        // CAPA 3: Fallback vía Firebase Firestore (Persistencia en la Nube en Tiempo Real)
+        // =========================================================================
+        if (fuenteDatos === '' && typeof db !== 'undefined') {
+            try {
+                const snapshot = await db.collection('recolecciones').get();
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (!data) return;
+                    
+                    const matchFecha = coincideFecha(data.fecha || '');
+                    const matchRuta = (data.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(data.ruta) === rutaHomologadaBuscada));
+
+                    if (matchFecha && matchRuta) {
+                        recoleccionesDelDia.push({
+                            proveedor: data.proveedor || '',
+                            sucursal: data.sucursal || '',
+                            totalKilos: typeof data.totalKilos === 'number' ? data.totalKilos : parseKilosFloat(data.totalKilos),
+                            observaciones: data.observaciones || ''
+                        });
+                    }
+                });
+                fuenteDatos = 'Firestore (Nube)';
+                badgeColor = { bg: '#f3e8ff', text: '#6b21a8' };
+                console.log("✅ Cierre auditado exitosamente vía Firebase Firestore:", recoleccionesDelDia.length);
+            } catch (eFs) {
+                console.warn("⚠️ Firestore no disponible, activando fallback memoria local...", eFs);
+            }
+        }
+
+        // =========================================================================
+        // CAPA 4: Fallback de Seguridad Local (LocalStorage Offline)
+        // =========================================================================
+        if (fuenteDatos === '') {
+            try {
+                const localBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+                localBackup.forEach(data => {
+                    if (!data) return;
+                    const matchFecha = coincideFecha(data.fecha || '');
+                    const matchRuta = (data.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(data.ruta) === rutaHomologadaBuscada));
+
+                    if (matchFecha && matchRuta) {
+                        recoleccionesDelDia.push({
+                            proveedor: data.proveedor || '',
+                            sucursal: data.sucursal || '',
+                            totalKilos: typeof data.totalKilos === 'number' ? data.totalKilos : parseKilosFloat(data.totalKilos),
+                            observaciones: data.observaciones || ''
+                        });
+                    }
+                });
+                fuenteDatos = 'Memoria Local (Offline)';
+                badgeColor = { bg: '#fef3c7', text: '#92400e' };
+                console.log("✅ Cierre auditado desde memoria local:", recoleccionesDelDia.length);
+            } catch (eLoc) {
+                console.warn("⚠️ Error leyendo LocalStorage:", eLoc);
+            }
+        }
+
+        // Si fallaron absolutamente todas las fuentes (sin conexión y sin datos locales)
+        if (!fuenteDatos) {
+            if (alertaInfo) {
+                alertaInfo.style.display = 'block';
+                alertaInfo.style.backgroundColor = '#fee2e2';
+                alertaInfo.style.color = '#991b1b';
+                alertaInfo.style.border = '1px solid #f87171';
+                alertaInfo.innerHTML = '⚠️ No se pudo conectar con Google Sheets ni con la base en la nube. Verifique su conexión a internet.';
+            } else {
+                alert("No se pudo conectar con Google Sheets ni con la base en la nube. Verifique su conexión a internet.");
+            }
+            return;
+        }
+
+        // Actualizar badge de origen de auditoría
+        if (badgeFuente) {
+            badgeFuente.textContent = fuenteDatos;
+            badgeFuente.style.backgroundColor = badgeColor.bg;
+            badgeFuente.style.color = badgeColor.text;
         }
 
         // 3. Obtener puntos asignados en el catálogo para esta ruta
         const puntosAsignados = MATRIZ_PUNTOS_RUTAS.filter(p => 
+            p &&
             (p.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(p.ruta) === rutaHomologadaBuscada)) && 
-            p.estado.toLowerCase() !== 'inactivo'
+            (p.estado || 'Activo').toLowerCase() !== 'inactivo'
         );
         
         let visitadosExito = 0;
@@ -4352,10 +4504,10 @@ async function generarCierreDiarioAdmin() {
         let checklistHTML = '';
 
         if (puntosAsignados.length === 0) {
-            checklistHTML = '<tr><td colspan="4" style="text-align: center;">No hay puntos asignados a esta ruta.</td></tr>';
+            checklistHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #64748b;">No hay puntos de recolección asignados a esta ruta en el catálogo.</td></tr>';
         } else {
             puntosAsignados.forEach(puntoInfo => {
-                // Buscar si este punto tiene registros HOY en Google Sheets con coincidencia flexible
+                // Buscar si este punto tiene registros HOY con coincidencia flexible
                 const registrosVisita = recoleccionesDelDia.filter(r => {
                     const provR = normTexto(r.proveedor);
                     const provP = normTexto(puntoInfo.proveedor);
@@ -4407,8 +4559,8 @@ async function generarCierreDiarioAdmin() {
 
                 checklistHTML += `<tr style="${bgColor}">
                     <td>${estadoHtml}</td>
-                    <td style="font-weight: 600;">${puntoInfo.proveedor}</td>
-                    <td>${puntoInfo.punto}</td>
+                    <td style="font-weight: 600;">${puntoInfo.proveedor || 'Sin proveedor'}</td>
+                    <td>${puntoInfo.punto || 'Sin punto'}</td>
                     <td>${kilosNovedadStr}</td>
                 </tr>`;
             });
@@ -4425,13 +4577,13 @@ async function generarCierreDiarioAdmin() {
         const progressBar = document.getElementById('cierre-progress-bar');
         progressBar.style.width = porcentaje + '%';
         if (porcentaje === 100) {
-            progressBar.style.backgroundColor = '#10b981'; // Green
+            progressBar.style.backgroundColor = '#10b981'; // Verde
             document.getElementById('cierre-porcentaje').style.color = '#10b981';
         } else if (porcentaje >= 80) {
-            progressBar.style.backgroundColor = '#f59e0b'; // Yellow/Orange
+            progressBar.style.backgroundColor = '#f59e0b'; // Amarillo/Naranja
             document.getElementById('cierre-porcentaje').style.color = '#f59e0b';
         } else {
-            progressBar.style.backgroundColor = '#ef4444'; // Red
+            progressBar.style.backgroundColor = '#ef4444'; // Rojo
             document.getElementById('cierre-porcentaje').style.color = '#ef4444';
         }
 
@@ -4440,8 +4592,16 @@ async function generarCierreDiarioAdmin() {
         document.getElementById('cierre-checklist-body').innerHTML = checklistHTML;
 
     } catch (error) {
-        console.error("Error al generar cierre diario desde Google Sheets:", error);
-        alert("Ocurrió un error al auditar los datos contra Google Sheets. Verifique su conexión.");
+        console.error("Error al generar cierre diario:", error);
+        if (alertaInfo) {
+            alertaInfo.style.display = 'block';
+            alertaInfo.style.backgroundColor = '#fee2e2';
+            alertaInfo.style.color = '#991b1b';
+            alertaInfo.style.border = '1px solid #f87171';
+            alertaInfo.innerHTML = `⚠️ Ocurrió un error al procesar el cierre: ${error.message || 'Verifique su conexión'}`;
+        } else {
+            alert(`Ocurrió un error al auditar los datos: ${error.message || 'Verifique su conexión'}`);
+        }
     } finally {
         btn.disabled = false;
         btn.innerHTML = 'Generar Cierre';
