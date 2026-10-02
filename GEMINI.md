@@ -56,3 +56,15 @@
 1. **Despliegue Web:** Cualquier cambio en `app.js`, `index.html`, `styles.css` o `sw.js` se sube con `git add .`, `git commit` y `git push origin main`. Vercel compila y publica en menos de 10 segundos.
 2. **Despliegue Apps Script:** Si se modifica `Code.gs`, el usuario debe pegarlo en el editor de Google Sheets (*Extensiones > Apps Script*) e implementar una nueva versión del Webhook (*Implementar > Administrar implementaciones > Nueva versión*).
 3. **Copias de Seguridad:** Mantener siempre actualizados los directorios `PROTEINAGRO_Backup_vX.X.X` y archivos comprimidos `.zip` con todos los activos del proyecto.
+
+---
+
+## 🤖 4. Directiva de Automatización Proactiva (Cierre Autónomo)
+
+> **Regla de Oro:** El usuario **NUNCA debe tener que pedir** *"guarda, backup, memoria ya sabes qué hacer"*.
+
+Al completar y verificar con éxito cualquier corrección, cambio de código o nueva funcionalidad, el agente **DEBE ejecutar automáticamente y en ese mismo turno** el protocolo integral:
+1. **Actualización de Memoria:** Registrar los cambios técnicos en [`GEMINI.md`](./GEMINI.md) y [`PROYECTO.md`](./PROYECTO.md).
+2. **Generación de Respaldos:** Crear la carpeta `PROTEINAGRO_Backup_vX.X.X` y el archivo comprimido `PROTEINAGRO_BACKUP_vX.X.X_...zip` en la raíz.
+3. **Despliegue Inmediato:** Realizar `git add`, `git commit` descriptivo y `git push origin main` para publicación en Vercel.
+4. **Entrega Final:** Presentar al usuario la solución ya probada junto con la confirmación de que todo quedó respaldado, versionado y desplegado.
