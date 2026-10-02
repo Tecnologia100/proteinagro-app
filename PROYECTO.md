@@ -564,6 +564,23 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
      - Valida `existingRecordsMap[id + '|' + producto]` para materias primas y `existingIdsMap[id]` para novedades (`NOV-`).
      - Si un registro ya existe en Google Sheets, el servidor lo omite en el acto (`Logger.log`), retornando confirmación exitosa sin agregar filas duplicadas a la contabilidad.
 
+## 🚀 13. Arquitectura de Auditoría en 4 Capas Anti-Fallo y Blindaje Decimal (`v1.6.4`)
+> **Fecha de Implementación:** 02 de Octubre de 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`sw.js`](./sw.js), [`index.html`](./index.html), [`Code.gs`](./Code.gs)  
+> **Objetivo:** Garantizar 100% de disponibilidad en la auditoría del Cierre Diario ante cualquier eventualidad de red, bloqueador de anuncios (AdBlockers / Brave Shields) o caída de servicio, y blindar el formateo numérico de kilogramos contra errores de punto flotante en JavaScript.
+
+- **Auditoría en Cascada Multi-Capa:**
+  1. **Capa 1 (Google Sheets GViz En Vivo):** Conexión directa a la hoja contable. En `sw.js`, `docs.google.com` está explícitamente excluido del interceptor del Service Worker para evitar respuestas `503 Service Unavailable`.
+  2. **Capa 2 (Webhook Google Apps Script Respaldo):** Endpoint `action=getRecolecciones&fecha=YYYY-MM-DD` en `Code.gs` que consulta la hoja y devuelve JSON nativo, eludiendo restricciones de CORS y bloqueadores de rastreo.
+  3. **Capa 3 (Firebase Firestore en Tiempo Real):** Consulta a la colección `recolecciones` en la nube si Google Sheets no responde por problemas de infraestructura de Google.
+  4. **Capa 4 (LocalStorage Offline):** Lee `recolecciones_backup` en el dispositivo para auditar rutas incluso sin conexión a internet.
+- **Badge Semafórico de Fuente en la UI:** Etiqueta dinámica que indica al usuario de dónde provienen los datos (`Google Sheets (En Vivo)`, `Google Sheets (Webhook)`, `Firestore (Nube)`, `Memoria Local (Offline)`).
+- **Corrección Numérica de Kilogramos (`RangeError: maximumFractionDigits`):**
+  - Se corrigió la función `formatKilosDisplay()` que fallaba cuando un número tenía más de 2 decimales o residuos de cálculo flotante (`81.60000000000001`).
+  - Ahora se redondea a 2 decimales (`Math.round(num * 100) / 100`) y se acota estrictamente: `minimumFractionDigits = Math.min(2, Math.max(1, decCount))`, garantizando que jamás exceda `maximumFractionDigits: 2`.
+- **Actualización Global de Versión:**
+  - Actualización sincronizada de `index.html` (Login, Header Admin, Header Conductor, Footer), `app.js` (registro de SW y recarga forzada) y `sw.js` a la versión oficial **`v1.6.4`**.
+
 ---
 
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
