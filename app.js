@@ -2157,63 +2157,134 @@ async function resincronizarTodoAGoogleSheets() {
         alert("⚠️ No está configurada la URL de Google Sheets.");
         return;
     }
-    const backupList = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
-    if (backupList.length === 0) {
-        alert("ℹ️ No hay registros en la memoria de este dispositivo para re-sincronizar.");
-        return;
+
+    const btn = document.getElementById('btn-admin-resync-sheets');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Verificando pendientes en la nube...';
     }
 
-    // 1. Identificar registros que realmente están pendientes de sincronizar
-    const pendingIndices = [];
-    backupList.forEach((item, idx) => {
-        const isSynced = (item.sync_sheets === true) || (item.estado === 'Sincronizado' && item.sync_sheets !== false);
-        if (!isSynced) {
-            pendingIndices.push(idx);
-        }
-    });
-
-    let indicesAEnviar = [];
-
-    if (pendingIndices.length === 0) {
-        // Todos los registros ya están sincronizados
-        const forzar = confirm(`✅ Todos los ${backupList.length} registros respaldados localmente ya están sincronizados con Google Sheets.\n\nPara evitar generar filas duplicadas en el archivo de Sheets, no es necesario volver a enviarlos.\n\n¿Desea FORZAR el re-envío de todos modos? (Seleccione Cancelar para mantener la base de datos limpia)`);
-        if (!forzar) return;
-        // Si el usuario fuerza conscientemente:
-        for (let i = 0; i < backupList.length; i++) {
-            indicesAEnviar.push(i);
-        }
-    } else {
-        const confirmar = confirm(`Se detectaron ${pendingIndices.length} registro(s) pendiente(s) de sincronizar (de un total de ${backupList.length} guardados localmente).\n\n¿Desea enviar los registros pendientes a Google Sheets ahora?`);
-        if (!confirmar) return;
-        indicesAEnviar = pendingIndices;
-    }
-
-    let enviados = 0;
-    for (const idx of indicesAEnviar) {
-        const item = backupList[idx];
-        if (!navigator.onLine) {
-            alert("⚠️ Se perdió la conexión a Internet durante la sincronización.");
-            break;
-        }
-        try {
-            const ok = await enviarAGoogleSheets(item);
-            if (ok) {
-                backupList[idx].sync_sheets = true;
-                backupList[idx].sync_sheets_at = Date.now();
-                if (backupList[idx].estado === 'Offline') {
-                    backupList[idx].estado = (backupList[idx].tipo === 'Novedad' || String(backupList[idx].id || '').startsWith('NOV-')) ? 'Visita Fallida' : 'Sincronizado';
-                }
-                enviados++;
-            }
-            await new Promise(r => setTimeout(r, 200));
-        } catch(e) {
-            console.warn("Error re-sincronizando ítem:", item.id, e);
-        }
-    }
     try {
-        localStorage.setItem('recolecciones_backup', JSON.stringify(backupList));
-    } catch(e) {}
-    alert(`✅ Se sincronizaron ${enviados} registro(s) con Google Sheets exitosamente.`);
+        // 1. Recopilar registros locales
+        const localBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+        
+        // 2. Recopilar registros de la nube (adminRecordsCache o Firestore)
+        let cloudRecords = [];
+        if (Array.isArray(adminRecordsCache) && adminRecordsCache.length > 0) {
+            cloudRecords = adminRecordsCache;
+        } else if (typeof db !== 'undefined') {
+            try {
+                const snap = await db.collection('recolecciones').orderBy('timestamp', 'desc').limit(200).get();
+                snap.forEach(d => {
+                    const data = d.data();
+                    data._docId = d.id;
+                    cloudRecords.push(data);
+                });
+            } catch(e) {
+                console.warn("No se pudo leer Firestore para re-sincronizar:", e);
+            }
+        }
+
+        // 3. Unificar registros sin duplicados
+        const combinedMap = new Map();
+        localBackup.forEach(item => { 
+            const id = item.id || item._docId;
+            if (id) combinedMap.set(String(id), item); 
+        });
+        cloudRecords.forEach(item => { 
+            const id = item.id || item._docId;
+            if (id && !combinedMap.has(String(id))) {
+                combinedMap.set(String(id), item);
+            }
+        });
+
+        const listaTotal = Array.from(combinedMap.values());
+        if (listaTotal.length === 0) {
+            alert("ℹ️ No hay registros en memoria ni en la nube para sincronizar.");
+            return;
+        }
+
+        // 4. Consultar qué IDs ya existen en Google Sheets
+        let existingIdsInSheets = new Set();
+        try {
+            const checkUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=getRecolecciones&t=${Date.now()}`;
+            const res = await fetch(checkUrl);
+            if (res.ok) {
+                const jsonCheck = await res.json();
+                if (jsonCheck && Array.isArray(jsonCheck.recolecciones)) {
+                    jsonCheck.recolecciones.forEach(r => {
+                        if (r.id) existingIdsInSheets.add(String(r.id));
+                    });
+                }
+            }
+        } catch(eCheck) {
+            console.warn("No se pudo verificar IDs en Sheets:", eCheck);
+        }
+
+        // 5. Filtrar registros que faltan en Google Sheets
+        let faltantes = listaTotal.filter(item => {
+            const id = String(item.id || item._docId || '');
+            if (!id) return false;
+            if (existingIdsInSheets.size > 0) {
+                return !existingIdsInSheets.has(id);
+            }
+            return item.sync_sheets !== true;
+        });
+
+        if (faltantes.length === 0) {
+            const forzar = confirm(`✅ Todos los registros (${listaTotal.length}) ya se encuentran sincronizados con Google Sheets.\n\nPara evitar generar filas duplicadas, no es necesario volver a enviarlos.\n\n¿Desea FORZAR el re-envío de todos modos?`);
+            if (!forzar) return;
+            faltantes = [...listaTotal];
+        } else {
+            const confirmar = confirm(`Se detectaron ${faltantes.length} registro(s) en la nube pendientes de ingresar a Google Sheets (de ${listaTotal.length} auditados).\n\n¿Desea enviarlos a Google Sheets ahora?`);
+            if (!confirmar) return;
+        }
+
+        if (btn) btn.innerHTML = `⏳ Sincronizando (0/${faltantes.length})...`;
+
+        let enviados = 0;
+        for (let i = 0; i < faltantes.length; i++) {
+            const item = faltantes[i];
+            if (!navigator.onLine) {
+                alert("⚠️ Se perdió la conexión a Internet durante la sincronización.");
+                break;
+            }
+            try {
+                const ok = await enviarAGoogleSheets(item);
+                if (ok) {
+                    item.sync_sheets = true;
+                    item.sync_sheets_at = Date.now();
+                    enviados++;
+                }
+                if (btn) btn.innerHTML = `⏳ Sincronizando (${enviados}/${faltantes.length})...`;
+                await new Promise(r => setTimeout(r, 250));
+            } catch(e) {
+                console.warn("Error re-sincronizando ítem:", item.id, e);
+            }
+        }
+
+        try {
+            localStorage.setItem('recolecciones_backup', JSON.stringify(localBackup));
+        } catch(e) {}
+
+        alert(`✅ Se sincronizaron exitosamente ${enviados} registro(s) con Google Sheets.`);
+
+        // Si la pantalla de Cierre Diario está visible, refrescar cierre
+        const fechaCierre = document.getElementById('cierre-fecha');
+        if (fechaCierre && fechaCierre.value && typeof generarCierreDiarioAdmin === 'function') {
+            generarCierreDiarioAdmin();
+        }
+
+    } catch (err) {
+        console.error("Error en resincronización general:", err);
+        alert(`Ocurrió un error al sincronizar: ${err.message}`);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText || '🔄 Re-sincronizar Sheets';
+        }
+    }
 }
 window.resincronizarTodoAGoogleSheets = resincronizarTodoAGoogleSheets;
 
@@ -4324,66 +4395,9 @@ async function generarCierreDiarioAdmin() {
         };
 
         // =========================================================================
-        // CAPA 1: Intento directo vía Google Sheets GViz CSV
+        // CAPA 1: Consulta directa vía Apps Script Webhook (Exacta, JSON, sin filtros UI)
         // =========================================================================
-        try {
-            const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
-            const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Recolecciones&t=${Date.now()}`;
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 7000);
-            const res = await fetch(url, { signal: controller.signal });
-            clearTimeout(timeoutId);
-
-            if (res.ok) {
-                const csvText = await res.text();
-                // Validar que no sea página de error HTML o redirección
-                if (csvText && !csvText.trim().startsWith('<!DOCTYPE') && !csvText.trim().startsWith('<html')) {
-                    const parseCSVRow = (row) => {
-                        const result = [];
-                        let insideQuote = false, currentWord = '';
-                        for (let i = 0; i < row.length; i++) {
-                            const char = row[i];
-                            if (char === '"' && row[i+1] === '"') { currentWord += '"'; i++; } 
-                            else if (char === '"') { insideQuote = !insideQuote; } 
-                            else if (char === ',' && !insideQuote) { result.push(currentWord); currentWord = ''; } 
-                            else { currentWord += char; }
-                        }
-                        result.push(currentWord);
-                        return result;
-                    };
-
-                    const rows = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
-                    for (let i = 1; i < rows.length; i++) {
-                        const cols = parseCSVRow(rows[i]);
-                        const fechaHora = cols[1] || '';
-                        const ruta = cols[2] || '';
-                        
-                        const matchFecha = coincideFecha(fechaHora);
-                        const matchRuta = (ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(ruta) === rutaHomologadaBuscada));
-                        
-                        if (matchFecha && matchRuta) {
-                            recoleccionesDelDia.push({
-                                proveedor: cols[4] || '',
-                                sucursal: cols[5] || '',
-                                totalKilos: parseKilosFloat(cols[7] || '0'),
-                                observaciones: cols[8] || ''
-                            });
-                        }
-                    }
-                    fuenteDatos = 'Google Sheets (En Vivo)';
-                    badgeColor = { bg: '#dcfce7', text: '#166534' };
-                    console.log("✅ Cierre auditado exitosamente vía Google Sheets GViz:", recoleccionesDelDia.length);
-                }
-            }
-        } catch (eGviz) {
-            console.warn("⚠️ GViz CSV no disponible o bloqueado por navegador/adblocker, activando fallback Apps Script...", eGviz);
-        }
-
-        // =========================================================================
-        // CAPA 2: Fallback vía Webhook Apps Script (Immune a AdBlockers y CORS)
-        // =========================================================================
-        if (fuenteDatos === '' && GOOGLE_SHEETS_WEBHOOK_URL) {
+        if (GOOGLE_SHEETS_WEBHOOK_URL) {
             try {
                 const webhookUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=getRecolecciones&fecha=${fechaStr}&t=${Date.now()}`;
                 const controller = new AbortController();
@@ -4399,47 +4413,127 @@ async function generarCierreDiarioAdmin() {
                             if (matchRuta) {
                                 recoleccionesDelDia.push({
                                     proveedor: r.proveedor || '',
-                                    sucursal: r.sucursal || '',
+                                    sucursal: r.sucursal || r.punto || '',
                                     totalKilos: typeof r.totalKilos === 'number' ? r.totalKilos : parseKilosFloat(r.totalKilos),
                                     observaciones: r.observaciones || ''
                                 });
                             }
                         });
-                        fuenteDatos = 'Google Sheets (Webhook)';
-                        badgeColor = { bg: '#dbeafe', text: '#1e40af' };
-                        console.log("✅ Cierre auditado exitosamente vía Apps Script Webhook:", recoleccionesDelDia.length);
+                        if (recoleccionesDelDia.length > 0) {
+                            fuenteDatos = 'Google Sheets (En Vivo)';
+                            badgeColor = { bg: '#dcfce7', text: '#166534' };
+                            console.log("✅ Cierre auditado exitosamente vía Apps Script Webhook:", recoleccionesDelDia.length);
+                        }
                     }
                 }
             } catch (eWebhook) {
-                console.warn("⚠️ Webhook Apps Script no respondió, activando fallback Firestore...", eWebhook);
+                console.warn("⚠️ Webhook Apps Script no respondió, activando fallback GViz...", eWebhook);
+            }
+        }
+
+        // =========================================================================
+        // CAPA 2: Fallback vía Google Sheets GViz CSV (Si Webhook no trajo datos)
+        // =========================================================================
+        if (recoleccionesDelDia.length === 0) {
+            try {
+                const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+                const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Recolecciones&t=${Date.now()}`;
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 7000);
+                const res = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (res.ok) {
+                    const csvText = await res.text();
+                    if (csvText && !csvText.trim().startsWith('<!DOCTYPE') && !csvText.trim().startsWith('<html')) {
+                        const parseCSVRow = (row) => {
+                            const result = [];
+                            let insideQuote = false, currentWord = '';
+                            for (let i = 0; i < row.length; i++) {
+                                const char = row[i];
+                                if (char === '"' && row[i+1] === '"') { currentWord += '"'; i++; } 
+                                else if (char === '"') { insideQuote = !insideQuote; } 
+                                else if (char === ',' && !insideQuote) { result.push(currentWord); currentWord = ''; } 
+                                else { currentWord += char; }
+                            }
+                            result.push(currentWord);
+                            return result;
+                        };
+
+                        const rows = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
+                        for (let i = 1; i < rows.length; i++) {
+                            const cols = parseCSVRow(rows[i]);
+                            const fechaHora = cols[1] || '';
+                            const ruta = cols[2] || '';
+                            
+                            const matchFecha = coincideFecha(fechaHora);
+                            const matchRuta = (ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(ruta) === rutaHomologadaBuscada));
+                            
+                            if (matchFecha && matchRuta) {
+                                recoleccionesDelDia.push({
+                                    proveedor: cols[4] || '',
+                                    sucursal: cols[5] || '',
+                                    totalKilos: parseKilosFloat(cols[7] || '0'),
+                                    observaciones: cols[8] || ''
+                                });
+                            }
+                        }
+                        if (recoleccionesDelDia.length > 0) {
+                            fuenteDatos = 'Google Sheets (GViz CSV)';
+                            badgeColor = { bg: '#dcfce7', text: '#166534' };
+                            console.log("✅ Cierre auditado exitosamente vía Google Sheets GViz:", recoleccionesDelDia.length);
+                        }
+                    }
+                }
+            } catch (eGviz) {
+                console.warn("⚠️ GViz CSV no disponible o bloqueado por navegador...", eGviz);
             }
         }
 
         // =========================================================================
         // CAPA 3: Fallback vía Firebase Firestore (Persistencia en la Nube en Tiempo Real)
         // =========================================================================
-        if (fuenteDatos === '' && typeof db !== 'undefined') {
+        if (recoleccionesDelDia.length === 0 && typeof db !== 'undefined') {
             try {
-                const snapshot = await db.collection('recolecciones').get();
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (!data) return;
-                    
+                const sourceRecords = (Array.isArray(adminRecordsCache) && adminRecordsCache.length > 0)
+                    ? adminRecordsCache
+                    : [];
+
+                if (sourceRecords.length === 0) {
+                    const snapshot = await db.collection('recolecciones').get();
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data) { data._docId = doc.id; sourceRecords.push(data); }
+                    });
+                }
+
+                sourceRecords.forEach(data => {
                     const matchFecha = coincideFecha(data.fecha || '');
                     const matchRuta = (data.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(data.ruta) === rutaHomologadaBuscada));
 
                     if (matchFecha && matchRuta) {
                         recoleccionesDelDia.push({
                             proveedor: data.proveedor || '',
-                            sucursal: data.sucursal || '',
+                            sucursal: data.sucursal || data.punto || '',
                             totalKilos: typeof data.totalKilos === 'number' ? data.totalKilos : parseKilosFloat(data.totalKilos),
                             observaciones: data.observaciones || ''
                         });
                     }
                 });
-                fuenteDatos = 'Firestore (Nube)';
-                badgeColor = { bg: '#f3e8ff', text: '#6b21a8' };
-                console.log("✅ Cierre auditado exitosamente vía Firebase Firestore:", recoleccionesDelDia.length);
+
+                if (recoleccionesDelDia.length > 0) {
+                    fuenteDatos = 'Firestore (Nube - Pendiente Sincronizar)';
+                    badgeColor = { bg: '#fef3c7', text: '#92400e' };
+                    console.log("✅ Cierre auditado exitosamente vía Firebase Firestore:", recoleccionesDelDia.length);
+                    if (alertaInfo) {
+                        alertaInfo.style.display = 'block';
+                        alertaInfo.style.backgroundColor = '#fef3c7';
+                        alertaInfo.style.color = '#92400e';
+                        alertaInfo.style.border = '1px solid #fde68a';
+                        alertaInfo.innerHTML = `⚠️ <strong>Nota:</strong> Estos registros provienen de la Nube de Firebase porque aún no han sincronizado a Google Sheets. <button type="button" onclick="resincronizarTodoAGoogleSheets()" style="margin-left:8px; padding:4px 10px; background:#10b981; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">Sincronizar a Sheets</button>`;
+                    }
+                }
             } catch (eFs) {
                 console.warn("⚠️ Firestore no disponible, activando fallback memoria local...", eFs);
             }
