@@ -54,7 +54,7 @@
   - `Bodega Santa Elena`: Proveedor: `Bodega Santa Elena` | Sucursal/Punto: `Santa Elena`.
   - `Alejandro Garay`: Proveedor: `Alejandro Garay` | Sucursal/Punto: `Santa Elena`.
   - `Sevillana Santa Elena`: Proveedor: `Sevillana Santa Elena` | Sucursal/Punto: `Sevillana Santa Elena`.
-- **Garantía Histórica:** Reclasificación atómica de exactamente 276 filas auditadas en Google Sheets `Recolecciones` (192 Bodega, 63 Garay, 21 Sevillana), manteniendo 1.879 filas de las demás rutas 100% intactas, e inmutables los pesos (`Kg`), precios, valores, IDs y marcas de tiempo.
+- **Garantía Histórica:** Reclasificación atómica ejecutada con éxito en Google Sheets `Recolecciones`: **340 filas actualizadas** (192 Bodega Santa Elena, 63 Alejandro Garay, 85 Sevillana Santa Elena), manteniendo las 1.815 filas de las demás rutas 100% intactas, e inmutables los pesos (`Kg`), precios, valores, IDs y marcas de tiempo.
 - **Catálogo Web App & Offline:** Sincronizado en `DEFAULT_RUTAS_DATA` y `CATALOGO_PUNTOS_RUTAS_DEFAULT` en `app.js` v1.6.5.
 
 ---
