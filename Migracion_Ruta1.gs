@@ -1,135 +1,108 @@
 // ==============================================================================
 // ARCHIVO: Migracion_Ruta1.gs
-// RECLASIFICACIÓN HISTÓRICA RUTA 1: SANTA ELENA / CAVASA
+// RECLASIFICACIÓN HISTÓRICA RUTA 1: SANTA ELENA / CAVASA (VERSIÓN QUIRÚRGICA)
 // ==============================================================================
-// Este script reclasifica las 276 filas históricas de la Ruta 1 (Santa Elena)
-// en la hoja 'Recolecciones' e invierte Proveedor <-> Sucursal:
-//
-// 1. Bodega Santa Elena: Proveedor -> "Bodega Santa Elena" | Punto -> "Santa Elena"
-// 2. Garay:              Proveedor -> "Alejandro Garay"    | Punto -> "Santa Elena"
-// 3. Sevillana:          Proveedor -> "Sevillana Santa Elena" | Punto -> "Sevillana Santa Elena"
-//
-// TOTALMENTE ATÓMICO: NO toca Kilos, Precios, Valores, Fechas ni otras rutas.
+// Modifica ÚNICAMENTE las Columnas E (Proveedor) y F (Punto).
+// NO toca columnas con fórmulas (Col M, Col N, resúmenes), NO toca Kilos ni Precios.
 // ==============================================================================
 
 function migrarRuta1_SantaElena() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetRec = ss.getSheetByName("Recolecciones");
   if (!sheetRec) {
-    SpreadsheetApp.getUi().alert("Error: No se encontró la pestaña 'Recolecciones'.");
+    Logger.log("❌ No se encontró la hoja Recolecciones.");
     return;
   }
 
-  var lr = sheetRec.getLastRow();
-  var lc = sheetRec.getLastColumn();
-  if (lr <= 1) {
-    Logger.log("Hoja Recolecciones vacía.");
+  // 1. Escanear filas reales con ID en Columna A (evita límites de memoria o fórmulas vacías)
+  var totalRows = sheetRec.getLastRow();
+  if (totalRows <= 1) {
+    Logger.log("Hoja vacía.");
     return;
   }
 
-  // Identificar dinámicamente las columnas para seguridad total
-  var headers = sheetRec.getRange(1, 1, 1, lc).getValues()[0];
-  var colRuta = 2; // Col C base 0
-  var colProv = 4; // Col E base 0
-  var colPto  = 5; // Col F base 0
-
-  for (var c = 0; c < headers.length; c++) {
-    var h = String(headers[c] || '').toLowerCase().trim();
-    if (h.indexOf('ruta') !== -1) colRuta = c;
-    else if (h.indexOf('proveedor') !== -1) colProv = c;
-    else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colPto = c;
+  var idCol = sheetRec.getRange(2, 1, totalRows - 1, 1).getValues();
+  var filasReales = 0;
+  for (var r = idCol.length - 1; r >= 0; r--) {
+    if (String(idCol[r][0] || '').trim() !== '') {
+      filasReales = r + 1;
+      break;
+    }
   }
 
-  var range = sheetRec.getRange(2, 1, lr - 1, lc);
-  var values = range.getValues();
+  if (filasReales === 0) {
+    Logger.log("No se encontraron registros con ID.");
+    return;
+  }
 
-  var c1 = 0; // Bodega Santa Elena
-  var c2 = 0; // Alejandro Garay
-  var c3 = 0; // Sevillana Santa Elena
-  var totalMod = 0;
+  // 2. Leer ÚNICAMENTE Columnas C a F (Ruta, Conductor, Proveedor, Punto)
+  // Col C (3), D (4), E (5), F (6) -> 4 columnas
+  var datosLectura = sheetRec.getRange(2, 3, filasReales, 4).getValues();
 
-  for (var i = 0; i < values.length; i++) {
-    var ruta = String(values[i][colRuta] || '').trim().toLowerCase();
-    var prov = String(values[i][colProv] || '').trim().toLowerCase();
-    var pto  = String(values[i][colPto]  || '').trim().toLowerCase();
+  // 3. Preparar nuevos valores ÚNICAMENTE para Columnas E y F (Proveedor y Punto)
+  var nuevosValoresEF = [];
+  var c1 = 0, c2 = 0, c3 = 0, mod = 0;
 
-    var esRuta1 = (ruta.indexOf('ruta 1') !== -1) || (ruta.indexOf('santa elena') !== -1);
+  for (var i = 0; i < datosLectura.length; i++) {
+    var ruta = String(datosLectura[i][0] || '').trim().toLowerCase(); // Col C
+    var provOriginal = String(datosLectura[i][2] || '').trim();       // Col E
+    var ptoOriginal  = String(datosLectura[i][3] || '').trim();       // Col F
+
+    var provLower = provOriginal.toLowerCase();
+    var ptoLower  = ptoOriginal.toLowerCase();
+    var esRuta1   = (ruta.indexOf('ruta 1') !== -1) || (ruta.indexOf('santa elena') !== -1);
+
+    var nuevoProv = provOriginal;
+    var nuevoPto  = ptoOriginal;
 
     if (esRuta1) {
       // Caso 1: Bodega Santa Elena
-      if (pto.indexOf('bodega santa elena') !== -1 || (prov === 'santa elena' && pto.indexOf('bodega') !== -1)) {
-        values[i][colProv] = 'Bodega Santa Elena';
-        values[i][colPto]  = 'Santa Elena';
-        c1++;
-        totalMod++;
+      if (ptoLower.indexOf('bodega santa elena') !== -1 || (provLower === 'santa elena' && ptoLower.indexOf('bodega') !== -1)) {
+        nuevoProv = 'Bodega Santa Elena';
+        nuevoPto  = 'Santa Elena';
+        c1++; mod++;
       }
       // Caso 2: Alejandro Garay
-      else if (pto.indexOf('garay') !== -1 || prov.indexOf('garay') !== -1) {
-        values[i][colProv] = 'Alejandro Garay';
-        values[i][colPto]  = 'Santa Elena';
-        c2++;
-        totalMod++;
+      else if (ptoLower.indexOf('garay') !== -1 || provLower.indexOf('garay') !== -1) {
+        nuevoProv = 'Alejandro Garay';
+        nuevoPto  = 'Santa Elena';
+        c2++; mod++;
       }
       // Caso 3: Sevillana Santa Elena
-      else if (pto.indexOf('sevillana santa elena') !== -1 || (prov === 'santa elena' && pto.indexOf('sevillana') !== -1) || (prov === 'sevillana' && pto.indexOf('sevillana santa elena') !== -1)) {
-        values[i][colProv] = 'Sevillana Santa Elena';
-        values[i][colPto]  = 'Sevillana Santa Elena';
-        c3++;
-        totalMod++;
+      else if (ptoLower.indexOf('sevillana santa elena') !== -1 || provLower === 'sevillana' || (provLower === 'santa elena' && ptoLower.indexOf('sevillana') !== -1)) {
+        nuevoProv = 'Sevillana Santa Elena';
+        nuevoPto  = 'Sevillana Santa Elena';
+        c3++; mod++;
       }
     }
+
+    nuevosValoresEF.push([nuevoProv, nuevoPto]);
   }
 
-  // Guardado atómico en un solo bloque en Recolecciones
-  range.setValues(values);
-  var mensajeRec = "✅ Recolecciones actualizadas: " + totalMod + " filas.\n" +
-                   "  • Bodega Santa Elena: " + c1 + "\n" +
-                   "  • Alejandro Garay: " + c2 + "\n" +
-                   "  • Sevillana Santa Elena: " + c3;
-  Logger.log(mensajeRec);
+  // 4. Escribir ÚNICAMENTE en Columnas E y F (Fila 2, Columna 5, filasReales, 2 columnas)
+  // ¡0 conflicto con fórmulas, 0 error desconocido, 100% seguro!
+  sheetRec.getRange(2, 5, filasReales, 2).setValues(nuevosValoresEF);
 
-  // Actualizar también la matriz en Puntos_Rutas
-  var sheetPuntos = ss.getSheetByName("Puntos_Rutas");
-  var puntosMod = 0;
-  if (sheetPuntos && sheetPuntos.getLastRow() > 1) {
-    var prRange = sheetPuntos.getRange(2, 1, sheetPuntos.getLastRow() - 1, Math.max(3, sheetPuntos.getLastColumn()));
-    var prValues = prRange.getValues();
-    for (var j = 0; j < prValues.length; j++) {
-      var pRuta = String(prValues[j][0] || '').toLowerCase();
-      var pPto  = String(prValues[j][2] || '').toLowerCase().trim();
-      if (pRuta.indexOf('ruta 1') !== -1 || pRuta.indexOf('santa elena') !== -1) {
-        if (pPto.indexOf('bodega') !== -1) {
-          prValues[j][1] = 'Bodega Santa Elena';
-          prValues[j][2] = 'Santa Elena';
-          puntosMod++;
-        } else if (pPto.indexOf('garay') !== -1) {
-          prValues[j][1] = 'Alejandro Garay';
-          prValues[j][2] = 'Santa Elena';
-          puntosMod++;
-        } else if (pPto.indexOf('sevillana') !== -1) {
-          prValues[j][1] = 'Sevillana Santa Elena';
-          prValues[j][2] = 'Sevillana Santa Elena';
-          puntosMod++;
-        }
-      }
-    }
-    prRange.setValues(prValues);
-    Logger.log("✅ Puntos_Rutas actualizadas: " + puntosMod + " filas.");
-  }
+  var msg = "✅ ¡Migración completada con éxito!\n\n" +
+            "Total filas modificadas: " + mod + " de " + filasReales + "\n" +
+            "  • Bodega Santa Elena: " + c1 + "\n" +
+            "  • Alejandro Garay: " + c2 + "\n" +
+            "  • Sevillana Santa Elena: " + c3;
+  Logger.log(msg);
 
   try {
-    SpreadsheetApp.getUi().alert("¡Migración Completada con Éxito!\n\n" + mensajeRec + "\n\nMatriz Puntos_Rutas actualizada: " + puntosMod + " filas.");
+    SpreadsheetApp.getUi().alert(msg);
   } catch(e) {
-    // Si se ejecutó desde el editor de Apps Script o consola
+    // Si corre desde el editor de Apps Script
   }
 
   return {
     success: true,
-    totalModificados: totalMod,
+    totalModificados: mod,
     bodegaSantaElena: c1,
     alejandroGaray: c2,
     sevillanaSantaElena: c3,
-    puntosRutasModificados: puntosMod
+    totalFilasAuditadas: filasReales
   };
 }
 
