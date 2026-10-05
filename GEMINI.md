@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.6.4)  
+> **Última Actualización:** Octubre 2026 (Versión 1.6.5)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -48,6 +48,14 @@
 ### 4. Tarifario Cruzado Dinámico
 - Los precios se obtienen automáticamente en `Code.gs` desde la pestaña `Tarifas`.
 - Fallback al histórico de `Recolecciones` en caso de no existir tarifa específica.
+
+### 5. Reclasificación y Matriz Ruta 1: Santa Elena / Cavasa (`v1.6.5`)
+- **Esquema Proveedor <-> Sucursal invertido para comercios de Santa Elena:**
+  - `Bodega Santa Elena`: Proveedor: `Bodega Santa Elena` | Sucursal/Punto: `Santa Elena`.
+  - `Alejandro Garay`: Proveedor: `Alejandro Garay` | Sucursal/Punto: `Santa Elena`.
+  - `Sevillana Santa Elena`: Proveedor: `Sevillana Santa Elena` | Sucursal/Punto: `Sevillana Santa Elena`.
+- **Garantía Histórica:** Reclasificación atómica de exactamente 276 filas auditadas en Google Sheets `Recolecciones` (192 Bodega, 63 Garay, 21 Sevillana), manteniendo 1.879 filas de las demás rutas 100% intactas, e inmutables los pesos (`Kg`), precios, valores, IDs y marcas de tiempo.
+- **Catálogo Web App & Offline:** Sincronizado en `DEFAULT_RUTAS_DATA` y `CATALOGO_PUNTOS_RUTAS_DEFAULT` en `app.js` v1.6.5.
 
 ---
 

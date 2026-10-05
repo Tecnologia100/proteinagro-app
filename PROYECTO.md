@@ -581,8 +581,30 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Actualización Global de Versión:**
   - Actualización sincronizada de `index.html` (Login, Header Admin, Header Conductor, Footer), `app.js` (registro de SW y recarga forzada) y `sw.js` a la versión oficial **`v1.6.4`**.
 
+## 🚀 14. Reclasificación Histórica Ruta 1: Santa Elena / Cavasa y Matriz Dinámica (`v1.6.5`)
+> **Fecha de Implementación:** 05 de Octubre de 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`sw.js`](./sw.js), [`index.html`](./index.html), [`Code.gs`](./Code.gs), [`Migracion_Ruta1.gs`](./Migracion_Ruta1.gs), [`MIGRACION_RUTA1_SANTA_ELENA.md`](./MIGRACION_RUTA1_SANTA_ELENA.md)  
+> **Objetivo:** Invertir y estandarizar la clasificación Proveedor <-> Punto en la Ruta 1 (Santa Elena), reclasificando 276 registros históricos de Google Sheets sin alterar pesos, montos, fechas ni registros de otras rutas.
+
+- **Reclasificación de los 3 Puntos Clave de Santa Elena:**
+  1. *Bodega Santa Elena:* Proveedor pasa a ser `Bodega Santa Elena` y Punto/Sucursal pasa a ser `Santa Elena` (192 filas históricas).
+  2. *Alejandro Garay:* Proveedor pasa a ser `Alejandro Garay` y Punto/Sucursal pasa a ser `Santa Elena` (63 filas históricas).
+  3. *Sevillana Santa Elena:* Proveedor pasa a ser `Sevillana Santa Elena` y Punto/Sucursal pasa a ser `Sevillana Santa Elena` (21 filas históricas).
+- **Garantía Histórica Cero-Impacto:**
+  - Auditadas 2.155 filas reales en Google Sheets.
+  - Modificadas exactamente 276 filas de la Ruta 1.
+  - 1.879 filas pertenecientes a todas las demás rutas permanecen 100% intactas.
+  - Todos los datos numéricos (`Kg`, `Precio`, `Valor`), IDs y fechas permanecen inmutables.
+- **Sincronización de Catálogo Offline & Web:**
+  - `DEFAULT_RUTAS_DATA` y `CATALOGO_PUNTOS_RUTAS_DEFAULT` actualizados en `app.js`.
+  - Service Worker e interfaz actualizados a la versión oficial **`v1.6.5`**.
+- **Herramientas de Ejecución en Apps Script:**
+  - `migrarRuta1_SantaElena(ss)`: Barrido atómico en memoria por bloque `getValues()` / `setValues()`.
+  - Menú superior automático en hoja de cálculo: `🚀 ProteinAgro > Reclasificar Ruta 1 (Santa Elena)`.
+
 ---
 
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
+
 
 
