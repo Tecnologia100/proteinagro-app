@@ -579,27 +579,31 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - Se corrigió la función `formatKilosDisplay()` que fallaba cuando un número tenía más de 2 decimales o residuos de cálculo flotante (`81.60000000000001`).
   - Ahora se redondea a 2 decimales (`Math.round(num * 100) / 100`) y se acota estrictamente: `minimumFractionDigits = Math.min(2, Math.max(1, decCount))`, garantizando que jamás exceda `maximumFractionDigits: 2`.
 - **Actualización Global de Versión:**
-## 🔄 14. Sincronización en Vivo de Proveedores Oficiales desde Google Sheets (`v1.6.5`)
+## 🔄 14. Sincronización en Vivo y Homologación de Proveedores Oficiales (`v1.6.5`)
 > **Fecha de Implementación:** 06 de Octubre de 2026  
 > **Archivos Asociados:** [`app.js`](./app.js), [`index.html`](./index.html), [`sw.js`](./sw.js)  
-> **Objetivo:** Garantizar que los proveedores mostrados en el modal "Emitir Soporte Oficial" y en la edición administrativa correspondan exactamente con la hoja contable `Puntos_Rutas` en Google Sheets, eliminando nombres contables o cuentas obsoletas y permitiendo refresco en vivo.
+> **Objetivo:** Garantizar que los proveedores mostrados en el modal "Emitir Soporte Oficial" y en la edición administrativa correspondan exactamente con la hoja contable `Puntos_Rutas` en Google Sheets, eliminando nombres contables o cuentas obsoletas y homologando al 100% mayúsculas y minúsculas a formato Nombre Propio / Title Case.
 
 - **Diagnóstico del Problema Previo:**
   1. **Contaminación con Nombres Históricos:** El selector `#admin-search-provider` se llenaba usando `TODOS_LOS_PROVEEDORES`, un arreglo estático que contenía cuentas contables antiguas (`CUENTA 2026`, `CUENTA FABRICA`, `CUENTA SEVILLANA`, etc.) y registros de pruebas.
-  2. **Discrepancia con Google Sheets:** Al crearse o renombrarse un proveedor en la hoja `Puntos_Rutas`, la lista en pantalla no reflejaba los cambios y mostraba variantes que no coincidían con la data contable real.
+  2. **Discrepancia y Mezcla de Mayúsculas/Minúsculas:** En Google Sheets y en registros de base de datos coexistían nombres en mayúsculas sostenidas (`SUPERTIENDA CAÑAVERAL`, `MIGAN CAPITAL`, etc.) junto a minúsculas (`la gran colombia`), generando desorden visual y opciones repetidas.
 
 - **Solución Técnica Implementada:**
-  1. **Extracción Limpia y Oficial (`getProveedoresOficialesSheets`):**
+  1. **Motor de Homologación Inteligente (`homologarNombreProveedor` y `homologarNombrePunto`):**
+     - Transforma automáticamente cualquier texto en mayúsculas o minúsculas a formato Nombre Propio / Title Case (ej. *SUPERTIENDA CAÑAVERAL* ➔ *Supertienda Cañaveral*, *la gran colombia* ➔ *La Gran Colombia*).
+     - Preserva siglas y acrónimos comerciales (*LG*, *SAS*, *R y E*).
+     - Diccionario canónico que unifica variaciones ortográficas históricas (*JHOANATAN MARTINEZ* ➔ *Jhonatan Martinez*).
+  2. **Extracción Limpia y Oficial (`getProveedoresOficialesSheets`):**
      - La lista se genera en base a la matriz de datos de la hoja `Puntos_Rutas` obtenida de Google Sheets.
      - Deduplicación insensible a mayúsculas, minúsculas y tildes mediante normalización NFD.
      - Filtro para descartar entradas inactivas o registros genéricos.
-  2. **Actualización en Tiempo Real (`refrescarPuntosRutasDesdeSheets`):**
+  3. **Actualización en Tiempo Real (`refrescarPuntosRutasDesdeSheets`):**
      - Al abrir el modal "Emitir Soporte Oficial" (`btn-admin-support-modal`), el sistema consulta en segundo plano la hoja `Puntos_Rutas` vía Gviz CSV con `cache: 'no-store'`.
      - Si hay cambios en Google Sheets, la lista de proveedores se actualiza inmediatamente en pantalla sin recargar la página.
-  3. **Botón Interactivo `🔄 Refrescar Sheets`:**
+  4. **Botón Interactivo `🔄 Refrescar Sheets`:**
      - Se añadió un botón de acceso directo en el modal de soporte para forzar la sincronización de proveedores en cualquier momento con feedback visual instantáneo (`⏳ Refrescando...`).
-  4. **Blindaje en Edición Administrativa:**
-     - El datalist `#edit-prov-list` en `abrirModalEditarRecoleccion` fue actualizado para utilizar la misma fuente limpia y oficial de `Puntos_Rutas`.
+  5. **Blindaje en Edición Administrativa y Comprobantes:**
+     - El datalist `#edit-prov-list` en `abrirModalEditarRecoleccion`, el comprobante digital y el mensaje de WhatsApp ahora presentan los nombres 100% homologados y profesionales.
 
 ## 🚀 14. Reclasificación Histórica Ruta 1: Santa Elena / Cavasa y Matriz Dinámica (`v1.6.5`)
 > **Fecha de Implementación:** 05 de Octubre de 2026  

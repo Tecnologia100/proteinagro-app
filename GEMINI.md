@@ -41,11 +41,12 @@
   - 🟡 `Visita Fallida`: Novedad o punto con 0 Kg justificado.
   - 🔴 `No ha llegado a la Data`: Punto sin registrar en la base de datos hoy.
 
-### 3. Sincronización en Vivo de Proveedores Oficiales (`v1.6.5`)
+### 3. Sincronización en Vivo y Homologación de Proveedores Oficiales (`v1.6.5`)
 - **Fuente Oficial de Proveedores:** La lista de proveedores se obtiene **exclusivamente** desde la hoja `Puntos_Rutas` en Google Sheets mediante `refrescarPuntosRutasDesdeSheets()` y `getProveedoresOficialesSheets()`.
-- **Eliminación de Nombres Obsoletos/Contables:** Se eliminó la inyección de nombres contables heredados (`CUENTA 2026`, `CUENTA FABRICA`, `CUENTA SEVILLANA`, etc.) y variaciones arbitrarias de mayúsculas en los selectores de búsqueda de comprobante oficial.
+- **Eliminación de Nombres Obsoletos/Contables:** Se eliminó la inyección de nombres contables heredados (`CUENTA 2026`, `CUENTA FABRICA`, `CUENTA SEVILLANA`, etc.).
+- **Homologación de Mayúsculas y Minúsculas (`homologarNombreProveedor` / `homologarNombrePunto`):** Todos los nombres provenientes de Google Sheets, Firebase, catálogos locales o entradas de usuario se normalizan y homologan automáticamente a formato Nombre Propio / Title Case (ej. *SUPERTIENDA CAÑAVERAL* ➔ *Supertienda Cañaveral*, *la gran colombia* ➔ *La Gran Colombia*, *MIGAN CAPITAL* ➔ *Migan Capital*), preservando acrónimos comerciales (*LG*, *SAS*, *R y E*).
 - **Refresco Automático y Manual al Emitir Soporte:** Al abrir el modal "Emitir Soporte Oficial", se refresca de inmediato en segundo plano la matriz de proveedores desde Google Sheets en vivo, además de contar con el botón interactivo `🔄 Refrescar Sheets` para sincronización manual inmediata.
-- **Edición Administrativa Blindada:** El datalist de edición administrativa (`#edit-prov-list`) se alimenta de la misma fuente limpia y oficial.
+- **Edición Administrativa Blindada:** El datalist de edición administrativa (`#edit-prov-list` y `#edit-point-list`) se alimenta de la misma fuente limpia y homologada.
 
 ### 4. Matriz de Rutas y Homologación
 - Rutas soportadas: **Ruta 1 a Ruta 7** y **Planta San Joaquín**.

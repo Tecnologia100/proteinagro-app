@@ -163,7 +163,7 @@ window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 updateNetworkStatus();
 
-// === FUNCIONES DE FORMATO DE TEXTO (NOMBRE PROPIO) ===
+// === FUNCIONES DE FORMATO DE TEXTO (NOMBRE PROPIO Y HOMOLOGACIÓN) ===
 function aNombrePropio(texto) {
     if (!texto) return '';
     const s = String(texto).trim().toLowerCase();
@@ -171,6 +171,117 @@ function aNombrePropio(texto) {
     return s.replace(/(?:^|[\s\-\/\(\)\.,;:])([a-záéíóúñ])/g, function(match) {
         return match.toUpperCase();
     });
+}
+
+function formatearNombreTitulo(str) {
+    if (!str) return '';
+    const palabrasMinusculas = new Set(['de', 'del', 'la', 'las', 'los', 'y', 'e', 'en', 'el']);
+    const siglasMayusculas = new Set(['lg', 'sas', 's.a.s.', 'ips', 'eps', 'pwa', 'ii', 'iii', 'iv']);
+
+    const tokens = String(str).trim().toLowerCase().split(/\s+/);
+    return tokens.map((token, idx) => {
+        const clean = token.replace(/[^a-záéíóúñ]/g, '');
+        if (siglasMayusculas.has(clean)) {
+            return token.toUpperCase();
+        }
+        if (idx > 0 && palabrasMinusculas.has(clean)) {
+            return token.toLowerCase();
+        }
+        return token.replace(/(?:^|[\(\[\/])([a-záéíóúñ])/g, m => m.toUpperCase());
+    }).join(' ');
+}
+
+// Diccionario canónico para homologación estricta de proveedores (mayúsculas, minúsculas y ortografía)
+const CANONICOS_PROVEEDORES = {
+    'angeloparedesproteincol': 'Angelo Paredes Proteincol',
+    'albertomillan': 'Alberto Millan',
+    'augustomunoz': 'Augusto Muñoz',
+    'baratoncarnesberlin': 'Baratón Carnes Berlín',
+    'barbaragomez': 'Barbara Gomez',
+    'belalcazar': 'Belalcazar',
+    'bodegasantaelena': 'Bodega Santa Elena',
+    'alejandrogaray': 'Alejandro Garay',
+    'caribe': 'Caribe',
+    'carloscaicedo': 'Carlos Caicedo',
+    'carlosmartinez': 'Carlos Martinez',
+    'carlosrebolledo': 'Carlos Rebolledo',
+    'carnesmaiale': 'Carnes Maiale',
+    'carniceriafabianlopezaguilaroja': 'Carnicería Fabián López (Águila Roja)',
+    'carnicoslafama': 'Carnicos La Fama',
+    'cavasa': 'Cavasa',
+    'centralhenrymartinez': 'Central Henry Martinez',
+    'ciudaddelcampo': 'Ciudad del Campo',
+    'ciudadeladelrio': 'Ciudadela del Río',
+    'comercializadorarye': 'Comercializadora R y E',
+    'crhistiancedeno': 'Crhistian Cedeño',
+    'diegobuitrago': 'Diego Buitrago',
+    'distribuidoradecarnesmillan': 'Distribuidora de Carnes Millan',
+    'districarneslg': 'Districarnes LG',
+    'edinsonaguirre': 'Edinson Aguirre',
+    'elrebajon': 'El Rebajón',
+    'fabianlopez': 'Fabian Lopez',
+    'freddyfernandez': 'Freddy Fernandez',
+    'freddyhernandez': 'Freddy Hernandez',
+    'frigorivalle': 'Frigorivalle',
+    'gildardotejada': 'Gildardo Tejada',
+    'graxpro': 'Graxpro',
+    'hebergamboa': 'Heber Gamboa',
+    'hernandohidalgo': 'Hernando Hidalgo',
+    'jaimezuluaga': 'Jaime Zuluaga',
+    'jairomosquera': 'Jairo Mosquera',
+    'jhonatanmartinez': 'Jhonatan Martinez',
+    'jhoanatanmartinez': 'Jhonatan Martinez',
+    'jorgeadrianrodasvillagorgona': 'Jorge Adrián Rodas (Villagorgona)',
+    'josealexpareja': 'Jose Alex Pareja',
+    'julianluna': 'Julian Luna',
+    'lacosechademitierra': 'La Cosecha de Mi Tierra',
+    'laesperanza': 'La Esperanza',
+    'lagrancolombia': 'La Gran Colombia',
+    'lareserva': 'La Reserva',
+    'loslagos': 'Los Lagos',
+    'mariaelsialegria': 'Maria Elsi Alegria',
+    'martinperez': 'Martin Perez',
+    'mercamio': 'Mercamio',
+    'mercaunion': 'Mercaunion',
+    'migancapital': 'Migan Capital',
+    'miguelangelotero': 'Miguel Angel Otero',
+    'milsongonsalez': 'Milson Gonsalez',
+    'milsongonzalez': 'Milson Gonsalez',
+    'miltonmunoz': 'Milton Muñoz',
+    'miriamcuaran': 'Miriam Cuaran',
+    'nutrialimentosvaldezvillagorgona': 'Nutrialimentos Valdez (Villagorgona)',
+    'orlandogiraldo': 'Orlando Giraldo',
+    'orlandomartinez': 'Orlando Martinez',
+    'oscarlara': 'Oscar Lara',
+    'ricardogil': 'Ricardo Gil',
+    'santaelena': 'Santa Elena',
+    'sevillana': 'Sevillana',
+    'sevillanarepublicadeisrael': 'Sevillana República de Israel',
+    'sevillanasantaelena': 'Sevillana Santa Elena',
+    'supercarneslosandes': 'Super Carnes Los Andes',
+    'supertiendacanaveral': 'Supertienda Cañaveral',
+    'supertiendacanaveralfrigorivalle': 'Supertienda Cañaveral - Frigorivalle',
+    'wilmerbustamante': 'Wilmer Bustamante',
+    'yimisanclemente': 'Yimi Sanclemente',
+    'yeniferdiazvillagorgona': 'Yénifer Díaz (Villagorgona)'
+};
+
+function homologarNombreProveedor(texto) {
+    if (!texto) return '';
+    const s = String(texto).trim();
+    if (!s) return '';
+    if (s.toUpperCase() === 'PROVEEDOR GENERAL') return 'PROVEEDOR GENERAL';
+    const norm = str => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const k = norm(s);
+    if (CANONICOS_PROVEEDORES[k]) return CANONICOS_PROVEEDORES[k];
+    return formatearNombreTitulo(s);
+}
+
+function homologarNombrePunto(texto) {
+    if (!texto) return '';
+    const s = String(texto).trim();
+    if (!s) return '';
+    return formatearNombreTitulo(s);
 }
 
 // Función de sanitización para prevenir XSS en vistas HTML
@@ -959,7 +1070,13 @@ function renderDynamicRoutes(routes) {
 function procesarPuntosRutasDinamicos(puntosArray) {
     if (!Array.isArray(puntosArray) || puntosArray.length === 0) return;
 
-    MATRIZ_PUNTOS_RUTAS = puntosArray.filter(item => item && item.punto && item.estado !== 'Inactivo');
+    MATRIZ_PUNTOS_RUTAS = puntosArray
+        .filter(item => item && item.punto && item.estado !== 'Inactivo')
+        .map(item => ({
+            ...item,
+            proveedor: homologarNombreProveedor(item.proveedor),
+            punto: homologarNombrePunto(item.punto)
+        }));
 
     // Limpiar mapas dinámicos previos para evitar arrastrar datos obsoletos
     for (let k in PUNTO_TO_PROVEEDOR_MAP) delete PUNTO_TO_PROVEEDOR_MAP[k];
@@ -968,8 +1085,8 @@ function procesarPuntosRutasDinamicos(puntosArray) {
     for (let k in CRONOGRAMA_RUTAS) delete CRONOGRAMA_RUTAS[k];
 
     MATRIZ_PUNTOS_RUTAS.forEach(item => {
-        const punto = (item.punto || '').trim();
-        const prov = (item.proveedor || 'PROVEEDOR GENERAL').trim();
+        const punto = homologarNombrePunto(item.punto);
+        const prov = homologarNombreProveedor(item.proveedor || 'PROVEEDOR GENERAL');
         const ruta = (item.ruta || 'Ruta General').trim();
 
         PUNTO_TO_PROVEEDOR_MAP[punto] = prov;
@@ -1106,8 +1223,8 @@ async function refrescarPuntosRutasDesdeSheets() {
             if (r[0] && r[1] && r[2] && (r[7] || 'Activo').toLowerCase() !== 'inactivo') {
                 gvizPuntos.push({
                     ruta: r[0],
-                    proveedor: r[1],
-                    punto: r[2],
+                    proveedor: homologarNombreProveedor(r[1]),
+                    punto: homologarNombrePunto(r[2]),
                     direccion: r[3] || '',
                     telefono: r[4] || '',
                     horario: r[5] || '',
@@ -1134,7 +1251,7 @@ function getProveedoresOficialesSheets() {
     const mapa = new Map();
     (MATRIZ_PUNTOS_RUTAS || []).forEach(it => {
         if (!it || it.estado === 'Inactivo') return;
-        const prov = (it.proveedor || '').trim();
+        const prov = homologarNombreProveedor(it.proveedor);
         if (!prov || prov === 'PROVEEDOR GENERAL') return;
         const k = norm(prov);
         if (k && !mapa.has(k)) mapa.set(k, prov);
@@ -1562,11 +1679,11 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     const data = {
         id: recordId,
         timestamp: tsNow,
-        conductor: conductorName,
+        conductor: aNombrePropio(conductorName),
         ruta: homologarRuta(rutaName),
-        proveedor: proveedorName,
-        sucursal: sucursalName,
-        punto: sucursalName,
+        proveedor: homologarNombreProveedor(proveedorName),
+        sucursal: homologarNombrePunto(sucursalName),
+        punto: homologarNombrePunto(sucursalName),
         productos: collectedProducts,
         totalKilos: totalKilos,
         observaciones: observacionesVal,
@@ -2315,10 +2432,6 @@ window.resincronizarTodoAGoogleSheets = resincronizarTodoAGoogleSheets;
 // === SISTEMA DE RUTAS Y PROVEEDORES DINÁMICOS ===
 const DEFAULT_RUTAS_DATA = {
     "RUTA 1: Santa Elena / Cavasa": [
-        "CUENTA SEVILLANA",
-        "MIGAN CAPITAL",
-        "CUENTA PROVEEDORES HUESO",
-        "CUENTA 2026",
         "Bodega Santa Elena",
         "Alejandro Garay",
         "Sevillana Santa Elena",
@@ -2326,10 +2439,8 @@ const DEFAULT_RUTAS_DATA = {
         "Cavasa"
     ],
     "RUTA 2: Cali (Norte / Centro / Sur / Oriente)": [
-        "SUPERTIENDA CAÑAVERAL",
-        "COMERCIALIZADORA R Y E",
-        "CUENTA SEVILLANA",
-        "MIGAN CAPITAL",
+        "Supertienda Cañaveral",
+        "Comercializadora R y E",
         "Carnes Maiale",
         "Districarnes LG",
         "Super Carnes Los Andes",
@@ -2342,22 +2453,17 @@ const DEFAULT_RUTAS_DATA = {
         "Jaime Zuluaga",
         "Milton Muñoz",
         "Ciudadela del Río",
-        "La gran colombia",
+        "La Gran Colombia",
         "Carnicos La Fama"
     ],
     "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance": [
-        "CARIBE",
-        "SUPERTIENDA CAÑAVERAL",
-        "CUENTA 2026"
+        "Caribe",
+        "Supertienda Cañaveral"
     ],
     "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá": [
-        "CUENTA ALBERTO MILLAN",
-        "CARIBE",
-        "SUPERTIENDA CAÑAVERAL",
-        "CUENTA SEVILLANA",
-        "ANGELO PAREDES PROTEINCOL",
-        "CUENTA FABRICA",
-        "MATADERO",
+        "Caribe",
+        "Supertienda Cañaveral",
+        "Angelo Paredes Proteincol",
         "Supertienda Cañaveral - Frigorivalle",
         "Frigorivalle",
         "Jhonatan Martinez",
@@ -2366,10 +2472,9 @@ const DEFAULT_RUTAS_DATA = {
         "Hernando Hidalgo"
     ],
     "RUTA 5: Palmira / Villagorgona / Carmelo": [
-        "SUPERTIENDA CAÑAVERAL",
-        "CUENTA SEVILLANA",
-        "JHOANATAN MARTINEZ",
-        "MIGAN CAPITAL",
+        "Supertienda Cañaveral",
+        "Jhonatan Martinez",
+        "Migan Capital",
         "Mercamio",
         "Nutrialimentos Valdez (Villagorgona)",
         "Yénifer Díaz (Villagorgona)",
@@ -2394,100 +2499,100 @@ const DEFAULT_RUTAS_DATA = {
         "Belalcazar"
     ],
     "PLANTA SAN JOAQUIN": [
-        "HEBER GAMBOA",
-        "MILSON GONSALEZ",
-        "MIRIAM CUARAN",
-        "CARLOS CAICEDO",
-        "FREDDY FERNANDEZ",
-        "CARLOS MARTINEZ",
-        "CRHISTIAN CEDEÑO",
-        "GILDARDO TEJADA",
-        "MIGUEL ANGEL OTERO",
-        "MARIA ELSI ALEGRIA",
-        "WILMER BUSTAMANTE",
-        "JAIRO MOSQUERA",
-        "MARTIN PEREZ",
-        "OSCAR LARA",
-        "JULIAN LUNA",
-        "DIEGO BUITRAGO",
-        "FREDDY HERNANDEZ",
-        "BARBARA GOMEZ",
-        "HERNANDO HIDALGO",
-        "GRAXPRO",
-        "AUGUSTO MUÑOZ",
-        "FABIAN LOPEZ"
+        "Heber Gamboa",
+        "Milson Gonsalez",
+        "Miriam Cuaran",
+        "Carlos Caicedo",
+        "Freddy Fernandez",
+        "Carlos Martinez",
+        "Crhistian Cedeño",
+        "Gildardo Tejada",
+        "Miguel Angel Otero",
+        "Maria Elsi Alegria",
+        "Wilmer Bustamante",
+        "Jairo Mosquera",
+        "Martin Perez",
+        "Oscar Lara",
+        "Julian Luna",
+        "Diego Buitrago",
+        "Freddy Hernandez",
+        "Barbara Gomez",
+        "Hernando Hidalgo",
+        "Graxpro",
+        "Augusto Muñoz",
+        "Fabian Lopez"
     ]
 };
 
 const TODOS_LOS_PROVEEDORES = [
-    "ANGELO PAREDES PROTEINCOL",
     "Alberto Millan",
+    "Alejandro Garay",
+    "Angelo Paredes Proteincol",
     "Augusto Muñoz",
     "Baratón Carnes Berlín",
-    "BARBARA GOMEZ",
-    "BELALCAZAR",
-    "CARIBE",
+    "Barbara Gomez",
+    "Belalcazar",
+    "Bodega Santa Elena",
+    "Caribe",
     "Carlos Caicedo",
     "Carlos Martinez",
     "Carlos Rebolledo",
     "Carnes Maiale",
     "Carnicería Fabián López (Águila Roja)",
-    "CARNICOS LA FAMA",
-    "CAVASA",
+    "Carnicos La Fama",
+    "Cavasa",
     "Central Henry Martinez",
     "Ciudad del Campo",
     "Ciudadela del Río",
-    "COMERCIALIZADORA R Y E",
+    "Comercializadora R y E",
     "Crhistian Cedeño",
-    "CUENTA 2026",
-    "CUENTA ALBERTO MILLAN",
-    "CUENTA FABRICA",
-    "CUENTA PROVEEDORES HUESO",
-    "CUENTA SEVILLANA",
     "Diego Buitrago",
     "Distribuidora de Carnes Millan",
     "Districarnes LG",
+    "Edinson Aguirre",
     "El Rebajón",
     "Fabian Lopez",
     "Freddy Fernandez",
-    "FREDDY HERNANDEZ",
+    "Freddy Hernandez",
     "Frigorivalle",
     "Gildardo Tejada",
-    "GRAXPRO",
-    "HEBER GAMBOA",
-    "HERNANDO HIDALGO",
+    "Graxpro",
+    "Heber Gamboa",
+    "Hernando Hidalgo",
     "Jaime Zuluaga",
-    "JAIRO MOSQUERA",
-    "JHOANATAN MARTINEZ",
+    "Jairo Mosquera",
+    "Jhonatan Martinez",
     "Jorge Adrián Rodas (Villagorgona)",
     "Jose Alex Pareja",
     "Julian Luna",
     "La Cosecha de Mi Tierra",
     "La Esperanza",
-    "La gran colombia",
-    "MARIA ELSI ALEGRIA",
-    "MARTIN PEREZ",
-    "MATADERO",
+    "La Gran Colombia",
+    "La Reserva",
+    "Los Lagos",
+    "Maria Elsi Alegria",
+    "Martin Perez",
     "Mercamio",
     "Mercaunion",
-    "MIGAN CAPITAL",
-    "MIGUEL ANGEL OTERO",
-    "MILSON GONSALEZ",
+    "Migan Capital",
+    "Miguel Angel Otero",
+    "Milson Gonsalez",
     "Milton Muñoz",
-    "MIRIAM CUARAN",
+    "Miriam Cuaran",
     "Nutrialimentos Valdez (Villagorgona)",
     "Orlando Giraldo",
     "Orlando Martinez",
-    "OSCAR LARA",
+    "Oscar Lara",
     "Ricardo Gil",
     "Santa Elena",
-    "SEVILLANA",
+    "Sevillana",
     "Sevillana República de Israel",
+    "Sevillana Santa Elena",
     "Super Carnes Los Andes",
-    "SUPERTIENDA CAÑAVERAL",
+    "Supertienda Cañaveral",
     "Supertienda Cañaveral - Frigorivalle",
-    "WILMER BUSTAMANTE",
-    "YIMI SANCLEMENTE",
+    "Wilmer Bustamante",
+    "Yimi Sanclemente",
     "Yénifer Díaz (Villagorgona)"
 ];
 
@@ -2917,7 +3022,8 @@ function populardropdownSucursales(proveedorSeleccionado) {
     sucursalSelect.innerHTML = '<option value="" disabled selected>Seleccione el punto de recolección</option>';
 
     if (listaSucursales.length > 0) {
-        listaSucursales.forEach(suc => {
+        listaSucursales.forEach(sucRaw => {
+            const suc = homologarNombrePunto(sucRaw);
             const opt = document.createElement('option');
             opt.value = suc;
             opt.textContent = suc;
@@ -2926,7 +3032,7 @@ function populardropdownSucursales(proveedorSeleccionado) {
 
         // Si el proveedor tiene exactamente 1 punto registrado, preseleccionarlo automáticamente para ahorrar tiempo al conductor
         if (listaSucursales.length === 1) {
-            sucursalSelect.value = listaSucursales[0];
+            sucursalSelect.value = homologarNombrePunto(listaSucursales[0]);
             sucursalSelect.classList.remove('input-error');
             const errorMsg = document.getElementById('sucursal-error');
             if (errorMsg) errorMsg.style.display = 'none';
@@ -3025,7 +3131,15 @@ function populardropdownProveedoresPorRuta(rutaSeleccionada, mostrandoTodos = fa
 
     const listaProveedores = mostrandoTodos ? getTodosLosProveedores() : getProveedoresParaRuta(rutaSeleccionada);
 
-    listaProveedores.forEach(prov => {
+    const norm = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const provsUnicos = new Map();
+    listaProveedores.forEach(p => {
+        const clean = homologarNombreProveedor(p);
+        const k = norm(clean);
+        if (k && !provsUnicos.has(k)) provsUnicos.set(k, clean);
+    });
+
+    Array.from(provsUnicos.values()).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' })).forEach(prov => {
         const opt = document.createElement('option');
         opt.value = prov;
         opt.textContent = prov;
@@ -3092,10 +3206,10 @@ function mostrarComprobanteDigital(data) {
     document.getElementById('receipt-number').textContent = `N° ${data.id || (data._docId ? data._docId : 'REC-' + Date.now())}`;
     document.getElementById('receipt-date').textContent = receiptDateStr;
     document.getElementById('receipt-time').textContent = receiptTimeStr;
-    document.getElementById('receipt-driver').textContent = data.conductor || '-';
+    document.getElementById('receipt-driver').textContent = aNombrePropio(data.conductor) || '-';
     document.getElementById('receipt-route').textContent = data.ruta || '-';
-    document.getElementById('receipt-provider').textContent = data.proveedor || '-';
-    document.getElementById('receipt-branch').textContent = data.punto || data.sucursal || 'General';
+    document.getElementById('receipt-provider').textContent = homologarNombreProveedor(data.proveedor) || '-';
+    document.getElementById('receipt-branch').textContent = homologarNombrePunto(data.punto || data.sucursal) || 'General';
 
     // Rellenar tabla de items ordenada alfabéticamente
     const tbody = document.getElementById('receipt-items-body');
@@ -3173,10 +3287,10 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
         `-----------------------------------------\n` +
         `📄 *N° Recibo:* ${d.id || d._docId || 'N/A'}\n` +
         `📅 *Fecha:* ${fechaMsg}\n` +
-        `🚛 *Conductor:* ${d.conductor}\n` +
+        `🚛 *Conductor:* ${aNombrePropio(d.conductor)}\n` +
         `🗺️ *Ruta:* ${d.ruta}\n` +
-        `🏬 *Proveedor:* ${d.proveedor}\n` +
-        `📍 *Sucursal/Punto:* ${d.punto || d.sucursal || 'General'}\n` +
+        `🏬 *Proveedor:* ${homologarNombreProveedor(d.proveedor)}\n` +
+        `📍 *Sucursal/Punto:* ${homologarNombrePunto(d.punto || d.sucursal) || 'General'}\n` +
         `-----------------------------------------\n` +
         `📦 *PRODUCTOS RECOLECTADOS:*\n${prodsTxt}\n` +
         `-----------------------------------------\n` +
@@ -3272,7 +3386,7 @@ function initAdminSupportModal() {
         const provsMap = new Map();
 
         (provsList || []).forEach(p => {
-            const clean = (p || '').trim();
+            const clean = homologarNombreProveedor(p);
             const k = norm(clean);
             if (k && !provsMap.has(k)) {
                 provsMap.set(k, clean);
@@ -3281,7 +3395,7 @@ function initAdminSupportModal() {
 
         // Asegurar que registros existentes en caché también estén disponibles si no estuvieran en catálogo
         adminRecordsCache.forEach(r => {
-            const prov = (r.proveedor || '').trim();
+            const prov = homologarNombreProveedor(r.proveedor);
             const k = norm(prov);
             if (k && !provsMap.has(k)) {
                 provsMap.set(k, prov);
@@ -3375,12 +3489,12 @@ function initAdminSupportModal() {
         const puntosSet = new Set();
 
         const puntosCat = getPuntosParaProveedor('', provVal);
-        puntosCat.forEach(pt => puntosSet.add(pt));
+        puntosCat.forEach(pt => puntosSet.add(homologarNombrePunto(pt)));
 
         adminRecordsCache.forEach(r => {
             if (cleanStr(r.proveedor) === targetProv) {
                 const pt = r.punto || r.sucursal;
-                if (pt) puntosSet.add(pt);
+                if (pt) puntosSet.add(homologarNombrePunto(pt));
             }
         });
 
@@ -3613,7 +3727,8 @@ window.abrirModalEditarRecoleccion = function(docId, recordLocalId) {
     const pointDatalist = document.getElementById('edit-point-list');
 
     provInput.value = rec.proveedor || '';
-    pointInput.value = rec.punto || rec.sucursal || '';
+    pointInput.value = homologarNombrePunto(rec.punto || rec.sucursal || '');
+    provInput.value = homologarNombreProveedor(rec.proveedor || '');
 
     if (provDatalist) {
         provDatalist.innerHTML = '';
@@ -3624,13 +3739,14 @@ window.abrirModalEditarRecoleccion = function(docId, recordLocalId) {
         const norm = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
         const provsMap = new Map();
         (oficiales || []).forEach(p => {
-            const clean = (p || '').trim();
+            const clean = homologarNombreProveedor(p);
             const k = norm(clean);
             if (k && !provsMap.has(k)) provsMap.set(k, clean);
         });
         if (rec.proveedor) {
-            const k = norm(rec.proveedor);
-            if (k && !provsMap.has(k)) provsMap.set(k, rec.proveedor.trim());
+            const cleanRec = homologarNombreProveedor(rec.proveedor);
+            const k = norm(cleanRec);
+            if (k && !provsMap.has(k)) provsMap.set(k, cleanRec);
         }
         Array.from(provsMap.values()).sort((a,b) => a.localeCompare(b, 'es', {sensitivity: 'base'})).forEach(p => {
             const opt = document.createElement('option');
@@ -3642,9 +3758,17 @@ window.abrirModalEditarRecoleccion = function(docId, recordLocalId) {
     if (pointDatalist) {
         pointDatalist.innerHTML = '';
         const ptsSet = new Set();
+        const norm = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        const targetProv = norm(provInput.value);
+
+        if (provInput.value) {
+            getPuntosParaProveedor('', provInput.value).forEach(pt => ptsSet.add(homologarNombrePunto(pt)));
+        }
         adminRecordsCache.forEach(r => {
-            const pt = r.punto || r.sucursal;
-            if (pt) ptsSet.add(pt.trim());
+            if (!targetProv || norm(r.proveedor) === targetProv) {
+                const pt = r.punto || r.sucursal;
+                if (pt) ptsSet.add(homologarNombrePunto(pt));
+            }
         });
         Array.from(ptsSet).sort((a,b) => a.localeCompare(b, 'es', {sensitivity: 'base'})).forEach(pt => {
             const opt = document.createElement('option');
@@ -3850,9 +3974,9 @@ function initAdminEditModal() {
             const updatedData = {
                 conductor: aNombrePropio(conductor),
                 ruta: homologarRuta(ruta),
-                proveedor: aNombrePropio(proveedor),
-                punto: aNombrePropio(punto),
-                sucursal: aNombrePropio(punto),
+                proveedor: homologarNombreProveedor(proveedor),
+                punto: homologarNombrePunto(punto),
+                sucursal: homologarNombrePunto(punto),
                 fecha: fecha,
                 observaciones: observaciones,
                 productos: productos,
@@ -4171,11 +4295,11 @@ function initNovedadesModal() {
                 id: recordId,
                 timestamp: tsNow,
                 tipo: 'Novedad',
-                conductor: conductorName,
+                conductor: aNombrePropio(conductorName),
                 ruta: homologarRuta(rutaName),
-                proveedor: provName,
-                sucursal: puntoName,
-                punto: puntoName,
+                proveedor: homologarNombreProveedor(provName),
+                sucursal: homologarNombrePunto(puntoName),
+                punto: homologarNombrePunto(puntoName),
                 causal: causal,
                 productos: [{
                     producto: `Visita Fallida: ${causal}`,
