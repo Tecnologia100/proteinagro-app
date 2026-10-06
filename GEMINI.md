@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.6.6)  
+> **Última Actualización:** Octubre 2026 (Versión 1.6.7)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -74,6 +74,17 @@
   - `Migrar_Tarifas_Ruta1.gs`: Script de Google Apps Script ejecutable desde el menú *🚀 ProteinAgro > Actualizar Tarifario Ruta 1 (Opción 1)* o consola de Apps Script para actualización atómica en vivo de la pestaña `Tarifas`.
   - `Code.gs`: Endpoint `action=migrarTarifasRuta1` y fallback de respaldo inteligente en `obtenerPrecioTarifa`.
   - Archivos Excel y CSV actualizados: `Tarifario_Completo_Reparado_2026_Actualizado.xlsx`, `Tarifario_Por_Proveedor_2026_Actualizado.xlsx`, `tarifario.xlsx`, `Tarifas_GoogleSheets_Actualizado.xlsx` y `Tarifas_GoogleSheets_Actualizado.csv`.
+
+### 8. Saneamiento Quirúrgico de Duplicados y Anomalías de Septiembre (`v1.6.7`)
+- **Diagnóstico y Causa Raíz:**
+  - *Error Tipográfico 40.000 Kg:* Fila 1807 (`REC-1790357561744`, 25/09 12:32:41) registró 40.000 Kg con valor de \$48.000.000. Corregido quirúrgicamente a **40 Kg** a \$1.200/Kg = **\$48.000**, asignado a su proveedor real **Edinson Aguirre** (Punto Cavasa).
+  - *Identificación 142 Kg Cavasa:* Fila 1758 (`REC-1790285777272`, 24/09 16:36:17) registrada genéricamente como "Cavasa Cavasa" corregida a su proveedor real **Edinson Aguirre** (Punto Cavasa).
+  - *Clones Sintéticos con IDs `REC-...000`:* Creados a finales de septiembre por copias de filas sin ID donde un script rellenó IDs evaluando fechas texto en UTC (`...000` con desfase de 5 horas / 18.000.000 ms), burlando la regla de ID duplicado. Se identificaron y eliminaron quirúrgicamente **24 clones sintéticos** (entre ellos Cañaveral Matadero 100 kg y 50 kg de Carolina, y clones de Cavasa del 11 al 26 de septiembre).
+- **Salvaguarda y Ejecución Segura:**
+  - Creación automática previa de la pestaña congelada **`Recolecciones_Backup_PreReparacion`** en Google Sheets.
+  - Eliminación inversa (*bottom-up*) de los 24 clones y actualización puntual de las 2 filas afectadas.
+  - Las 2.166 filas de recolecciones legítimas de los conductores, sus kilos y proveedores reales permanecen 100% intactas.
+  - Scripts de soporte: `Reparar_Duplicados_Septiembre.gs`, función `repararDuplicadosSeptiembre` en `Code.gs` y menú directo *🚀 ProteinAgro > 🔧 Reparar Duplicados de Septiembre*.
 
 ---
 

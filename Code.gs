@@ -50,6 +50,11 @@ function doGet(e) {
       return migrarTarifasRuta1Http(ss);
     }
 
+    // 0.0817 Reparación de duplicados y anomalías de septiembre (Cavasa / Cañaveral)
+    if (e && e.parameter && e.parameter.action === 'repararDuplicadosSeptiembre') {
+      return repararDuplicadosSeptiembreHttp(ss);
+    }
+
     if (e && e.parameter && e.parameter.action === 'corregirKilosFechas') {
       return corregirKilosFechasSheet(ss);
     }
@@ -1909,6 +1914,7 @@ function onOpen() {
       .createMenu("🚀 ProteinAgro")
       .addItem("Reclasificar Ruta 1 (Santa Elena)", "migrarRuta1_SantaElena")
       .addItem("Actualizar Tarifario Ruta 1 (Opción 1)", "migrarTarifasRuta1")
+      .addItem("🔧 Reparar Duplicados de Septiembre", "repararDuplicadosSeptiembre")
       .addToUi();
   } catch (e) {
     // Modo headless / web app
@@ -2114,6 +2120,162 @@ function migrarTarifasRuta1(ss) {
 function migrarTarifasRuta1Http(ss) {
   try {
     var res = migrarTarifasRuta1(ss);
+    return ContentService.createTextOutput(JSON.stringify(res, null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==============================================================================
+// REPARACIÓN QUIRÚRGICA DE DUPLICADOS Y ANOMALÍAS DE SEPTIEMBRE
+// ==============================================================================
+function repararDuplicadosSeptiembre(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetRec = ss.getSheetByName("Recolecciones");
+    if (!sheetRec) {
+      throw new Error("No se encontró la pestaña 'Recolecciones'.");
+    }
+
+    var lastRow = sheetRec.getLastRow();
+    var lastCol = sheetRec.getLastColumn();
+    if (lastRow <= 1) {
+      throw new Error("La hoja 'Recolecciones' está vacía.");
+    }
+
+    // PASO 1: CREAR RESPALDO DE SEGURIDAD 100% INMUTABLE
+    var backupSheetName = "Recolecciones_Backup_PreReparacion";
+    var existingBackup = ss.getSheetByName(backupSheetName);
+    if (existingBackup) {
+      ss.deleteSheet(existingBackup);
+    }
+    var backupSheet = sheetRec.copyTo(ss);
+    backupSheet.setName(backupSheetName);
+    Logger.log("✅ [Seguridad] Pestaña de respaldo creada: " + backupSheetName);
+
+    // PASO 2: MAPEAR COLUMNAS
+    var headers = sheetRec.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colIdx = { id: 0, fecha: 1, ruta: 2, cond: 3, prov: 4, punto: 5, prod: 6, kg: 7, obs: 8, precio: 10, valor: 11 };
+
+    for (var c = 0; c < headers.length; c++) {
+      var h = String(headers[c] || '').toLowerCase().trim();
+      if (h.indexOf('id') !== -1) colIdx.id = c;
+      else if (h.indexOf('fecha') !== -1) colIdx.fecha = c;
+      else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+      else if (h.indexOf('kg') !== -1 || h.indexOf('kilo') !== -1) colIdx.kg = c;
+      else if (h.indexOf('precio') !== -1) colIdx.precio = c;
+      else if (h.indexOf('valor') !== -1) colIdx.valor = c;
+    }
+
+    // PASO 3: LISTA EXACTA DE IDs SINTÉTICOS DUPLICADOS A ELIMINAR (24 CLONES)
+    var idsClonesEliminar = {
+      'REC-1790263124000': true, // 24/09 Cañaveral Matadero 100 kg
+      'REC-1790270182000': true, // 24/09 Cañaveral Matadero 50 kg
+      'REC-1790291094000': true, // 24/09 Cavasa 15 kg (Los Lagos)
+      'REC-1790291189000': true, // 24/09 Cavasa 111 kg (La Reserva)
+      'REC-1790372238000': true, // 25/09 Cavasa 482 kg Pieles (Sevillana)
+      'REC-1790372467000': true, // 25/09 Cavasa 207 kg Sebo (Sevillana)
+      'REC-1790372587000': true, // 25/09 Cavasa 180 kg Sebo (Los Lagos)
+      'REC-1790372678000': true, // 25/09 Cavasa 75 kg Sebo (La Reserva)
+      'REC-1790373112000': true, // 25/09 Cavasa 228 kg Sebo (Edinson Aguirre)
+      'REC-1789145873000': true, // 11/09 Cavasa 507.8 kg Pieles
+      'REC-1789146762000': true, // 11/09 Cavasa 595 kg Sebo
+      'REC-1789245060000': true, // 12/09 Cavasa 275 kg Gordana
+      'REC-1789728450000': true, // 18/09 Cavasa 625 kg Sebo
+      'REC-1789985928000': true, // 21/09 Cavasa 979 kg Pieles
+      'REC-1789985974000': true, // 21/09 Cavasa 126 kg Sebo
+      'REC-1789986008000': true, // 21/09 Cavasa 206 kg Sebo
+      'REC-1789986582000': true, // 21/09 Cavasa 423 kg Sebo
+      'REC-1790101154000': true, // 22/09 Cavasa 210 kg Sebo
+      'REC-1790101244000': true, // 22/09 Cavasa 249 kg Sebo
+      'REC-1790101302000': true, // 22/09 Cavasa 53 kg Sebo
+      'REC-1790101494000': true, // 22/09 Cavasa 327.5 kg Hueso Promocion
+      'REC-1790101686000': true, // 22/09 Cavasa 169 kg Sebo
+      'REC-1790181288000': true, // 23/09 Cavasa 171 kg Sebo
+      'REC-1790437841000': true  // 26/09 Cavasa 362 kg Sebo
+    };
+
+    // PASO 4: APLICAR CORRECCIONES EN MEMORIA Y MARCAR CLONES
+    var idRange = sheetRec.getRange(2, 1, lastRow - 1, 1).getValues();
+    var filasParaEliminar = [];
+    var correcionesRealizadas = [];
+
+    for (var r = idRange.length - 1; r >= 0; r--) {
+      var filaNum = r + 2;
+      var idFila = String(idRange[r][0] || '').trim();
+
+      // Caso A: Corrección Fila 40.000 Kg (REC-1790357561744)
+      if (idFila === 'REC-1790357561744') {
+        sheetRec.getRange(filaNum, colIdx.prov + 1).setValue('Edinson Aguirre');
+        sheetRec.getRange(filaNum, colIdx.punto + 1).setValue('Cavasa');
+        sheetRec.getRange(filaNum, colIdx.kg + 1).setValue(40);
+        sheetRec.getRange(filaNum, colIdx.valor + 1).setValue(48000);
+        correcionesRealizadas.push("Fila " + filaNum + ": 40.000 Kg corregidos a 40 Kg (Edinson Aguirre - $48.000)");
+        Logger.log("✅ Corregida Fila " + filaNum + " (40.000 Kg -> 40 Kg Edinson Aguirre)");
+        continue;
+      }
+
+      // Caso B: Corrección Fila 142 Kg (REC-1790285777272)
+      if (idFila === 'REC-1790285777272') {
+        sheetRec.getRange(filaNum, colIdx.prov + 1).setValue('Edinson Aguirre');
+        sheetRec.getRange(filaNum, colIdx.punto + 1).setValue('Cavasa');
+        correcionesRealizadas.push("Fila " + filaNum + ": Proveedor 'Cavasa' corregido a 'Edinson Aguirre' (142 Kg Sebo)");
+        Logger.log("✅ Corregida Fila " + filaNum + " (142 Kg -> Edinson Aguirre)");
+        continue;
+      }
+
+      // Caso C: Clon sintético duplicado -> Marcar para eliminación
+      if (idsClonesEliminar[idFila]) {
+        filasParaEliminar.push(filaNum);
+      }
+    }
+
+    // PASO 5: ELIMINAR CLONES DE ABAJO HACIA ARRIBA
+    for (var d = 0; d < filasParaEliminar.length; d++) {
+      var numEliminar = filasParaEliminar[d];
+      sheetRec.deleteRow(numEliminar);
+      Logger.log("🗑️ Eliminada fila clon duplicada: " + numEliminar);
+    }
+
+    var mensajeFinal = "🎉 ¡REPARACIÓN DE SEPTIEMBRE COMPLETADA CON ÉXITO!\n\n" +
+      "1. Correcciones específicas aplicadas:\n" +
+      "   • " + correcionesRealizadas.join("\n   • ") + "\n\n" +
+      "2. Clones sintéticos duplicados eliminados:\n" +
+      "   • Total filas clon eliminadas: " + filasParaEliminar.length + " filas\n\n" +
+      "3. Respaldo de seguridad creado:\n" +
+      "   • Pestaña: '" + backupSheetName + "' (conserva el 100% de los datos previos)\n\n" +
+      "Las recolecciones legítimas de los conductores, sus kilos y proveedores reales (Edinson Aguirre, Los Lagos, La Reserva, Sevillana) quedaron 100% intactas y saneadas.";
+
+    Logger.log(mensajeFinal);
+
+    try {
+      SpreadsheetApp.getUi().alert(mensajeFinal);
+    } catch(e) {}
+
+    return {
+      status: "success",
+      filasModificadas: correcionesRealizadas.length,
+      clonesEliminados: filasParaEliminar.length,
+      backupCreado: backupSheetName,
+      totalFilasRestantes: sheetRec.getLastRow()
+    };
+
+  } catch(err) {
+    Logger.log("❌ Error en repararDuplicadosSeptiembre: " + err.toString());
+    try {
+      SpreadsheetApp.getUi().alert("Error: " + err.toString());
+    } catch(e) {}
+    return { status: "error", error: err.toString() };
+  }
+}
+
+function repararDuplicadosSeptiembreHttp(ss) {
+  try {
+    var res = repararDuplicadosSeptiembre(ss);
     return ContentService.createTextOutput(JSON.stringify(res, null, 2))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {

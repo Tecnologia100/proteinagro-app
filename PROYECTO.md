@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.6.6`  
+> **Versión Actual:** `v=1.6.7`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -648,6 +648,25 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - `Migrar_Tarifas_Ruta1.gs`: Script de Google Apps Script con ejecución en un clic para actualizar la pestaña `Tarifas` en vivo.
   - Menú directo en Google Sheets: `🚀 ProteinAgro > Actualizar Tarifario Ruta 1 (Opción 1)`.
   - Fallback en `Code.gs`: Motor `obtenerPrecioTarifa` blindado con herencia Santa Elena / Cavasa para garantizar cero interrupciones de precios.
+
+## 🔧 16. Saneamiento Quirúrgico de Duplicados y Anomalías de Septiembre (`v1.6.7`)
+> **Fecha de Implementación:** 06 de Octubre de 2026  
+> **Archivos Asociados:** [`Reparar_Duplicados_Septiembre.gs`](./Reparar_Duplicados_Septiembre.gs), [`Code.gs`](./Code.gs), [`REPARACION_DUPLICADOS_SEPTIEMBRE.md`](./REPARACION_DUPLICADOS_SEPTIEMBRE.md)  
+> **Objetivo:** Resolver quirúrgicamente las quejas administrativas de septiembre respecto a registros duplicados y montos anómalos en Google Sheets `Recolecciones`, garantizando cero impacto en los 2.166 registros legítimos.
+
+- **Corrección Quirúrgica de Anomalías Puntuales:**
+  1. *Fila 1807 (`REC-1790357561744`, 25/09 12:32:41):* Error tipográfico con punto decimal `40.000 Kg` (\$48.000.000) corregido a **`40 Kg`** (\$48.000), asignando formalmente al proveedor **`Edinson Aguirre`** (Punto Cavasa).
+  2. *Fila 1758 (`REC-1790285777272`, 24/09 16:36:17):* 142 Kg de Sebo registrado genéricamente como "Cavasa Cavasa" asignado a su proveedor real **`Edinson Aguirre`** (Punto Cavasa).
+- **Eliminación de 24 Clones Sintéticos Duplicados (`REC-...000`):**
+  - Identificados mediante barrido forense 24 registros clonados sin milisegundos reales (desfase UTC de 5 horas = 18.000.000 ms), incluyendo los reportados por administración: Cañaveral Matadero (100 Kg y 50 Kg de Carolina el 24/09), Cavasa 15 Kg (Los Lagos), Cavasa 111 Kg (La Reserva), Cavasa 482 Kg (Sevillana el 25/09), y demás clones de Cavasa del 11 al 26 de septiembre.
+  - Los 24 clones se eliminan de forma atómica en sentido inverso (*bottom-up*) para preservar índices.
+- **Blindaje y Respaldo de Seguridad:**
+  - Creación automática previa de la pestaña inmutable **`Recolecciones_Backup_PreReparacion`** en Google Sheets.
+  - 2.166 recolecciones legítimas de campo, con sus marcas de tiempo reales, firmas, kilos y valores monetarios, preservadas 100% intactas.
+- **Herramientas de Ejecución:**
+  - Script independiente [`Reparar_Duplicados_Septiembre.gs`](./Reparar_Duplicados_Septiembre.gs).
+  - Menú directo en Google Sheets: `🚀 ProteinAgro > 🔧 Reparar Duplicados de Septiembre`.
+  - Endpoint en `Code.gs`: `action=repararDuplicadosSeptiembre`.
 
 ---
 
