@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.6.5`  
+> **Versión Actual:** `v=1.6.6`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -625,6 +625,29 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Herramientas de Ejecución en Apps Script:**
   - `migrarRuta1_SantaElena(ss)`: Barrido atómico en memoria por bloque `getValues()` / `setValues()`.
   - Menú superior automático en hoja de cálculo: `🚀 ProteinAgro > Reclasificar Ruta 1 (Santa Elena)`.
+
+## 💵 15. Tarifario Individualizado por Proveedor en Ruta 1: Santa Elena / Cavasa (Opción 1 - `v1.6.6`)
+> **Fecha de Implementación:** 06 de Octubre de 2026  
+> **Archivos Asociados:** [`Migrar_Tarifas_Ruta1.gs`](./Migrar_Tarifas_Ruta1.gs), [`Code.gs`](./Code.gs), [`actualizar_tarifario_ruta1.py`](./actualizar_tarifario_ruta1.py), [`ACTUALIZACION_TARIFAS_RUTA1_OPCION1.md`](./ACTUALIZACION_TARIFAS_RUTA1_OPCION1.md), [`Tarifas_GoogleSheets_Actualizado.xlsx`](./Tarifas_GoogleSheets_Actualizado.xlsx)  
+> **Objetivo:** Implementar la **Opción 1**, individualizando las tarifas de la Ruta 1 por cada cliente/proveedor a partir de los precios históricos de zona (Santa Elena y Cavasa), manteniendo intactas las demás rutas.
+
+- **Desglose de Tarifas Asignadas (78 Filas Nuevas):**
+  - **Santa Elena (3 Proveedores x 10 Materias = 30 filas):**
+    - *Bodega Santa Elena* (Punto: `Santa Elena`)
+    - *Alejandro Garay* (Punto: `Santa Elena`)
+    - *Sevillana Santa Elena* (Punto: `Sevillana Santa Elena`)
+    - Tarifas asignadas: Aceite (\$3.600), Desperdicio (\$150), Empella (\$2.000), Hueso Blanco (\$300), Hueso Cerdo (\$150), Hueso Seco (\$700), Manteca (\$3.500), Sebo en Rama (\$1.300), Gordana/Calambombo (*Pendiente cotizar*).
+  - **Cavasa (8 Proveedores x 6 Materias = 48 filas):**
+    - *Barbara Gomez*, *Los Lagos*, *Caribe*, *Sevillana*, *Migan Capital*, *Freddy Hernandez*, *Edinson Aguirre*, *La Reserva* (todos con Punto: `Cavasa`).
+    - Tarifas asignadas: Gordana (\$2.000), Hueso Blanco (\$350), Hueso Cerdo (\$250), Hueso Promoción (\$1.200), Pieles (\$100), Sebo en Rama (\$1.200).
+- **Salvaguarda de Respaldo y Cobertura Total:**
+  - 16 filas de respaldo histórico bajo nombres genéricos `Santa Elena` y `Cavasa`.
+  - 278 filas de todas las demás rutas (Cali, Palmira, Jamundí, Buga, Tuluá, Planta San Joaquín) 100% intactas.
+  - Total general en la pestaña `Tarifas`: **372 filas de tarifas**.
+- **Herramientas de Ejecución e Integración:**
+  - `Migrar_Tarifas_Ruta1.gs`: Script de Google Apps Script con ejecución en un clic para actualizar la pestaña `Tarifas` en vivo.
+  - Menú directo en Google Sheets: `🚀 ProteinAgro > Actualizar Tarifario Ruta 1 (Opción 1)`.
+  - Fallback en `Code.gs`: Motor `obtenerPrecioTarifa` blindado con herencia Santa Elena / Cavasa para garantizar cero interrupciones de precios.
 
 ---
 

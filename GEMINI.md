@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.6.5)  
+> **Última Actualización:** Octubre 2026 (Versión 1.6.6)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -56,13 +56,24 @@
 - Los precios se obtienen automáticamente en `Code.gs` desde la pestaña `Tarifas`.
 - Fallback al histórico de `Recolecciones` en caso de no existir tarifa específica.
 
-### 5. Reclasificación y Matriz Ruta 1: Santa Elena / Cavasa (`v1.6.5`)
+### 6. Reclasificación y Matriz Ruta 1: Santa Elena / Cavasa (`v1.6.5`)
 - **Esquema Proveedor <-> Sucursal invertido para comercios de Santa Elena:**
   - `Bodega Santa Elena`: Proveedor: `Bodega Santa Elena` | Sucursal/Punto: `Santa Elena`.
   - `Alejandro Garay`: Proveedor: `Alejandro Garay` | Sucursal/Punto: `Santa Elena`.
   - `Sevillana Santa Elena`: Proveedor: `Sevillana Santa Elena` | Sucursal/Punto: `Sevillana Santa Elena`.
 - **Garantía Histórica:** Reclasificación atómica ejecutada con éxito en Google Sheets `Recolecciones`: **340 filas actualizadas** (192 Bodega Santa Elena, 63 Alejandro Garay, 85 Sevillana Santa Elena), manteniendo las 1.815 filas de las demás rutas 100% intactas, e inmutables los pesos (`Kg`), precios, valores, IDs y marcas de tiempo.
 - **Catálogo Web App & Offline:** Sincronizado en `DEFAULT_RUTAS_DATA` y `CATALOGO_PUNTOS_RUTAS_DEFAULT` en `app.js` v1.6.5.
+
+### 7. Tarifario Individualizado Ruta 1: Santa Elena / Cavasa (Opción 1 - `v1.6.6`)
+- **Desglose Individual por Comercio:**
+  - 3 Proveedores Santa Elena (`Bodega Santa Elena`, `Alejandro Garay`, `Sevillana Santa Elena`) con 10 materias primas heredadas de Santa Elena (30 filas).
+  - 8 Proveedores Cavasa (`Barbara Gomez`, `Los Lagos`, `Caribe`, `Sevillana`, `Migan Capital`, `Freddy Hernandez`, `Edinson Aguirre`, `La Reserva`) con 6 materias primas heredadas de Cavasa (48 filas).
+  - 16 filas de respaldo histórico para `Santa Elena` (10 filas) y `Cavasa` (6 filas).
+  - Matriz resultante en pestaña `Tarifas`: **372 filas de datos** (+ 1 fila de encabezado = 373 filas), con las 278 filas de demás rutas 100% intactas.
+- **Herramientas de Sincronización:**
+  - `Migrar_Tarifas_Ruta1.gs`: Script de Google Apps Script ejecutable desde el menú *🚀 ProteinAgro > Actualizar Tarifario Ruta 1 (Opción 1)* o consola de Apps Script para actualización atómica en vivo de la pestaña `Tarifas`.
+  - `Code.gs`: Endpoint `action=migrarTarifasRuta1` y fallback de respaldo inteligente en `obtenerPrecioTarifa`.
+  - Archivos Excel y CSV actualizados: `Tarifario_Completo_Reparado_2026_Actualizado.xlsx`, `Tarifario_Por_Proveedor_2026_Actualizado.xlsx`, `tarifario.xlsx`, `Tarifas_GoogleSheets_Actualizado.xlsx` y `Tarifas_GoogleSheets_Actualizado.csv`.
 
 ---
 
