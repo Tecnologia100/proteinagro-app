@@ -3328,7 +3328,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.5&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.7&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -4416,12 +4416,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.6.5 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.6.7 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.6.5')
+            navigator.serviceWorker.register('/sw.js?v=1.6.7')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.6.5 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.6.7 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -4429,8 +4429,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.6.5 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.5&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.6.7 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.7&t=' + Date.now();
                                 }
                             };
                         }
@@ -4459,7 +4459,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.6.5&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.6.7&t=' + Date.now();
             }
         });
 
@@ -4468,7 +4468,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.5&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.7&t=' + Date.now();
                 }
             }
         });
