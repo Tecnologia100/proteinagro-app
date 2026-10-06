@@ -1080,6 +1080,68 @@ async function sincronizarCredencialesDesdeGviz() {
 }
 
 // Sincronización directa de Productos y Puntos_Rutas vía Google Sheets Gviz (Alta disponibilidad anti-fallos)
+// Lectura en vivo de la hoja Puntos_Rutas (fuente oficial de Proveedores y Puntos) vía Gviz CSV
+async function refrescarPuntosRutasDesdeSheets() {
+    if (!navigator.onLine) return false;
+    try {
+        const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+        const puntosUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Puntos_Rutas&headers=1&t=${Date.now()}`;
+        const resPuntos = await fetch(puntosUrl, { cache: 'no-store' });
+        if (!resPuntos.ok) return false;
+        const csvPuntos = await resPuntos.text();
+        const lines = csvPuntos.split(/\r?\n/).filter(l => l.trim().length > 0);
+        const gvizPuntos = [];
+        for (let i = 1; i < lines.length; i++) {
+            const cols = [];
+            let cur = '';
+            let inQuotes = false;
+            for (let j = 0; j < lines[i].length; j++) {
+                const char = lines[i][j];
+                if (char === '"') inQuotes = !inQuotes;
+                else if (char === ',' && !inQuotes) { cols.push(cur.trim()); cur = ''; }
+                else cur += char;
+            }
+            cols.push(cur.trim());
+            const r = cols.map(c => c.replace(/^"|"$/g, '').trim());
+            if (r[0] && r[1] && r[2] && (r[7] || 'Activo').toLowerCase() !== 'inactivo') {
+                gvizPuntos.push({
+                    ruta: r[0],
+                    proveedor: r[1],
+                    punto: r[2],
+                    direccion: r[3] || '',
+                    telefono: r[4] || '',
+                    horario: r[5] || '',
+                    frecuencia: r[6] || '',
+                    estado: 'Activo'
+                });
+            }
+        }
+        if (gvizPuntos.length > 0) {
+            procesarPuntosRutasDinamicos(gvizPuntos);
+            console.log("✅ Puntos_Rutas sincronizados directamente desde Google Sheets (Gviz):", gvizPuntos.length);
+            return true;
+        }
+    } catch (ePuntos) {
+        console.warn("Aviso Gviz Puntos_Rutas:", ePuntos);
+    }
+    return false;
+}
+
+// Lista oficial de proveedores tomada EXCLUSIVAMENTE de Puntos_Rutas (Google Sheets),
+// deduplicada sin distinguir mayúsculas ni tildes (ej. "SEVILLANA" = "Sevillana").
+function getProveedoresOficialesSheets() {
+    const norm = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const mapa = new Map();
+    (MATRIZ_PUNTOS_RUTAS || []).forEach(it => {
+        if (!it || it.estado === 'Inactivo') return;
+        const prov = (it.proveedor || '').trim();
+        if (!prov || prov === 'PROVEEDOR GENERAL') return;
+        const k = norm(prov);
+        if (k && !mapa.has(k)) mapa.set(k, prov);
+    });
+    return Array.from(mapa.values()).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+}
+
 async function sincronizarCatalogosDesdeGviz() {
     try {
         const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
@@ -1110,46 +1172,7 @@ async function sincronizarCatalogosDesdeGviz() {
         }
 
         // 2. Sincronizar Puntos_Rutas directamente vía Gviz CSV (&headers=1 para no perder la fila 1 de Ruta 1)
-        try {
-            const puntosUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Puntos_Rutas&headers=1&t=${Date.now()}`;
-            const resPuntos = await fetch(puntosUrl);
-            if (resPuntos.ok) {
-                const csvPuntos = await resPuntos.text();
-                const lines = csvPuntos.split(/\r?\n/).filter(l => l.trim().length > 0);
-                const gvizPuntos = [];
-                for (let i = 1; i < lines.length; i++) {
-                    const cols = [];
-                    let cur = '';
-                    let inQuotes = false;
-                    for (let j = 0; j < lines[i].length; j++) {
-                        const char = lines[i][j];
-                        if (char === '"') inQuotes = !inQuotes;
-                        else if (char === ',' && !inQuotes) { cols.push(cur.trim()); cur = ''; }
-                        else cur += char;
-                    }
-                    cols.push(cur.trim());
-                    const r = cols.map(c => c.replace(/^"|"$/g, '').trim());
-                    if (r[0] && r[1] && r[2] && (r[7] || 'Activo').toLowerCase() !== 'inactivo') {
-                        gvizPuntos.push({
-                            ruta: r[0],
-                            proveedor: r[1],
-                            punto: r[2],
-                            direccion: r[3] || '',
-                            telefono: r[4] || '',
-                            horario: r[5] || '',
-                            frecuencia: r[6] || '',
-                            estado: 'Activo'
-                        });
-                    }
-                }
-                if (gvizPuntos.length > 0) {
-                    procesarPuntosRutasDinamicos(gvizPuntos);
-                    console.log("✅ Puntos_Rutas sincronizados directamente desde Google Sheets (Gviz):", gvizPuntos.length);
-                }
-            }
-        } catch(ePuntos) {
-            console.warn("Aviso Gviz Puntos_Rutas:", ePuntos);
-        }
+        await refrescarPuntosRutasDesdeSheets();
 
         // 3. Sincronizar Rutas Oficiales directamente vía Gviz CSV (Garantiza Rutas 1 a 7 y Planta San Joaquín)
         try {
@@ -2786,6 +2809,10 @@ function getPuntosParaRuta(rutaSeleccionada) {
 }
 
 function getTodosLosProveedores() {
+    const oficiales = getProveedoresOficialesSheets();
+    if (oficiales && oficiales.length > 0) {
+        return oficiales;
+    }
     const provsSet = new Set(TODOS_LOS_PROVEEDORES);
     Object.values(PUNTO_TO_PROVEEDOR_MAP).forEach(prov => {
         if (prov && prov !== 'PROVEEDOR GENERAL') provsSet.add(prov);
@@ -2795,7 +2822,7 @@ function getTodosLosProveedores() {
             if (prov && prov !== 'PROVEEDOR GENERAL') provsSet.add(prov);
         });
     }
-    return Array.from(provsSet).filter(p => p && p.trim() !== '').sort((a, b) => a.localeCompare(b));
+    return Array.from(provsSet).filter(p => p && p.trim() !== '').sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 }
 
 function getProveedoresParaRuta(rutaSeleccionada) {
@@ -3230,24 +3257,66 @@ function initAdminSupportModal() {
     const loadingBox = document.getElementById('admin-search-loading');
     const btnViewVoucher = document.getElementById('btn-admin-view-voucher');
 
-    if (!btnOpen || !modal) return;
+    const btnRefreshProviders = document.getElementById('btn-refresh-admin-providers');
 
-    const popularProveedoresAdmin = () => {
+    const popularProveedoresAdmin = (selectedValue = '') => {
+        const prevVal = selectedValue || provSelect.value;
         provSelect.innerHTML = '<option value="" disabled selected>Seleccione un proveedor</option>';
-        const provsSet = new Set(TODOS_LOS_PROVEEDORES);
-        adminRecordsCache.forEach(r => {
-            if (r.proveedor) provsSet.add(r.proveedor.trim());
+        
+        let provsList = getProveedoresOficialesSheets();
+        if (!provsList || provsList.length === 0) {
+            provsList = getTodosLosProveedores();
+        }
+
+        const norm = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        const provsMap = new Map();
+
+        (provsList || []).forEach(p => {
+            const clean = (p || '').trim();
+            const k = norm(clean);
+            if (k && !provsMap.has(k)) {
+                provsMap.set(k, clean);
+            }
         });
-        const provsList = Array.from(provsSet).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-        provsList.forEach(p => {
+
+        // Asegurar que registros existentes en caché también estén disponibles si no estuvieran en catálogo
+        adminRecordsCache.forEach(r => {
+            const prov = (r.proveedor || '').trim();
+            const k = norm(prov);
+            if (k && !provsMap.has(k)) {
+                provsMap.set(k, prov);
+            }
+        });
+
+        const sortedList = Array.from(provsMap.values()).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+        sortedList.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p;
             opt.textContent = p;
             provSelect.appendChild(opt);
         });
+
+        if (prevVal && provsMap.has(norm(prevVal))) {
+            provSelect.value = provsMap.get(norm(prevVal));
+        }
     };
 
-    btnOpen.addEventListener('click', () => {
+    btnRefreshProviders?.addEventListener('click', async () => {
+        const origText = btnRefreshProviders.innerHTML;
+        btnRefreshProviders.innerHTML = '⏳ Refrescando...';
+        btnRefreshProviders.disabled = true;
+        try {
+            await refrescarPuntosRutasDesdeSheets();
+            popularProveedoresAdmin(provSelect.value);
+        } catch (e) {
+            console.warn("Aviso refrescando proveedores:", e);
+        } finally {
+            btnRefreshProviders.innerHTML = origText;
+            btnRefreshProviders.disabled = false;
+        }
+    });
+
+    btnOpen.addEventListener('click', async () => {
         modal.style.display = 'flex';
         if (!dateInput.value) {
             const today = new Date();
@@ -3262,6 +3331,21 @@ function initAdminSupportModal() {
         resultBox.style.display = 'none';
         emptyBox.style.display = 'none';
         multipleBox.style.display = 'none';
+
+        // Refrescar en vivo desde Google Sheets (Puntos_Rutas)
+        if (navigator.onLine) {
+            if (btnRefreshProviders) btnRefreshProviders.innerHTML = '⏳ Refrescando...';
+            try {
+                const refreshed = await refrescarPuntosRutasDesdeSheets();
+                if (refreshed) {
+                    popularProveedoresAdmin(provSelect.value);
+                }
+            } catch (err) {
+                console.warn("Aviso al refrescar proveedores de Google Sheets:", err);
+            } finally {
+                if (btnRefreshProviders) btnRefreshProviders.innerHTML = '🔄 Refrescar Sheets';
+            }
+        }
     });
 
     btnClose?.addEventListener('click', () => {
@@ -3533,9 +3617,22 @@ window.abrirModalEditarRecoleccion = function(docId, recordLocalId) {
 
     if (provDatalist) {
         provDatalist.innerHTML = '';
-        const provsSet = new Set(TODOS_LOS_PROVEEDORES);
-        adminRecordsCache.forEach(r => { if (r.proveedor) provsSet.add(r.proveedor.trim()); });
-        Array.from(provsSet).sort((a,b) => a.localeCompare(b, 'es', {sensitivity: 'base'})).forEach(p => {
+        let oficiales = getProveedoresOficialesSheets();
+        if (!oficiales || oficiales.length === 0) {
+            oficiales = getTodosLosProveedores();
+        }
+        const norm = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        const provsMap = new Map();
+        (oficiales || []).forEach(p => {
+            const clean = (p || '').trim();
+            const k = norm(clean);
+            if (k && !provsMap.has(k)) provsMap.set(k, clean);
+        });
+        if (rec.proveedor) {
+            const k = norm(rec.proveedor);
+            if (k && !provsMap.has(k)) provsMap.set(k, rec.proveedor.trim());
+        }
+        Array.from(provsMap.values()).sort((a,b) => a.localeCompare(b, 'es', {sensitivity: 'base'})).forEach(p => {
             const opt = document.createElement('option');
             opt.value = p;
             provDatalist.appendChild(opt);

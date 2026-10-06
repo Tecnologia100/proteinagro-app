@@ -41,11 +41,17 @@
   - 🟡 `Visita Fallida`: Novedad o punto con 0 Kg justificado.
   - 🔴 `No ha llegado a la Data`: Punto sin registrar en la base de datos hoy.
 
-### 3. Matriz de Rutas y Homologación
+### 3. Sincronización en Vivo de Proveedores Oficiales (`v1.6.5`)
+- **Fuente Oficial de Proveedores:** La lista de proveedores se obtiene **exclusivamente** desde la hoja `Puntos_Rutas` en Google Sheets mediante `refrescarPuntosRutasDesdeSheets()` y `getProveedoresOficialesSheets()`.
+- **Eliminación de Nombres Obsoletos/Contables:** Se eliminó la inyección de nombres contables heredados (`CUENTA 2026`, `CUENTA FABRICA`, `CUENTA SEVILLANA`, etc.) y variaciones arbitrarias de mayúsculas en los selectores de búsqueda de comprobante oficial.
+- **Refresco Automático y Manual al Emitir Soporte:** Al abrir el modal "Emitir Soporte Oficial", se refresca de inmediato en segundo plano la matriz de proveedores desde Google Sheets en vivo, además de contar con el botón interactivo `🔄 Refrescar Sheets` para sincronización manual inmediata.
+- **Edición Administrativa Blindada:** El datalist de edición administrativa (`#edit-prov-list`) se alimenta de la misma fuente limpia y oficial.
+
+### 4. Matriz de Rutas y Homologación
 - Rutas soportadas: **Ruta 1 a Ruta 7** y **Planta San Joaquín**.
 - Todos los nombres de rutas deben pasar por la función `homologarRuta(texto)` antes de ser persistidos o comparados.
 
-### 4. Tarifario Cruzado Dinámico
+### 5. Tarifario Cruzado Dinámico
 - Los precios se obtienen automáticamente en `Code.gs` desde la pestaña `Tarifas`.
 - Fallback al histórico de `Recolecciones` en caso de no existir tarifa específica.
 

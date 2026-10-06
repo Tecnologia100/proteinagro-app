@@ -562,7 +562,12 @@
             </div>
 
             <div class="form-group" style="margin-bottom: 12px;">
-                <label for="admin-search-provider" style="font-size: 0.85rem; font-weight: 600; color: #1e293b;">🏬 2. Proveedor / Razón Social</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label for="admin-search-provider" style="font-size: 0.85rem; font-weight: 600; color: #1e293b; margin: 0;">🏬 2. Proveedor / Razón Social</label>
+                    <button type="button" id="btn-refresh-admin-providers" title="Refrescar lista en vivo desde Google Sheets" style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 0.76rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;">
+                        🔄 Refrescar Sheets
+                    </button>
+                </div>
                 <select id="admin-search-provider" class="premium-input" style="padding: 10px 12px; font-size: 0.95rem;">
                     <option value="" disabled selected>Seleccione un proveedor</option>
                 </select>

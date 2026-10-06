@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.6.4`  
+> **Versión Actual:** `v=1.6.5`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -579,7 +579,27 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - Se corrigió la función `formatKilosDisplay()` que fallaba cuando un número tenía más de 2 decimales o residuos de cálculo flotante (`81.60000000000001`).
   - Ahora se redondea a 2 decimales (`Math.round(num * 100) / 100`) y se acota estrictamente: `minimumFractionDigits = Math.min(2, Math.max(1, decCount))`, garantizando que jamás exceda `maximumFractionDigits: 2`.
 - **Actualización Global de Versión:**
-  - Actualización sincronizada de `index.html` (Login, Header Admin, Header Conductor, Footer), `app.js` (registro de SW y recarga forzada) y `sw.js` a la versión oficial **`v1.6.4`**.
+## 🔄 14. Sincronización en Vivo de Proveedores Oficiales desde Google Sheets (`v1.6.5`)
+> **Fecha de Implementación:** 06 de Octubre de 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`index.html`](./index.html), [`sw.js`](./sw.js)  
+> **Objetivo:** Garantizar que los proveedores mostrados en el modal "Emitir Soporte Oficial" y en la edición administrativa correspondan exactamente con la hoja contable `Puntos_Rutas` en Google Sheets, eliminando nombres contables o cuentas obsoletas y permitiendo refresco en vivo.
+
+- **Diagnóstico del Problema Previo:**
+  1. **Contaminación con Nombres Históricos:** El selector `#admin-search-provider` se llenaba usando `TODOS_LOS_PROVEEDORES`, un arreglo estático que contenía cuentas contables antiguas (`CUENTA 2026`, `CUENTA FABRICA`, `CUENTA SEVILLANA`, etc.) y registros de pruebas.
+  2. **Discrepancia con Google Sheets:** Al crearse o renombrarse un proveedor en la hoja `Puntos_Rutas`, la lista en pantalla no reflejaba los cambios y mostraba variantes que no coincidían con la data contable real.
+
+- **Solución Técnica Implementada:**
+  1. **Extracción Limpia y Oficial (`getProveedoresOficialesSheets`):**
+     - La lista se genera en base a la matriz de datos de la hoja `Puntos_Rutas` obtenida de Google Sheets.
+     - Deduplicación insensible a mayúsculas, minúsculas y tildes mediante normalización NFD.
+     - Filtro para descartar entradas inactivas o registros genéricos.
+  2. **Actualización en Tiempo Real (`refrescarPuntosRutasDesdeSheets`):**
+     - Al abrir el modal "Emitir Soporte Oficial" (`btn-admin-support-modal`), el sistema consulta en segundo plano la hoja `Puntos_Rutas` vía Gviz CSV con `cache: 'no-store'`.
+     - Si hay cambios en Google Sheets, la lista de proveedores se actualiza inmediatamente en pantalla sin recargar la página.
+  3. **Botón Interactivo `🔄 Refrescar Sheets`:**
+     - Se añadió un botón de acceso directo en el modal de soporte para forzar la sincronización de proveedores en cualquier momento con feedback visual instantáneo (`⏳ Refrescando...`).
+  4. **Blindaje en Edición Administrativa:**
+     - El datalist `#edit-prov-list` en `abrirModalEditarRecoleccion` fue actualizado para utilizar la misma fuente limpia y oficial de `Puntos_Rutas`.
 
 ## 🚀 14. Reclasificación Histórica Ruta 1: Santa Elena / Cavasa y Matriz Dinámica (`v1.6.5`)
 > **Fecha de Implementación:** 05 de Octubre de 2026  
