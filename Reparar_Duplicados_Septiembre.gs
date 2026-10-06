@@ -84,7 +84,14 @@ function repararDuplicadosSeptiembre(ss) {
       'REC-1790101494000': true, // 22/09 Cavasa 327.5 kg Hueso Promocion (Clon de 1644 Sevillana)
       'REC-1790101686000': true, // 22/09 Cavasa 169 kg Sebo (Clon de 1646 Sevillana)
       'REC-1790181288000': true, // 23/09 Cavasa 171 kg Sebo (Clon de 1679 Edinson Aguirre)
-      'REC-1790437841000': true  // 26/09 Cavasa 362 kg Sebo (Clon de 1875 Edinson Aguirre)
+      'REC-1790437841000': true, // 26/09 Cavasa 362 kg Sebo (Clon de 1875 Edinson Aguirre)
+
+      // Filas de Suma Total Duplicada en Santa Elena (Doble conteo)
+      'REC-1790267623000': true, // 24/09 Bodega Santa Elena 8.051 kg (Suma doble de 3423 + 3307 + 1321)
+      'REC-1790267710000': true, // 24/09 Garay Santa Elena 207 kg (Suma doble de 56 + 151)
+      'REC-1790371544000': true, // 25/09 Bodega Santa Elena 5.515 kg (Suma doble de 3464 + 519 + 1532)
+      'REC-1790372033000': true, // 25/09 Garay Santa Elena 448 kg (Suma doble de 29 + 419)
+      'REC-1790373021000': true  // 25/09 Sevillana Santa Elena 915.2 kg (Suma doble de 620 + 134.6 + 122 + 38.6)
     };
 
     // ==========================================================================

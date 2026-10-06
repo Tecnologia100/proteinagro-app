@@ -657,9 +657,12 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Corrección Quirúrgica de Anomalías Puntuales:**
   1. *Fila 1807 (`REC-1790357561744`, 25/09 12:32:41):* Error tipográfico con punto decimal `40.000 Kg` (\$48.000.000) corregido a **`40 Kg`** (\$48.000), asignando formalmente al proveedor **`Edinson Aguirre`** (Punto Cavasa).
   2. *Fila 1758 (`REC-1790285777272`, 24/09 16:36:17):* 142 Kg de Sebo registrado genéricamente como "Cavasa Cavasa" asignado a su proveedor real **`Edinson Aguirre`** (Punto Cavasa).
-- **Eliminación de 24 Clones Sintéticos Duplicados (`REC-...000`):**
-  - Identificados mediante barrido forense 24 registros clonados sin milisegundos reales (desfase UTC de 5 horas = 18.000.000 ms), incluyendo los reportados por administración: Cañaveral Matadero (100 Kg y 50 Kg de Carolina el 24/09), Cavasa 15 Kg (Los Lagos), Cavasa 111 Kg (La Reserva), Cavasa 482 Kg (Sevillana el 25/09), y demás clones de Cavasa del 11 al 26 de septiembre.
-  - Los 24 clones se eliminan de forma atómica en sentido inverso (*bottom-up*) para preservar índices.
+- **Eliminación de 29 Filas Duplicadas en Google Sheets:**
+  - *24 Clones Sintéticos (`REC-...000`):* Identificados mediante barrido forense sin milisegundos reales (desfase UTC de 5 horas = 18.000.000 ms), incluyendo los reportados por administración: Cañaveral Matadero (100 Kg y 50 Kg de Carolina el 24/09), Cavasa 15 Kg (Los Lagos), Cavasa 111 Kg (La Reserva), Cavasa 482 Kg (Sevillana el 25/09), y demás clones de Cavasa del 11 al 26 de septiembre.
+  - *5 Filas de Suma Total Doble en Santa Elena:* Filas que sumaban todos los productos de un viaje de Santa Elena y los volvían a facturar como "Hueso Blanco" (8.051 kg, 5.515 kg, etc.), inflando los kilos.
+  - Las 29 filas se eliminan de forma atómica en sentido inverso (*bottom-up*) para preservar índices.
+- **Homologación de Datos en `original.xlsx` (Excel de Auditoría):**
+  - Procesado con 4 pestañas: `original_homologado` (361 filas limpias con proveedores y puntos oficiales de `Puntos_Rutas`), `original` (388 filas crudas intactas), `clones_duplicados_retirados` (27 filas retiradas de la Ruta 1 con su motivo), y `Puntos_Rutas`.
 - **Blindaje y Respaldo de Seguridad:**
   - Creación automática previa de la pestaña inmutable **`Recolecciones_Backup_PreReparacion`** en Google Sheets.
   - 2.166 recolecciones legítimas de campo, con sus marcas de tiempo reales, firmas, kilos y valores monetarios, preservadas 100% intactas.

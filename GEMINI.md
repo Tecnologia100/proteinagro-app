@@ -80,10 +80,12 @@
   - *Error Tipográfico 40.000 Kg:* Fila 1807 (`REC-1790357561744`, 25/09 12:32:41) registró 40.000 Kg con valor de \$48.000.000. Corregido quirúrgicamente a **40 Kg** a \$1.200/Kg = **\$48.000**, asignado a su proveedor real **Edinson Aguirre** (Punto Cavasa).
   - *Identificación 142 Kg Cavasa:* Fila 1758 (`REC-1790285777272`, 24/09 16:36:17) registrada genéricamente como "Cavasa Cavasa" corregida a su proveedor real **Edinson Aguirre** (Punto Cavasa).
   - *Clones Sintéticos con IDs `REC-...000`:* Creados a finales de septiembre por copias de filas sin ID donde un script rellenó IDs evaluando fechas texto en UTC (`...000` con desfase de 5 horas / 18.000.000 ms), burlando la regla de ID duplicado. Se identificaron y eliminaron quirúrgicamente **24 clones sintéticos** (entre ellos Cañaveral Matadero 100 kg y 50 kg de Carolina, y clones de Cavasa del 11 al 26 de septiembre).
+  - *Filas de Suma Total Doble en Santa Elena:* Se identificaron **5 filas de totalización duplicada** (8.051 kg, 5.515 kg, etc.) que sumaban todos los productos de un viaje de Santa Elena y los volvían a facturar como "Hueso Blanco", duplicando artificialmente las toneladas.
 - **Salvaguarda y Ejecución Segura:**
   - Creación automática previa de la pestaña congelada **`Recolecciones_Backup_PreReparacion`** en Google Sheets.
-  - Eliminación inversa (*bottom-up*) de los 24 clones y actualización puntual de las 2 filas afectadas.
+  - Eliminación inversa (*bottom-up*) de las **29 filas duplicadas** (24 clones + 5 sumas dobles) y actualización puntual de las 2 filas afectadas.
   - Las 2.166 filas de recolecciones legítimas de los conductores, sus kilos y proveedores reales permanecen 100% intactas.
+  - Homologación local en **`original.xlsx`**: Pestaña `original_homologado` con 361 filas limpias mapeadas a `Puntos_Rutas`, pestaña `clones_duplicados_retirados` con las 27 filas de Ruta 1 retiradas, y la fuente original cruda preservada.
   - Scripts de soporte: `Reparar_Duplicados_Septiembre.gs`, función `repararDuplicadosSeptiembre` en `Code.gs` y menú directo *🚀 ProteinAgro > 🔧 Reparar Duplicados de Septiembre*.
 
 ---

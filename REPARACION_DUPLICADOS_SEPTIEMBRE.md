@@ -114,5 +114,23 @@ Tienes **dos opciones muy fáciles** para ejecutar la reparación:
    - `✅ [Seguridad] Pestaña de respaldo creada: Recolecciones_Backup_PreReparacion`
    - `✅ Corregida Fila 1807 (40.000 Kg -> 40 Kg Edinson Aguirre)`
    - `✅ Corregida Fila 1758 (142 Kg -> Edinson Aguirre)`
-   - `🗑️ Eliminada fila clon duplicada... (24 filas)`
+   - `🗑️ Eliminadas 29 filas (24 clones sintéticos + 5 filas de suma doble de Santa Elena)`
    - `🎉 ¡REPARACIÓN DE SEPTIEMBRE COMPLETADA CON ÉXITO!`
+
+---
+
+## 📊 5. Homologación Completa en `original.xlsx` (Excel Local)
+
+Para auditoría y revisión gerencial inmediata, se procesó el archivo local [`original.xlsx`](./original.xlsx), organizándolo en **4 pestañas de trabajo**:
+
+1. **`original_homologado` (361 Filas Limpias):**
+   - Base oficial saneada con los nombres exactos de `Puntos_Rutas` (Bodega Santa Elena, Alejandro Garay, Sevillana Santa Elena, Edinson Aguirre, Los Lagos, La Reserva, Sevillana, etc.).
+   - Corrección de los 40 Kg de Edinson Aguirre (\$48.000).
+   - Columnas de auditoría añadidas: `Estado_Auditoria` y `Detalle_Ajuste`.
+2. **`original` (388 Filas Intactas):**
+   - Conserva los datos crudos originales de septiembre para comparación celda a celda.
+3. **`clones_duplicados_retirados` (27 Filas):**
+   - Contiene exactamente las 22 filas de clones sintéticos y las 5 filas de suma doble que causaban duplicidad en septiembre, con el motivo detallado de su retiro.
+4. **`Puntos_Rutas` (11 Puntos):**
+   - Matriz maestra oficial de referencia de la Ruta 1.
+
