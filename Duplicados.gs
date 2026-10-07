@@ -1,10 +1,12 @@
 // ==============================================================================
 // ARCHIVO: Duplicados.gs
-// DETECTOR AUTOMÁTICO DE DUPLICADOS Y SEMÁFORO EN TIEMPO REAL (PROTEINAGRO)
+// DETECTOR AUTOMÁTICO DE DUPLICADOS Y SEMÁFORO EN TIEMPO REAL (PROTEINAGRO v1.6.9)
+// Optimizado para alto rendimiento (anti-timeout 30s) y prevención de falsos positivos
 // ==============================================================================
 
 /**
- * Evento en tiempo real: Detecta duplicados al escribir o al copiar/pegar filas
+ * Evento en tiempo real: Detecta duplicados al editar celdas en Recolecciones
+ * Optimizado para ejecutar en < 500ms y con alertas NO bloqueantes (evita timeout de 30s)
  */
 function onEdit(e) {
   try {
@@ -12,79 +14,95 @@ function onEdit(e) {
     var sheet = e.range.getSheet();
     if (sheet.getName() !== "Recolecciones") return;
 
+    var colInicio = e.range.getColumn();
+    // 1. Salir de inmediato si la edición es fuera de las columnas de datos (cols 1 a 8: A a H)
+    if (colInicio > 8) return;
+
     var filaInicio = e.range.getRow();
     var numFilasEditadas = e.range.getNumRows();
     
-    // Ignorar si solo editaron el encabezado (Fila 1)
+    // Ignorar si solo editaron encabezados (fila 1)
     if (filaInicio <= 1 && numFilasEditadas === 1) return;
-    
+
     var lastRow = sheet.getLastRow();
     if (lastRow <= 2) return;
 
     var numColsTotal = Math.min(sheet.getLastColumn(), 12);
+    // Leer solo las columnas de comparación relevantes (A a H)
     var dataCompleta = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
 
-    // Revisar cada una de las filas que fueron editadas o pegadas
     for (var r = 0; r < numFilasEditadas; r++) {
       var filaActualReal = filaInicio + r;
-      if (filaActualReal <= 1) continue; // Saltar encabezado
+      if (filaActualReal <= 1) continue;
 
       var filaValores = sheet.getRange(filaActualReal, 1, 1, 8).getValues()[0];
+      var idActual = String(filaValores[0] || '').trim();
       var fechaActual = normalizarFechaDuplicado_(filaValores[1]);
       var provActual = String(filaValores[4] || '').trim().toLowerCase();
       var prodActual = String(filaValores[6] || '').trim().toLowerCase();
       var kgActual = parseNumeroDuplicado_(filaValores[7]);
 
-      // Si no están los 4 datos completos, no evaluar aún
-      if (!fechaActual || !provActual || !prodActual || kgActual <= 0) continue;
+      // Si no están los datos esenciales, no evaluar aún
+      if (!prodActual || kgActual <= 0) continue;
 
-      var duplicados = [];
+      var duplicadoEncontrado = null;
 
       for (var i = 0; i < dataCompleta.length; i++) {
         var filaComparada = i + 2;
-        if (filaComparada === filaActualReal) continue; // No compararse consigo misma
+        if (filaComparada === filaActualReal) continue;
 
+        var fId = String(dataCompleta[i][0] || '').trim();
         var fFecha = normalizarFechaDuplicado_(dataCompleta[i][1]);
         var fProv = String(dataCompleta[i][4] || '').trim().toLowerCase();
         var fProd = String(dataCompleta[i][6] || '').trim().toLowerCase();
         var fKg = parseNumeroDuplicado_(dataCompleta[i][7]);
 
-        if (fFecha === fechaActual && fProv === provActual && fProd === prodActual && fKg === kgActual) {
-          duplicados.push({
+        // Criterios precisos de duplicidad:
+        // Criterio A: Mismo ID no vacío y mismo producto (clon de transacción)
+        var esMismoIdYProd = (idActual && fId && idActual === fId && fProd === prodActual);
+        
+        // Criterio B: Misma fecha día, mismo proveedor, mismo producto, mismos kilos y mismo ID o ambos sin ID
+        var esMismaDataExacta = (fFecha === fechaActual && fProv === provActual && fProd === prodActual && fKg === kgActual && (idActual === fId || !idActual || !fId));
+
+        if (esMismoIdYProd || esMismaDataExacta) {
+          duplicadoEncontrado = {
             fila: filaComparada,
-            id: dataCompleta[i][0] || 'Manual'
-          });
+            id: fId || 'Manual'
+          };
+          break; // Detener en el primer duplicado para máximo rendimiento
         }
       }
 
+      var celdaId = sheet.getRange(filaActualReal, 1);
       var rangoFila = sheet.getRange(filaActualReal, 1, 1, numColsTotal);
 
-      if (duplicados.length > 0) {
-        // 🔴 Pintar la fila en rojo pastel
+      if (duplicadoEncontrado) {
+        // 🔴 Pintar fila en rojo pastel
         rangoFila.setBackground("#F4C7C3");
-
-        var primero = duplicados[0];
-        var mensaje = "🚨 ¡ATENCIÓN! REGISTRO DUPLICADO DETECTADO\n\n" +
-                      "• Proveedor: " + filaValores[4] + "\n" +
-                      "• Materia Prima: " + filaValores[6] + "\n" +
-                      "• Peso: " + kgActual + " Kg\n" +
-                      "• Fecha: " + fechaActual + "\n\n" +
-                      "⚠️ Ya existe exactamente este mismo registro en la FILA " + primero.fila + " (ID: " + primero.id + ").";
-
-        // Mostrar alerta emergente en pantalla
-        SpreadsheetApp.getUi().alert("ALERTA DE DUPLICIDAD", mensaje, SpreadsheetApp.getUi().ButtonSet.OK);
+        celdaId.setNote("⚠️ DUPLICADO DETECTADO: Coincide con Fila " + duplicadoEncontrado.fila + " (ID: " + duplicadoEncontrado.id + ")");
+        
+        // Notificación flotante Toast NO bloqueante (5 segundos). ¡No bloquea la UI ni causa timeout de 30s!
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          "⚠️ Registro duplicado con Fila " + duplicadoEncontrado.fila + " (ID: " + duplicadoEncontrado.id + ")",
+          "Alerta Duplicado",
+          5
+        );
       } else {
-        rangoFila.setBackground(null);
+        // Limpiar marca solo si la fila tenía una nota previa de duplicado
+        var notaPrevia = celdaId.getNote();
+        if (notaPrevia && notaPrevia.indexOf("DUPLICADO") !== -1) {
+          celdaId.clearNote();
+          rangoFila.setBackground(null);
+        }
       }
     }
-
   } catch(err) {
     Logger.log("Error en onEdit: " + err.toString());
   }
 }
 
 /**
- * Auditoría masiva de todo el histórico de Recolecciones
+ * Auditoría masiva de todo el histórico de Recolecciones (en memoria O(N))
  */
 function auditarYMarcarDuplicadosRecolecciones() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -101,13 +119,15 @@ function auditarYMarcarDuplicadosRecolecciones() {
 
   for (var i = 0; i < data.length; i++) {
     var filaReal = i + 2;
+    var id = String(data[i][0] || '').trim();
     var fecha = normalizarFechaDuplicado_(data[i][1]);
     var prov = String(data[i][4] || '').trim().toLowerCase();
     var prod = String(data[i][6] || '').trim().toLowerCase();
     var kg = parseNumeroDuplicado_(data[i][7]);
 
-    if (!fecha || !prov || !prod || kg <= 0) continue;
-    var clave = fecha + "|" + prov + "|" + prod + "|" + kg;
+    if (!prod || kg <= 0) continue;
+    // Clave precisa que combina ID si existe, o datos del registro
+    var clave = (id ? (id + '|' + prod) : (fecha + '|' + prov + '|' + prod + '|' + kg));
 
     if (registrosVistos[clave]) {
       filasDuplicadas.push(filaReal);

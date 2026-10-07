@@ -691,9 +691,36 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - `eliminarRecoleccion` notifica de inmediato al Webhook de Google Sheets (`action=deleteRecoleccion&id=...`) eliminando la fila correspondiente y garantizando congruencia con el Cierre Diario.
   - Incorporación de trazabilidad de autoría `modificadoPor: 'Administrador'` en modificaciones de recolecciones.
 
+## ⚡ 18. Blindaje Contable, Sanitización y Rendimiento Webhook (`v1.6.9`)
+> **Fecha de Implementación:** 06 de Octubre de 2026  
+> **Archivos Asociados:** [`Code.gs`](./Code.gs), [`Duplicados.gs`](./Duplicados.gs), [`app.js`](./app.js), [`index.html`](./index.html), [`sw.js`](./sw.js)  
+> **Objetivo:** Resolver de raíz el matching de productos por substring, eliminar precios inventados por fallback genérico, sanitizar contra inyección de fórmulas y optimizar el rendimiento del Webhook Apps Script a escala.
+
+- **Matching Exacto de Productos:**
+  - Implementación de la función `productosCoinciden(prod1, prod2)` que erradica colisiones por substring en los motores de búsqueda de tarifas (`Tarifas` e histórico de `Recolecciones`).
+  - Previene que *"SEBO"* coincida con *"SEBO EN RAMA"*, *"HUESO"* con *"HUESO BLANCO"* o *"PIEL"* con *"PIEL POLLO"*, garantizando la liquidación del precio unitario legítimo de cada materia prima.
+- **Erradicación del Fallback Ciego `precioCualquiera`:**
+  - Eliminado el nivel de búsqueda que tomaba el último precio de cualquier proveedor ajeno cuando no había tarifa ni histórico.
+  - Si un producto no tiene tarifa configurada para ese proveedor ni registro previo, el precio y valor quedan vacíos (`''`) para auditoría y revisión administrativa, impidiendo inventar valores contables arbitrarios.
+- **Sanitización contra Inyección de Fórmulas:**
+  - Función `sanitizarParaHoja(val)` que antepone un apóstrofe `'` a cualquier cadena que empiece por `=`, `+`, `-`, `@`, neutralizando ataques de ejecución o inyección de fórmulas (Formula Injection) en `Recolecciones`.
+  - Validación estricta de identificadores mediante expresión regular `/^(REC|NOV)-\d+(-[a-zA-Z0-9]+)?$/` en la persistencia y en `eliminarRecoleccionSheet`.
+- **Rendimiento y Escalabilidad O(1) en Webhook (`Code.gs`):**
+  - `cargarCatalogoTarifas(ss)` lee la pestaña `Tarifas` una sola vez por petición en memoria, reduciendo el costo de I/O de $O(\text{productos} \times \text{filas})$ a $O(1)$.
+  - Carga perezosa del histórico de `Recolecciones` a lo sumo una vez por transacción si algún producto requiere búsqueda histórica.
+  - Escritura atómica en lote (un único `setValues` para todos los productos de la recolección en lugar de llamadas individuales fila a fila).
+  - Control de concurrencia con `LockService` (`tryLock(20000)`), previniendo sobreescritura de filas y condiciones de carrera entre conductores simultáneos.
+- **Optimización y Desbloqueo de `Duplicados.gs`:**
+  - Salida inmediata en `onEdit(e)` si la edición ocurre fuera de las columnas de datos (A:H, cols 1 a 8).
+  - Comparación refinada por ID de transacción y fecha/hora para prevenir falsos positivos en viajes legítimos del mismo día con igual peso.
+  - Reemplazo del cuadro modal bloqueante `SpreadsheetApp.getUi().alert(...)` por una notificación flotante no bloqueante `SpreadsheetApp.getActiveSpreadsheet().toast(...)` (5s) y nota en celda (`setNote`), eliminando los fallos por timeout de 30 segundos de Apps Script.
+- **Priorización de Mutaciones por POST:**
+  - `eliminarRecoleccion` en `app.js` prioriza envío por `POST` manteniendo `GET` como fallback redundante con ID validado.
+
 ---
 
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
+
 
 
 

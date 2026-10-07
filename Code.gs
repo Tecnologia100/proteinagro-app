@@ -352,8 +352,46 @@ function obtenerRecoleccionesHttp(ss, fechaFiltro, rutaFiltro) {
   }
 }
 
+// Sanitización contra inyección de fórmulas (CSV / Formula Injection en Google Sheets)
+function sanitizarParaHoja(val) {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'number' || typeof val === 'boolean') return val;
+  var str = String(val);
+  // Si inicia con =, +, -, o @, anteponer apóstrofe ' para que Google Sheets lo almacene como texto literal puro
+  if (/^[\=\+\-\@]/.test(str)) {
+    return "'" + str;
+  }
+  return str;
+}
+
+// Comparador robusto de productos: Exactitud estricta sin colisiones por substring
+function productosCoinciden(prod1, prod2) {
+  var p1 = normalizarTexto(prod1);
+  var p2 = normalizarTexto(prod2);
+  if (!p1 || !p2) return false;
+  // 1. Coincidencia exacta 100%
+  if (p1 === p2) return true;
+  // 2. Tolerancia estricta solo para singular/plural de la misma palabra (ej. "piel" vs "pieles")
+  // Jamás permitir que "sebo" coincida con "sebo en rama", ni "hueso" con "hueso blanco" o "hueso de cerdo"
+  if (p1 + 's' === p2 || p2 + 's' === p1 || p1 + 'es' === p2 || p2 + 'es' === p1) {
+    if (p1.indexOf('pollo') === -1 && p2.indexOf('pollo') === -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function guardarRecoleccionSheet(ss, rawPayload) {
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
   try {
+    // 1. Bloqueo de concurrencia: evitar que sincronizaciones simultáneas sobreescriban filas o colisionen
+    try {
+      lockAcquired = lock.tryLock(20000); // 20 segundos máx de espera
+    } catch (eLock) {
+      Logger.log("Aviso LockService: " + eLock.toString());
+    }
+
     var sheet = ss.getSheetByName("Recolecciones");
     if (!sheet) {
       sheet = ss.insertSheet("Recolecciones");
@@ -373,6 +411,12 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     if (!data) throw new Error("No payload recibido.");
 
     var id = data.id || 'REC-' + new Date().getTime();
+    // Validar ID seguro contra inyección
+    id = String(id).trim();
+    if (!/^(REC|NOV)-\d+(-[a-zA-Z0-9]+)?$/.test(id)) {
+      id = sanitizarParaHoja(id);
+    }
+
     var fecha = data.fecha ? String(data.fecha) : new Date().toLocaleString();
     var ruta = data.ruta || '';
     var conductor = data.conductor || '';
@@ -422,6 +466,12 @@ function guardarRecoleccionSheet(ss, rawPayload) {
       }
     }
 
+    // 2. Optimización O(1): Cargar Tarifas una sola vez en memoria antes del bucle de productos
+    var catalogoTarifas = cargarCatalogoTarifas(ss);
+    var catalogoHistorico = null; // Carga perezosa si algún producto lo requiere
+
+    var filasNuevas = [];
+
     for (var p = 0; p < productos.length; p++) {
       var prodItem = productos[p];
       var prodNombre = '';
@@ -455,10 +505,24 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         continue;
       }
 
-      // Búsqueda inteligente de tarifa: Primero en hoja "Tarifas", y fallback a histórico de Recolecciones
-      var precio = esNovedad ? 0 : obtenerPrecioTarifa(ss, proveedor, punto, prodNombre);
+      // Búsqueda inteligente en memoria (Tarifas primero, fallback a histórico si hace falta)
+      var precio = '';
+      if (esNovedad) {
+        precio = 0;
+      } else {
+        var pTarifa = buscarPrecioEnCatalogoTarifas(catalogoTarifas, proveedor, punto, prodNombre);
+        if (pTarifa !== null && pTarifa > 0) {
+          precio = pTarifa;
+        } else {
+          // Si no está en Tarifas, consultar histórico de Recolecciones (cargado a lo sumo 1 vez)
+          if (!catalogoHistorico) {
+            catalogoHistorico = cargarHistoricoRecolecciones(ss);
+          }
+          precio = buscarPrecioEnHistorico(catalogoHistorico, proveedor, punto, prodNombre);
+        }
+      }
+
       var valor = '';
-      
       if (precio !== '' && !isNaN(parseFloat(precio)) && prodKilos > 0) {
         valor = Math.round(parseFloat(precio) * prodKilos * 100) / 100;
       }
@@ -471,20 +535,43 @@ function guardarRecoleccionSheet(ss, rawPayload) {
       var prodNombreFinal = aNombrePropio(prodNombre);
       var observacionesFinal = capitalizarOracion(observaciones);
       
-      targetRow++;
-      sheet.getRange(targetRow, 1, 1, 12).setValues([[
-        id, fecha, rutaFinal, conductorFinal, proveedorFinal, puntoFinal,
-        prodNombreFinal, prodKilos, observacionesFinal, ubicacionGps, precio, valor
-      ]]);
+      // Sanitización estricta contra inyección de fórmulas (=, +, -, @)
+      filasNuevas.push([
+        sanitizarParaHoja(id),
+        sanitizarParaHoja(fecha),
+        sanitizarParaHoja(rutaFinal),
+        sanitizarParaHoja(conductorFinal),
+        sanitizarParaHoja(proveedorFinal),
+        sanitizarParaHoja(puntoFinal),
+        sanitizarParaHoja(prodNombreFinal),
+        prodKilos,
+        sanitizarParaHoja(observacionesFinal),
+        sanitizarParaHoja(ubicacionGps),
+        precio,
+        valor
+      ]);
+
       existingRecordsMap[prodKey] = true;
       existingIdsMap[id] = true;
     }
 
-    return ContentService.createTextOutput(JSON.stringify({"result": "success", "message": "Guardado exitosamente"}))
-      .setMimeType(ContentService.MimeType.JSON);
+    // 3. Escritura atómica en lote (1 sola llamada setValues para todas las materias primas del viaje)
+    if (filasNuevas.length > 0) {
+      sheet.getRange(targetRow + 1, 1, filasNuevas.length, 12).setValues(filasNuevas);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      "result": "success",
+      "message": "Guardado exitosamente",
+      "filas": filasNuevas.length
+    })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    if (lockAcquired) {
+      try { lock.releaseLock(); } catch(eRel) {}
+    }
   }
 }
 
@@ -537,7 +624,12 @@ function eliminarRecoleccionSheet(ss, idTarget) {
     if (!sheet) throw new Error("No existe la pestaña Recolecciones.");
     idTarget = String(idTarget || '').trim();
     if (!idTarget) throw new Error("ID inválido");
-    
+
+    // Validar formato seguro de ID contra inyecciones
+    if (!/^(REC|NOV)-\d+(-[a-zA-Z0-9]+)?$/.test(idTarget)) {
+      throw new Error("Formato de ID no válido para eliminación.");
+    }
+
     var lastRow = sheet.getLastRow();
     var deletedCount = 0;
     if (lastRow > 1) {
@@ -562,220 +654,224 @@ function eliminarRecoleccionSheet(ss, idTarget) {
 // MOTOR INTELIGENTE DE TARIFA VIGENTE (HOJA TARIFAS + FALLBACK HISTÓRICO)
 // ==============================================================================
 
-// Búsqueda inteligente de tarifa: Primero en hoja "Tarifas", si no existe o está vacía, busca en el histórico de "Recolecciones"
+// Carga del catálogo completo de Tarifas en memoria (1 sola lectura de Sheets por request)
+function cargarCatalogoTarifas(ss) {
+  var catalogo = [];
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    if (!sheetTarifas || sheetTarifas.getLastRow() <= 1) return catalogo;
+    var lastRow = sheetTarifas.getLastRow();
+    var lastCol = sheetTarifas.getLastColumn();
+    var headers = sheetTarifas.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colIdx = { prov: 1, punto: 2, prod: 3, precio: 4, estado: 5 };
+    for (var c = 0; c < headers.length; c++) {
+      var h = normalizarTexto(headers[c]);
+      if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+      else if (h.indexOf('estado') !== -1) colIdx.estado = c;
+    }
+    var raw = sheetTarifas.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    for (var i = 0; i < raw.length; i++) {
+      var est = normalizarTexto(raw[i][colIdx.estado] || 'activo');
+      if (est === 'inactivo') continue;
+      var cleanP = parsePrecioMoneda(raw[i][colIdx.precio]);
+      if (cleanP === null || cleanP <= 0) continue;
+      catalogo.push({
+        prov: normalizarTexto(raw[i][colIdx.prov]),
+        punto: normalizarTexto(raw[i][colIdx.punto]),
+        prod: normalizarTexto(raw[i][colIdx.prod]),
+        precio: cleanP
+      });
+    }
+  } catch(e) {
+    Logger.log("Error cargando catalogo tarifas en memoria: " + e.toString());
+  }
+  return catalogo;
+}
+
+// Búsqueda en memoria de precio vigente en Tarifas con matching exacto de producto
+function buscarPrecioEnCatalogoTarifas(catalogo, proveedor, punto, producto) {
+  if (!catalogo || catalogo.length === 0) return null;
+  var targetProv = normalizarTexto(proveedor);
+  var targetPunto = normalizarTexto(punto);
+  var targetProd = normalizarTexto(producto);
+
+  var precioExactoPunto = null;
+  var precioGeneralProv = null;
+  var precioParcial = null;
+  var provKeywords = targetProv.split(/[\s\-]+/).filter(function(w) { return w.length > 3; });
+
+  for (var i = 0; i < catalogo.length; i++) {
+    var row = catalogo[i];
+    // ¡REGLA CRÍTICA!: El producto debe coincidir de forma exacta (o singular/plural idéntico)
+    if (!productosCoinciden(row.prod, targetProd)) continue;
+
+    // Nivel 1: Proveedor exacto + Punto exacto
+    if (row.prov === targetProv && targetPunto !== '' && (row.punto === targetPunto || row.punto.indexOf(targetPunto) !== -1)) {
+      precioExactoPunto = row.precio;
+      break;
+    }
+
+    // Nivel 2: Proveedor exacto + Todas las sucursales (o general)
+    if (row.prov === targetProv && (row.punto === '' || row.punto.indexOf('todas') !== -1 || row.punto.indexOf('general') !== -1)) {
+      if (precioGeneralProv === null) precioGeneralProv = row.precio;
+    }
+
+    // Nivel 3: Coincidencia parcial de proveedor
+    if (precioParcial === null) {
+      if (targetProv.indexOf(row.prov) !== -1 || row.prov.indexOf(targetProv) !== -1) {
+        precioParcial = row.precio;
+      } else {
+        for (var k = 0; k < provKeywords.length; k++) {
+          if (row.prov.indexOf(provKeywords[k]) !== -1) {
+            precioParcial = row.precio;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (precioExactoPunto !== null) return precioExactoPunto;
+  if (precioGeneralProv !== null) return precioGeneralProv;
+  if (precioParcial !== null) return precioParcial;
+
+  // Respaldo histórico específico para comercios de Ruta 1 (Santa Elena / Cavasa)
+  var esProvSE = (targetProv.indexOf('santa elena') !== -1 || targetProv.indexOf('garay') !== -1 || targetPunto.indexOf('santa elena') !== -1);
+  if (esProvSE) {
+    for (var seI = 0; seI < catalogo.length; seI++) {
+      if (catalogo[seI].prov === 'santa elena' && productosCoinciden(catalogo[seI].prod, targetProd)) {
+        return catalogo[seI].precio;
+      }
+    }
+  }
+
+  var esPtoCV = (targetPunto.indexOf('cavasa') !== -1 || targetProv.indexOf('cavasa') !== -1);
+  if (esPtoCV) {
+    for (var cvI = 0; cvI < catalogo.length; cvI++) {
+      if (catalogo[cvI].prov === 'cavasa' && productosCoinciden(catalogo[cvI].prod, targetProd)) {
+        return catalogo[cvI].precio;
+      }
+    }
+  }
+
+  return null;
+}
+
+// Carga perezosa del histórico de Recolecciones en memoria (a lo sumo 1 lectura si se requiere fallback)
+function cargarHistoricoRecolecciones(ss) {
+  var hist = [];
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetRec = ss.getSheetByName("Recolecciones");
+    if (!sheetRec || sheetRec.getLastRow() <= 1) return hist;
+    var lastRow = sheetRec.getLastRow();
+    var lastCol = sheetRec.getLastColumn();
+    var headers = sheetRec.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colIdx = { prov: 4, punto: 5, prod: 6, precio: 10 };
+    for (var c = 0; c < headers.length; c++) {
+      var h = normalizarTexto(headers[c]);
+      if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1 || h.indexOf('unitario') !== -1) colIdx.precio = c;
+    }
+    var raw = sheetRec.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    for (var r = raw.length - 1; r >= 0; r--) {
+      var p = parsePrecioMoneda(raw[r][colIdx.precio]);
+      if (p !== null && p > 0) {
+        hist.push({
+          prov: normalizarTexto(raw[r][colIdx.prov]),
+          punto: normalizarTexto(raw[r][colIdx.punto]),
+          prod: normalizarTexto(raw[r][colIdx.prod]),
+          precio: p
+        });
+      }
+    }
+  } catch(e) {
+    Logger.log("Error cargando historico recolecciones en memoria: " + e.toString());
+  }
+  return hist;
+}
+
+// Búsqueda en memoria de precio histórico en Recolecciones (FALLBACK SEGURO Y EXACTO)
+function buscarPrecioEnHistorico(historico, proveedor, punto, producto) {
+  if (!historico || historico.length === 0) return '';
+  var targetProv = normalizarTexto(proveedor);
+  var targetPunto = normalizarTexto(punto);
+  var targetProd = normalizarTexto(producto);
+
+  var precioExacto = null;
+  var precioParcial = null;
+  var precioPunto = null;
+  var provKeywords = targetProv.split(/[\s\-]+/).filter(function(w) { return w.length > 3; });
+
+  for (var i = 0; i < historico.length; i++) {
+    var row = historico[i];
+    // ¡REGLA CRÍTICA!: El producto debe coincidir de forma exacta (o singular/plural idéntico)
+    if (!productosCoinciden(row.prod, targetProd)) continue;
+
+    // Nivel 1: Coincidencia EXACTA Proveedor + Producto
+    if (row.prov === targetProv) {
+      precioExacto = row.precio;
+      break;
+    }
+
+    // Nivel 2: Coincidencia Parcial de Proveedor
+    if (precioParcial === null) {
+      if (targetProv.indexOf(row.prov) !== -1 || row.prov.indexOf(targetProv) !== -1) {
+        precioParcial = row.precio;
+      } else {
+        for (var k = 0; k < provKeywords.length; k++) {
+          if (row.prov.indexOf(provKeywords[k]) !== -1) {
+            precioParcial = row.precio;
+            break;
+          }
+        }
+      }
+    }
+
+    // Nivel 3: Coincidencia por Punto / Sucursal
+    if (precioPunto === null && targetPunto !== '') {
+      if (row.punto === targetPunto || targetPunto.indexOf(row.punto) !== -1 || row.punto.indexOf(targetPunto) !== -1) {
+        precioPunto = row.precio;
+      }
+    }
+  }
+
+  if (precioExacto !== null) return precioExacto;
+  if (precioParcial !== null) return precioParcial;
+  if (precioPunto !== null) return precioPunto;
+
+  // ¡ELIMINADO FALLBACK GENÉRICO precioCualquiera!: Si no existe tarifa configurada ni histórico
+  // legítimo para este proveedor/punto, dejar en blanco para auditoría y evitar distorsión contable.
+  return '';
+}
+
+// Función fachada para compatibilidad total con llamadas existentes
 function obtenerPrecioTarifa(ss, proveedor, punto, producto) {
   try {
     if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
-    var targetProv = normalizarTexto(proveedor);
-    var targetPunto = normalizarTexto(punto);
-    var targetProd = normalizarTexto(producto);
+    var catalogo = cargarCatalogoTarifas(ss);
+    var pTarifa = buscarPrecioEnCatalogoTarifas(catalogo, proveedor, punto, producto);
+    if (pTarifa !== null && pTarifa > 0) return pTarifa;
 
-    // 1. INTENTAR BUSCAR EN PESTAÑA "Tarifas"
-    var sheetTarifas = ss.getSheetByName("Tarifas");
-    if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
-      var lastRow = sheetTarifas.getLastRow();
-      var lastCol = sheetTarifas.getLastColumn();
-      var headers = sheetTarifas.getRange(1, 1, 1, lastCol).getValues()[0];
-      
-      var colIdx = { prov: -1, punto: -1, prod: -1, precio: -1, estado: -1 };
-      for (var c = 0; c < headers.length; c++) {
-        var h = normalizarTexto(headers[c]);
-        if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
-        else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
-        else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
-        else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
-        else if (h.indexOf('estado') !== -1) colIdx.estado = c;
-      }
-
-      var tarifasData = sheetTarifas.getRange(2, 1, lastRow - 1, lastCol).getValues();
-      var precioExactoPunto = null;
-      var precioGeneralProv = null;
-      var precioParcial = null;
-
-      var provKeywords = targetProv.split(/[\s\-]+/).filter(function(w) { return w.length > 3; });
-
-      for (var i = 0; i < tarifasData.length; i++) {
-        var row = tarifasData[i];
-        var rowEstado = normalizarTexto(colIdx.estado !== -1 && colIdx.estado < row.length ? row[colIdx.estado] : 'activo');
-        if (rowEstado === 'inactivo') continue;
-
-        var rowProd = normalizarTexto(colIdx.prod !== -1 && colIdx.prod < row.length ? row[colIdx.prod] : '');
-        var coincideProd = (rowProd === targetProd || rowProd.indexOf(targetProd) !== -1 || targetProd.indexOf(rowProd) !== -1);
-        if (!coincideProd) continue;
-
-        var rawPrice = colIdx.precio !== -1 && colIdx.precio < row.length ? row[colIdx.precio] : null;
-        var cleanP = parsePrecioMoneda(rawPrice);
-        if (cleanP === null || cleanP <= 0) continue;
-
-        var rowProv = normalizarTexto(colIdx.prov !== -1 && colIdx.prov < row.length ? row[colIdx.prov] : '');
-        var rowPunto = normalizarTexto(colIdx.punto !== -1 && colIdx.punto < row.length ? row[colIdx.punto] : '');
-
-        // Nivel 1: Proveedor exacto + Punto exacto
-        if (rowProv === targetProv && targetPunto !== '' && (rowPunto === targetPunto || rowPunto.indexOf(targetPunto) !== -1)) {
-          precioExactoPunto = cleanP;
-          break;
-        }
-
-        // Nivel 2: Proveedor exacto + Todas las sucursales (o general)
-        if (rowProv === targetProv && (rowPunto === '' || rowPunto.indexOf('todas') !== -1 || rowPunto.indexOf('general') !== -1)) {
-          if (precioGeneralProv === null) precioGeneralProv = cleanP;
-        }
-
-        // Nivel 3: Coincidencia parcial de proveedor
-        if (precioParcial === null) {
-          if (targetProv.indexOf(rowProv) !== -1 || rowProv.indexOf(targetProv) !== -1) {
-            precioParcial = cleanP;
-          } else {
-            for (var k = 0; k < provKeywords.length; k++) {
-              if (rowProv.indexOf(provKeywords[k]) !== -1) {
-                precioParcial = cleanP;
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      if (precioExactoPunto !== null) return precioExactoPunto;
-      if (precioGeneralProv !== null) return precioGeneralProv;
-      if (precioParcial !== null) return precioParcial;
-
-      // Nivel 4: Fallback inteligente para Ruta 1 (Santa Elena / Cavasa) dentro de hoja Tarifas
-      var esProvSE = (targetProv.indexOf('santa elena') !== -1 || targetProv.indexOf('garay') !== -1 || targetPunto.indexOf('santa elena') !== -1);
-      if (esProvSE) {
-        for (var seI = 0; seI < tarifasData.length; seI++) {
-          var rProvSE = normalizarTexto(colIdx.prov !== -1 ? tarifasData[seI][colIdx.prov] : '');
-          var rProdSE = normalizarTexto(colIdx.prod !== -1 ? tarifasData[seI][colIdx.prod] : '');
-          if (rProvSE === 'santa elena' && rProdSE === targetProd) {
-            var pSE = parsePrecioMoneda(colIdx.precio !== -1 ? tarifasData[seI][colIdx.precio] : null);
-            if (pSE !== null && pSE > 0) return pSE;
-          }
-        }
-      }
-
-      var esPtoCV = (targetPunto.indexOf('cavasa') !== -1 || targetProv.indexOf('cavasa') !== -1);
-      if (esPtoCV) {
-        for (var cvI = 0; cvI < tarifasData.length; cvI++) {
-          var rProvCV = normalizarTexto(colIdx.prov !== -1 ? tarifasData[cvI][colIdx.prov] : '');
-          var rProdCV = normalizarTexto(colIdx.prod !== -1 ? tarifasData[cvI][colIdx.prod] : '');
-          if (rProvCV === 'cavasa' && rProdCV === targetProd) {
-            var pCV = parsePrecioMoneda(colIdx.precio !== -1 ? tarifasData[cvI][colIdx.precio] : null);
-            if (pCV !== null && pCV > 0) return pCV;
-          }
-        }
-      }
-    }
-
-    // 2. SI NO ESTÁ EN TARIFAS (O AÚN ESTÁ PENDIENTE), BUSCAR EN EL HISTÓRICO DE RECOLECCIONES (FALLBACK SEGURO)
-    var sheetRec = ss.getSheetByName("Recolecciones");
-    if (sheetRec) {
-      return buscarPrecioHistorico(sheetRec, proveedor, punto, producto);
-    }
-
-    return '';
-  } catch (err) {
+    var hist = cargarHistoricoRecolecciones(ss);
+    return buscarPrecioEnHistorico(hist, proveedor, punto, producto);
+  } catch(e) {
     return '';
   }
 }
 
-// ==============================================================================
-// MOTOR DE BÚSQUEDA DE PRECIO HISTÓRICO EN RECOLECCIONES (FALLBACK)
-// ==============================================================================
 function buscarPrecioHistorico(sheet, proveedor, punto, producto) {
   try {
-    var lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return '';
-
-    var lastCol = sheet.getLastColumn();
-    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-
-    // 1. Mapeo dinámico de columnas por encabezados de fila 1
-    var colIdx = {
-      proveedor: 4,  // Col E por defecto
-      punto: 5,      // Col F por defecto
-      producto: 6,   // Col G por defecto
-      precio: 10     // Col K por defecto
-    };
-
-    for (var c = 0; c < headers.length; c++) {
-      var h = normalizarTexto(headers[c]);
-      if (h.indexOf('proveedor') !== -1) colIdx.proveedor = c;
-      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
-      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.producto = c;
-      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1 || h.indexOf('unitario') !== -1) colIdx.precio = c;
-    }
-
-    var numRows = lastRow - 1;
-    var allData = sheet.getRange(2, 1, numRows, lastCol).getValues();
-
-    var targetProv = normalizarTexto(proveedor);
-    var targetPunto = normalizarTexto(punto);
-    var targetProd = normalizarTexto(producto);
-
-    // Palabras clave principales del proveedor (ej. "supertienda", "canaveral", "frigorivalle")
-    var provKeywords = targetProv.split(/[\s\-]+/).filter(function(w) { return w.length > 3; });
-
-    var precioExacto = null;
-    var precioParcial = null;
-    var precioPunto = null;
-    var precioCualquiera = null;
-
-    // Buscar de abajo hacia arriba (desde la fila más reciente hacia la más antigua)
-    for (var i = allData.length - 1; i >= 0; i--) {
-      var row = allData[i];
-      var rawPrecio = colIdx.precio < row.length ? row[colIdx.precio] : null;
-      var cleanPrice = parsePrecioMoneda(rawPrecio);
-
-      // ¡REGLA DE ORO!: Si esta fila histórica NO tiene precio (> 0), IGNORARLA y seguir buscando hacia atrás
-      if (cleanPrice === null) continue;
-
-      var rowProd = normalizarTexto(colIdx.producto < row.length ? row[colIdx.producto] : '');
-      var rowProv = normalizarTexto(colIdx.proveedor < row.length ? row[colIdx.proveedor] : '');
-      var rowPunto = normalizarTexto(colIdx.punto < row.length ? row[colIdx.punto] : '');
-
-      // El producto debe coincidir
-      var coincideProd = (rowProd === targetProd || rowProd.indexOf(targetProd) !== -1 || targetProd.indexOf(rowProd) !== -1);
-      if (!coincideProd) continue;
-
-      // Nivel 1: Coincidencia EXACTA Proveedor + Producto
-      if (rowProv === targetProv) {
-        precioExacto = cleanPrice;
-        break; // ¡Coincidencia perfecta con precio real encontrada!
-      }
-
-      // Nivel 2: Coincidencia Parcial de Proveedor (ej. "supertienda canaveral" coincide con "supertienda canaveral - frigorivalle")
-      if (precioParcial === null) {
-        if (targetProv.indexOf(rowProv) !== -1 || rowProv.indexOf(targetProv) !== -1) {
-          precioParcial = cleanPrice;
-        } else {
-          for (var k = 0; k < provKeywords.length; k++) {
-            if (rowProv.indexOf(provKeywords[k]) !== -1) {
-              precioParcial = cleanPrice;
-              break;
-            }
-          }
-        }
-      }
-
-      // Nivel 3: Coincidencia por Punto / Sucursal (ej. "canaveral matadero")
-      if (precioPunto === null && targetPunto !== '') {
-        if (rowPunto === targetPunto || targetPunto.indexOf(rowPunto) !== -1 || rowPunto.indexOf(targetPunto) !== -1) {
-          precioPunto = cleanPrice;
-        }
-      }
-
-      // Nivel 4: Último precio registrado para este producto (cualquier proveedor como último recurso)
-      if (precioCualquiera === null) {
-        precioCualquiera = cleanPrice;
-      }
-    }
-
-    if (precioExacto !== null) return precioExacto;
-    if (precioParcial !== null) return precioParcial;
-    if (precioPunto !== null) return precioPunto;
-    return precioCualquiera !== null ? precioCualquiera : '';
-
-  } catch (err) {
+    var ss = sheet && sheet.getParent ? sheet.getParent() : SpreadsheetApp.getActiveSpreadsheet();
+    var hist = cargarHistoricoRecolecciones(ss);
+    return buscarPrecioEnHistorico(hist, proveedor, punto, producto);
+  } catch(e) {
     return '';
   }
 }

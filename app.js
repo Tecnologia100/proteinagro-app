@@ -2065,12 +2065,19 @@ async function eliminarRecoleccion(firestoreDocId, localRecordId) {
             localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
         }
 
-        // Sincronizar eliminación en Google Sheets para mantener sincronía contable total (v1.6.8)
+        // Sincronizar eliminación en Google Sheets para mantener sincronía contable total (v1.6.9)
         const targetId = localRecordId || firestoreDocId;
         if (targetId && GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== '') {
             try {
-                const urlDelete = GOOGLE_SHEETS_WEBHOOK_URL + '?action=deleteRecoleccion&id=' + encodeURIComponent(targetId);
-                fetch(urlDelete, { mode: 'no-cors' }).catch(err => console.warn("No se pudo notificar borrado a Sheets:", err));
+                fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `action=deleteRecoleccion&id=${encodeURIComponent(targetId)}`,
+                    mode: 'no-cors'
+                }).catch(() => {
+                    const urlDelete = GOOGLE_SHEETS_WEBHOOK_URL + '?action=deleteRecoleccion&id=' + encodeURIComponent(targetId);
+                    fetch(urlDelete, { mode: 'no-cors' }).catch(err => console.warn("No se pudo notificar borrado a Sheets:", err));
+                });
             } catch(sheetErr) {
                 console.warn("Error enviando eliminación a Sheets:", sheetErr);
             }
@@ -3365,7 +3372,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.8&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.9&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -4467,12 +4474,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.6.8 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.6.9 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.6.8')
+            navigator.serviceWorker.register('/sw.js?v=1.6.9')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.6.8 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.6.9 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -4480,8 +4487,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.6.8 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.8&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.6.9 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.9&t=' + Date.now();
                                 }
                             };
                         }
@@ -4510,7 +4517,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.6.8&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.6.9&t=' + Date.now();
             }
         });
 
@@ -4519,7 +4526,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.8&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.9&t=' + Date.now();
                 }
             }
         });
