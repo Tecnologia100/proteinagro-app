@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.6.7`  
+> **Versión Actual:** `v=1.6.8`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -670,6 +670,26 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - Script independiente [`Reparar_Duplicados_Septiembre.gs`](./Reparar_Duplicados_Septiembre.gs).
   - Menú directo en Google Sheets: `🚀 ProteinAgro > 🔧 Reparar Duplicados de Septiembre`.
   - Endpoint en `Code.gs`: `action=repararDuplicadosSeptiembre`.
+
+## 🛡️ 17. Blindaje de Autenticación, Idempotencia y Plausibilidad (`v1.6.8`)
+> **Fecha de Implementación:** 06 de Octubre de 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`index.html`](./index.html), [`sw.js`](./sw.js), [`Code.gs`](./Code.gs)  
+> **Objetivo:** Fortalecer la seguridad de acceso, garantizar la idempotencia de guardado en Firestore y prevenir errores tipográficos de kilos en campo.
+
+- **Seguridad de Acceso Reforzada:**
+  - Clave de Administrador establecida en **`2615`** como credencial oficial y segura.
+  - Eliminación total del PIN maestro `"0000"` tanto para administradores como para conductores. Se depuró cualquier clave `"0000"` en `localStorage`, asegurando que todos los dispositivos utilicen la nueva clave `2615`.
+  - Conductores ingresan exclusivamente con su PIN individual asignado (o `1234` de contingencia si no tienen PIN configurado).
+- **Validación de Plausibilidad de Pesaje (Anti-Errores Tipográficos):**
+  - Alerta interactiva de confirmación si un producto supera **2.500 Kg** (evitando errores como `40.000` en lugar de `40`).
+  - Alerta de capacidad si el peso total del viaje supera **10.000 Kg** (10 toneladas).
+  - Comprobaciones idénticas integradas en el formulario principal y en el modal de Edición Administrativa.
+- **Idempotencia y Prevención de Duplicados en Firestore:**
+  - IDs únicos con sufijo pseudo-aleatorio (`REC-[timestamp]-[rand4]` y `NOV-[timestamp]-[rand4]`).
+  - Sustitución de `.add()` por `.doc(recordId).set()` en Firestore: reintentos por intermitencia de red o pulsaciones dobles actualizan el mismo documento sin crear duplicados.
+- **Sincronización Bidireccional de Eliminación y Auditoría:**
+  - `eliminarRecoleccion` notifica de inmediato al Webhook de Google Sheets (`action=deleteRecoleccion&id=...`) eliminando la fila correspondiente y garantizando congruencia con el Cierre Diario.
+  - Incorporación de trazabilidad de autoría `modificadoPor: 'Administrador'` en modificaciones de recolecciones.
 
 ---
 

@@ -312,7 +312,7 @@ const DEFAULT_CONDUCTORES_AUTH = {
 };
 
 let CONDUCTORES_AUTH = Object.assign({}, DEFAULT_CONDUCTORES_AUTH);
-let ADMIN_CLAVE_CONFIG = "0000";
+let ADMIN_CLAVE_CONFIG = "2615";
 let CURRENT_LOGGED_DRIVER = null;
 
 // Cargar credenciales previas desde localStorage si existen (Soporte Offline inmediato)
@@ -332,8 +332,11 @@ try {
         }
     }
     const cachedAdmin = localStorage.getItem('proteinagro_admin_clave');
-    if (cachedAdmin) {
-        ADMIN_CLAVE_CONFIG = cachedAdmin;
+    if (cachedAdmin && cachedAdmin.trim() !== '' && cachedAdmin.trim() !== '0000') {
+        ADMIN_CLAVE_CONFIG = cachedAdmin.trim();
+    } else {
+        ADMIN_CLAVE_CONFIG = '2615';
+        try { localStorage.setItem('proteinagro_admin_clave', '2615'); } catch(e) {}
     }
 } catch (e) {}
 
@@ -466,11 +469,9 @@ const handleConductorLogin = (e) => {
 
     // Validación de seguridad estricta:
     // 1. Debe coincidir con la clave asignada al conductor
-    // 2. O clave maestra de respaldo de administración ('0000')
-    // 3. Solo si el conductor no tuviese ninguna clave asignada en el sistema, se admite '1234' o '0000'
+    // 2. Solo si el conductor no tuviese ninguna clave asignada en el sistema, se admite '1234'
     const pinValido = (expectedPin && expectedPin !== '' && pin === expectedPin) ||
-                      (pin === '0000') ||
-                      (!expectedPin && (pin === '1234' || pin === '0000'));
+                      (!expectedPin && pin === '1234');
 
     if (pinValido) {
         entrarComoConductor(driverName);
@@ -515,8 +516,8 @@ const handleAdminLogin = async (e) => {
     // 2. Validación de clave de Administrador
     const userLower = userInput.toLowerCase();
     const esUsuarioAdmin = (userLower === 'admin' || userLower === 'administrador' || userLower === '');
-    const expectedAdminPin = (ADMIN_CLAVE_CONFIG && ADMIN_CLAVE_CONFIG.trim() !== '') ? ADMIN_CLAVE_CONFIG.trim() : '0000';
-    const pinAdminValido = pin !== '' && (pin === expectedAdminPin || pin === '0000');
+    const expectedAdminPin = (ADMIN_CLAVE_CONFIG && ADMIN_CLAVE_CONFIG.trim() !== '' && ADMIN_CLAVE_CONFIG.trim() !== '0000') ? ADMIN_CLAVE_CONFIG.trim() : '2615';
+    const pinAdminValido = pin !== '' && (pin === expectedAdminPin);
 
     if (esUsuarioAdmin && pinAdminValido) {
         entrarComoAdmin();
@@ -1159,7 +1160,7 @@ async function sincronizarCredencialesDesdeGviz() {
                     const nombre = aNombrePropio(rawNombre);
 
                     if (nombre.toLowerCase() === 'admin' || nombre.toLowerCase() === 'administrador') {
-                        if (clave) {
+                        if (clave && clave !== '0000') {
                             ADMIN_CLAVE_CONFIG = clave;
                             try { localStorage.setItem('proteinagro_admin_clave', clave); } catch(e) {}
                         }
@@ -1389,7 +1390,7 @@ async function cargarCatalogosDinamicos() {
                             localStorage.setItem('proteinagro_conductores_auth', JSON.stringify(CONDUCTORES_AUTH));
                         } catch(e) {}
                     }
-                    if (data.admin_clave) {
+                    if (data.admin_clave && String(data.admin_clave).trim() !== '' && String(data.admin_clave).trim() !== '0000') {
                         ADMIN_CLAVE_CONFIG = String(data.admin_clave).trim();
                         try {
                             localStorage.setItem('proteinagro_admin_clave', ADMIN_CLAVE_CONFIG);
@@ -1416,8 +1417,10 @@ async function cargarCatalogosDinamicos() {
             }
         }
         const cachedAdmin = localStorage.getItem('proteinagro_admin_clave');
-        if (cachedAdmin) {
-            ADMIN_CLAVE_CONFIG = cachedAdmin;
+        if (cachedAdmin && cachedAdmin.trim() !== '' && cachedAdmin.trim() !== '0000') {
+            ADMIN_CLAVE_CONFIG = cachedAdmin.trim();
+        } else {
+            ADMIN_CLAVE_CONFIG = '2615';
         }
     } catch(e) {}
 
@@ -1443,6 +1446,15 @@ btnRegistrarProducto.addEventListener('click', () => {
         alert("Ingresa la cantidad en kilos (debe ser mayor a 0).");
         kilosInput.focus();
         return;
+    }
+
+    // Validación de plausibilidad de pesaje (protección contra errores tipográficos ej. 40.000 vs 40)
+    if (kilosVal > 2500) {
+        const confirmarKilos = confirm(`⚠️ ALERTA DE PLAUSIBILIDAD:\n\nHas ingresado ${formatKilosDisplay(kilosVal)} Kg para "${currentProduct}".\n\n¿Estás seguro de que esta cantidad es correcta y no un error de digitación?`);
+        if (!confirmarKilos) {
+            kilosInput.focus();
+            return;
+        }
     }
     
     // Guardar en la lista (redondeado a 2 decimales para evitar imprecisión de punto flotante)
@@ -1635,6 +1647,13 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     // Auto-registrar cualquier producto que el usuario haya seleccionado y colocado kilos pero no haya hecho clic en +
     const kilosPending = parseKilosFloat(kilosInput?.value);
     if (currentProduct && kilosInput && kilosInput.value && kilosPending > 0) {
+        if (kilosPending > 2500) {
+            const confirmarPending = confirm(`⚠️ ALERTA DE PLAUSIBILIDAD:\n\nHas ingresado ${formatKilosDisplay(kilosPending)} Kg para "${currentProduct}".\n\n¿Estás seguro de que esta cantidad es correcta y no un error tipográfico?`);
+            if (!confirmarPending) {
+                kilosInput.focus();
+                return;
+            }
+        }
         collectedProducts.push({
             producto: currentProduct,
             kilos: kilosPending
@@ -1657,6 +1676,13 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     collectedProducts.forEach(p => totalKilos += (Number(p.kilos) || 0));
     totalKilos = Math.round(totalKilos * 100) / 100;
 
+    if (totalKilos > 10000) {
+        const confirmarTotal = confirm(`⚠️ ALERTA DE CAPACIDAD:\n\nEl total acumulado de la recolección es de ${formatKilosDisplay(totalKilos)} Kg (${(totalKilos/1000).toFixed(1)} toneladas).\n\n¿Confirmas que este pesaje total es correcto?`);
+        if (!confirmarTotal) {
+            return;
+        }
+    }
+
     const btnSubmit = document.getElementById('btn-submit');
     const spinner = btnSubmit.querySelector('.spinner');
     const textSpan = btnSubmit.querySelector('.btn-text-content');
@@ -1670,7 +1696,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
 
     // Obtener firma base64
     const firmaDataUrl = canvas.toDataURL();
-    const recordId = 'REC-' + Date.now();
+    const recordId = 'REC-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
     const tsNow = Date.now();
 
     // Coordenada GPS en segundo plano (0 ms de espera, 100% inmediato y sin demoras)
@@ -1740,9 +1766,9 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
             }).catch(e => console.warn("Error en envío inmediato a Sheets (se reintentará en auto-sync):", e));
         }
 
-        // 3. Intentar guardar en Firebase con un tiempo límite de 4 segundos
+        // 3. Guardar en Firebase de forma idempotente con doc(recordId).set() y tiempo límite de 4 segundos
         try {
-            const firestorePromise = db.collection('recolecciones').add({ ...data, firma: firmaURL });
+            const firestorePromise = db.collection('recolecciones').doc(recordId).set({ ...data, firma: firmaURL });
             const timeoutPromise = new Promise((_, reject) => 
                 setTimeout(() => reject(new Error("Timeout de conexión a Firebase")), 4000)
             );
@@ -2039,7 +2065,18 @@ async function eliminarRecoleccion(firestoreDocId, localRecordId) {
             localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
         }
 
-        console.log("✅ Recolección eliminada correctamente.");
+        // Sincronizar eliminación en Google Sheets para mantener sincronía contable total (v1.6.8)
+        const targetId = localRecordId || firestoreDocId;
+        if (targetId && GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== '') {
+            try {
+                const urlDelete = GOOGLE_SHEETS_WEBHOOK_URL + '?action=deleteRecoleccion&id=' + encodeURIComponent(targetId);
+                fetch(urlDelete, { mode: 'no-cors' }).catch(err => console.warn("No se pudo notificar borrado a Sheets:", err));
+            } catch(sheetErr) {
+                console.warn("Error enviando eliminación a Sheets:", sheetErr);
+            }
+        }
+
+        console.log("✅ Recolección eliminada correctamente de Firestore, LocalStorage y Sheets.");
     } catch (e) {
         console.error("Error al eliminar recolección: ", e);
         alert("Hubo un error al eliminar el registro: " + e.message);
@@ -3328,7 +3365,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.7&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.8&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -3964,6 +4001,19 @@ function initAdminEditModal() {
 
         totalKilos = Math.round(totalKilos * 100) / 100;
 
+        for (const p of productos) {
+            if (p.kilos > 2500) {
+                if (!confirm(`⚠️ ALERTA DE PLAUSIBILIDAD:\n\nEl producto "${p.producto}" tiene ${formatKilosDisplay(p.kilos)} Kg.\n\n¿Confirmas que este pesaje es correcto y no un error tipográfico?`)) {
+                    return;
+                }
+            }
+        }
+        if (totalKilos > 10000) {
+            if (!confirm(`⚠️ ALERTA DE CAPACIDAD:\n\nEl total acumulado de la recolección es de ${formatKilosDisplay(totalKilos)} Kg (${(totalKilos/1000).toFixed(1)} toneladas).\n\n¿Confirmas que este pesaje total es correcto?`)) {
+                return;
+            }
+        }
+
         const btnSave = document.getElementById('btn-save-admin-edit');
         if (btnSave) {
             btnSave.disabled = true;
@@ -3981,7 +4031,8 @@ function initAdminEditModal() {
                 observaciones: observaciones,
                 productos: productos,
                 totalKilos: totalKilos,
-                modificadoEn: new Date().toLocaleString()
+                modificadoEn: new Date().toLocaleString(),
+                modificadoPor: 'Administrador'
             };
 
             // 1. Actualizar en Firebase Firestore
@@ -4247,7 +4298,7 @@ function initNovedadesModal() {
         if (btnGuardar) btnGuardar.disabled = true;
 
         try {
-            const recordId = 'NOV-' + Date.now();
+            const recordId = 'NOV-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
             const tsNow = Date.now();
             const obsUser = (obsTextarea?.value || '').trim();
             const observacionesFinal = obsUser ? `${causal}: ${obsUser}` : causal;
@@ -4342,9 +4393,9 @@ function initNovedadesModal() {
                 }).catch(e => console.warn("Error enviando novedad a Sheets (se reintentará en auto-sync):", e));
             }
 
-            // 3. Guardar en Firestore con timeout de 4 segundos
+            // 3. Guardar en Firestore de forma idempotente con doc(recordId).set() y timeout de 4 segundos
             try {
-                const firestorePromise = db.collection('recolecciones').add({ ...dataNovedad });
+                const firestorePromise = db.collection('recolecciones').doc(recordId).set({ ...dataNovedad });
                 const timeoutPromise = new Promise((_, reject) => 
                     setTimeout(() => reject(new Error("Timeout guardando novedad en Firebase")), 4000)
                 );
@@ -4416,12 +4467,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.6.7 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.6.8 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.6.7')
+            navigator.serviceWorker.register('/sw.js?v=1.6.8')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.6.7 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.6.8 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -4429,8 +4480,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.6.7 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.7&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.6.8 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.8&t=' + Date.now();
                                 }
                             };
                         }
@@ -4459,7 +4510,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.6.7&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.6.8&t=' + Date.now();
             }
         });
 
@@ -4468,7 +4519,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.7&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.8&t=' + Date.now();
                 }
             }
         });

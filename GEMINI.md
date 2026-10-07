@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.6.7)  
+> **Última Actualización:** Octubre 2026 (Versión 1.6.8)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -87,6 +87,22 @@
   - Las 2.166 filas de recolecciones legítimas de los conductores, sus kilos y proveedores reales permanecen 100% intactas.
   - Homologación local en **`original.xlsx`**: Pestaña `original_homologado` con 361 filas limpias mapeadas a `Puntos_Rutas`, pestaña `clones_duplicados_retirados` con las 27 filas de Ruta 1 retiradas, y la fuente original cruda preservada.
   - Scripts de soporte: `Reparar_Duplicados_Septiembre.gs`, función `repararDuplicadosSeptiembre` en `Code.gs` y menú directo *🚀 ProteinAgro > 🔧 Reparar Duplicados de Septiembre*.
+
+### 9. Blindaje de Autenticación, Idempotencia y Plausibilidad (`v1.6.8`)
+- **Seguridad de Acceso:**
+  - Clave de Administrador actualizada a **`2615`** como credencial oficial y segura.
+  - Eliminación total del bypass `"0000"` en el login de administrador y conductores. Se limpió cualquier residuo de `"0000"` en el almacenamiento local (`localStorage`) forzando la actualización a `2615`.
+  - Los conductores deben ingresar obligatoriamente su PIN asignado (o `1234` si no tienen PIN configurado).
+- **Validación de Plausibilidad de Pesaje (Anti-Error Tipográfico):**
+  - Alerta y confirmación interactiva si el pesaje de cualquier materia prima supera **2.500 Kg** (prevención contra errores de digitación de puntos como `40.000` vs `40`).
+  - Alerta y confirmación interactiva si la recolección total del viaje supera **10.000 Kg** (10 toneladas).
+  - Verificación idéntica integrada en el modal de Edición Administrativa de recolecciones.
+- **Idempotencia Absoluta en Persistencia:**
+  - Identificadores únicos con entropía aleatoria: `REC-[timestamp]-[rand4]` y `NOV-[timestamp]-[rand4]`.
+  - Reemplazo de `.add(...)` por `.doc(recordId).set(...)` en Firestore para recolecciones y visitas fallidas / novedades. Si ocurre reintento o doble clic, el documento se actualiza sobre su clave primaria sin generar duplicados.
+- **Sincronización Bidireccional de Eliminación:**
+  - Al eliminar un registro desde la tabla administrativa (`eliminarRecoleccion`), además de borrarse en Firestore y LocalStorage, se envía la petición de eliminación a Google Sheets (`action=deleteRecoleccion&id=...`) evitando filas huérfanas en el Cierre Diario.
+  - Se añadió trazabilidad de auditoría `modificadoPor: 'Administrador'` en la edición de registros.
 
 ---
 
