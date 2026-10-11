@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.7.0)  
+> **Última Actualización:** Octubre 2026 (Versión 1.7.1)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -160,6 +160,12 @@
   - El gráfico de barras por proveedor (`chart-proveedor`) agrupa exclusivamente kilogramos de carga cárnica para no inflar artificialmente las toneladas recibidas en planta.
   - El gráfico por producto (`chart-producto`) rotula la porción como `LEÑA (Atados)`.
   - La exportación CSV especifica las unidades en los ítems y en la columna de total.
+
+### 12. Optimización Visual y Selector Rápido de Atados (`v1.7.1`)
+- **Resolución de Colisión Visual:** Se erradicó la superposición gráfica entre el valor ingresado y el indicador `ATADOS` mediante la regla `.input-with-unit.unit-atados .huge-input` con `padding-right: 130px` y estilización del badge en pastilla ámbar de alto contraste (`#fef3c7`, borde `#fde68a`, texto `#b45309`).
+- **Selector Rápido Táctil (1 a 5 Atados):** Botonera de pulsación directa `[1] [2] [3] [4] [5]` (`.atados-quick-selector` / `.btn-quick-atado`) integrada en el formulario del conductor. Facilita la operación en campo al registrar viajes de camión con un solo toque en pantalla táctil sin desplegar teclado virtual.
+- **Sincronización Bidireccional Reactiva:** El valor seleccionado por botón o ingresado manualmente conmuta el estado visual `.active` de los botones. Placeholder simplificado a `0` para una lectura visual limpia.
+- **Actualización de Caché PWA:** Bumping de versión a `v1.7.1` en `sw.js`, Service Worker y hashes de recursos para forzar la actualización transparente e inmediata en todos los dispositivos de conductores y administradores.
 
 ---
 

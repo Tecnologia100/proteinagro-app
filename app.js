@@ -741,16 +741,23 @@ function actualizarInterfazUnidadProducto(prod) {
     const badge = document.getElementById('kilos-unit-badge');
     const hint = document.getElementById('kilos-atado-hint');
     const btnReg = document.getElementById('btn-registrar-producto');
+    const container = document.getElementById('input-with-unit-container');
+    const quickSelector = document.getElementById('atados-quick-selector');
     
     if (esProductoAtado(prod)) {
+        if (container) container.classList.add('unit-atados');
+        if (quickSelector) quickSelector.style.display = 'block';
         if (lbl) lbl.textContent = 'Cantidad (Atados)';
         if (badge) badge.textContent = 'ATADOS';
         if (hint) hint.style.display = 'block';
         if (kilosInput) {
-            kilosInput.placeholder = '1 - 5';
+            kilosInput.placeholder = '0';
         }
         if (btnReg) btnReg.innerHTML = '➕ Registrar atados';
+        actualizarEstadoBotonesAtados(kilosInput ? kilosInput.value.trim() : '');
     } else {
+        if (container) container.classList.remove('unit-atados');
+        if (quickSelector) quickSelector.style.display = 'none';
         if (lbl) lbl.textContent = 'Cantidad (Kilos)';
         if (badge) badge.textContent = 'KG';
         if (hint) hint.style.display = 'none';
@@ -758,7 +765,45 @@ function actualizarInterfazUnidadProducto(prod) {
             kilosInput.placeholder = '0';
         }
         if (btnReg) btnReg.innerHTML = '➕ Registrar producto';
+        actualizarEstadoBotonesAtados(null);
     }
+}
+
+// Inicializa interacción con los botones de selección rápida de atados (1 a 5)
+function inicializarSelectorAtados() {
+    const quickButtons = document.querySelectorAll('.btn-quick-atado');
+    if (!quickButtons || quickButtons.length === 0) return;
+
+    quickButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const val = btn.getAttribute('data-atados');
+            if (kilosInput) {
+                kilosInput.value = val;
+                kilosInput.focus();
+            }
+            actualizarEstadoBotonesAtados(val);
+        });
+    });
+
+    if (kilosInput) {
+        kilosInput.addEventListener('input', () => {
+            if (esProductoAtado(currentProduct)) {
+                actualizarEstadoBotonesAtados(kilosInput.value.trim());
+            }
+        });
+    }
+}
+
+// Resalta visualmente el botón activo de atados si coincide con el valor ingresado
+function actualizarEstadoBotonesAtados(activeVal) {
+    const quickButtons = document.querySelectorAll('.btn-quick-atado');
+    quickButtons.forEach(b => {
+        if (activeVal !== null && activeVal !== undefined && b.getAttribute('data-atados') === String(activeVal)) {
+            b.classList.add('active');
+        } else {
+            b.classList.remove('active');
+        }
+    });
 }
 
 // ==============================================================================
@@ -3544,7 +3589,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.0&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.1&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -4707,6 +4752,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAdminSupportModal();
     initAdminEditModal();
     initNovedadesModal();
+    inicializarSelectorAtados();
 
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
@@ -4719,12 +4765,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.7.0 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.7.1 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.7.0')
+            navigator.serviceWorker.register('/sw.js?v=1.7.1')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.7.0 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.7.1 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -4732,8 +4778,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.7.0 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.0&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.7.1 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.1&t=' + Date.now();
                                 }
                             };
                         }
@@ -4762,7 +4808,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.0&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.1&t=' + Date.now();
             }
         });
 
@@ -4771,7 +4817,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.0&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.1&t=' + Date.now();
                 }
             }
         });

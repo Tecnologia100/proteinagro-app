@@ -207,7 +207,21 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.5.6` (Octubre 2026) - Versión Actual
+### `v=1.7.1` (Octubre 2026) - Versión Actual
+- **Optimización Visual y Selector Táctil Rápido de Atados:**
+  - **Eliminación de Colisión en Campo de Entrada:** Corrección del traslape entre el texto/placeholder y el indicador `ATADOS` mediante `.input-with-unit.unit-atados .huge-input` (`padding-right: 130px`) y badge tipo pastilla color ámbar (`#fef3c7`, borde `#fde68a`, texto `#b45309`).
+  - **Botonera Táctil Rápida (1 a 5 Atados):** Selector directo `[1] [2] [3] [4] [5]` en el formulario del conductor que asigna el valor con un solo clic/toque, evitando el despliegue del teclado virtual en dispositivos móviles.
+  - **Sincronización Reactiva:** El valor ingresado activa dinámicamente el botón correspondiente (`.active`), reseteando al cambiar o registrar producto. Placeholder limpio fijado en `0`.
+  - **Actualización PWA:** Registro del Service Worker actualizado a `v1.7.1` con recarga de caché transparente.
+
+### `v=1.7.0` (Octubre 2026)
+- **Módulo de Unidades Diferenciadas (Kg vs Atados de Leña):**
+  - Soporte operativo para la materia prima `LEÑA` que se liquida por unidad de viaje completo de camión (`Atado`).
+  - Límite operativo máximo de 5 atados por recolección con validaciones de capacidad y bloqueo.
+  - Segregación matemática estricta: en ningún punto se suman Kg con Atados; persistencia y reportería independientes.
+  - Soporte oficial administrativo, comprobantes digitales, cierre diario y exportación CSV adaptados.
+
+### `v=1.5.6` (Octubre 2026)
 - **Resolución de Pérdida Silenciosa de Datos por `mode: no-cors`:**
   - Se eliminó el modo ciego `no-cors` de las peticiones `fetch` en `enviarAGoogleSheets` (`app.js`).
   - Ahora la PWA evalúa de forma estricta la respuesta real (`response.ok`). Si Google Sheets experimenta saturación o error 500, la app detecta el fallo, mantiene el registro como pendiente y permite que el motor de Auto-Sync en segundo plano (cada 5 minutos) lo reintente hasta lograr entrega garantizada.
