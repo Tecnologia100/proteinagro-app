@@ -717,6 +717,28 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Priorización de Mutaciones por POST:**
   - `eliminarRecoleccion` en `app.js` prioriza envío por `POST` manteniendo `GET` como fallback redundante con ID validado.
 
+## 🪵 19. Módulo de Unidades Diferenciadas: Soporte de Atados para Leña y Segregación Contable (`v1.7.0`)
+> **Fecha de Implementación:** 11 de Octubre de 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`index.html`](./index.html), [`sw.js`](./sw.js), [`GEMINI.md`](./GEMINI.md)  
+> **Objetivo:** Incorporar la gestión de la materia prima "LEÑA" en unidades de "Atado" (equivalente a un viaje de camión), aplicando un límite operativo estricto de máximo 5 atados, y segregando contable y aritméticamente los kilogramos de materias cárnicas de los atados de leña en toda la plataforma.
+
+- **Naturaleza Operativa y Límite Infranqueable:**
+  - La leña no se comercializa pesada en báscula, sino por atado completo de camión.
+  - Regla de capacidad física: **Ningún viaje puede sobrepasar 5 atados** (validado tanto de forma individual en cada adición como de forma acumulativa en el submit y en la edición administrativa).
+- **Interfaz Dinámica Reactiva en la PWA:**
+  - Al seleccionar `🪵 LEÑA`, las etiquetas del formulario conmutan en tiempo real: de *Cantidad (Kilos)* a *Cantidad (Atados)*, badge de unidad `KG` a `ATADOS`, placeholder `1 - 5`, botón *➕ Registrar atados*, y banner de orientación operativa.
+  - Al regresar a cualquier materia prima cárnica, retorna instantáneamente a *Cantidad (Kilos)* y `KG`.
+- **Segregación Contable y Resumen de Totales:**
+  - Persistencia independiente de `totalKilos` y `totalAtados` en Firestore, LocalStorage y Google Sheets.
+  - Función `formatResumenTotales` que emite representaciones limpias y transparentes (ej. `350 KG | 2 ATADOS`, `1 ATADO`, o `1.200 KG`).
+  - En los comprobantes digitales (pantalla y WhatsApp), cada renglón refleja su unidad respectiva y el total desglosa claramente ambos conceptos sin sumarlos como un solo número.
+- **Auditoría en Cierre Diario, Gráficos y Tablas:**
+  - Motor de auditoría en 4 capas adaptado para computar `kilosTotalesRuta` y `atadosTotalesRuta`.
+  - El gráfico por proveedor agrupa exclusivamente kilogramos de materias cárnicas para no distorsionar el tonelaje de planta.
+  - El gráfico por producto tipifica la categoría como `LEÑA (Atados)`.
+  - Exportación CSV enriquecida con desglose por ítem y total segregado.
+  - Modal de edición administrativa (`admin-edit-modal`) con badge reactivo por renglón y recálculo dinámico independiente.
+
 ---
 
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*

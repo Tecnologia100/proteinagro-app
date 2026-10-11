@@ -649,6 +649,119 @@ function parseKilosFloat(str) {
 }
 
 // ==============================================================================
+// GESTIÓN DE UNIDADES DIFERENCIADAS (v1.7.0): KG VS ATADOS (LEÑA)
+// ==============================================================================
+function esProductoAtado(producto) {
+    if (!producto) return false;
+    const p = String(producto).trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    return p.includes('LENA');
+}
+
+function getUnidadProducto(producto, cantidad = 1) {
+    if (esProductoAtado(producto)) {
+        return Number(cantidad) === 1 ? 'Atado' : 'Atados';
+    }
+    return 'Kg';
+}
+
+function formatCantidadProducto(producto, cantidad) {
+    const cantNum = typeof cantidad === 'number' ? cantidad : parseKilosFloat(cantidad);
+    if (esProductoAtado(producto)) {
+        return `${cantNum} ${cantNum === 1 ? 'Atado' : 'Atados'}`;
+    }
+    return `${formatKilosDisplay(cantNum)} kg`;
+}
+
+// Separación contable estricta: suma kilos cárnicos por un lado y atados por otro
+function calcularTotalesRecoleccion(productos, fallbackKilos = 0, fallbackProducto = '') {
+    let totalKilos = 0;
+    let totalAtados = 0;
+    
+    if (productos && Array.isArray(productos) && productos.length > 0) {
+        productos.forEach(p => {
+            const cant = Number(p.kilos) || 0;
+            if (esProductoAtado(p.producto)) {
+                totalAtados += cant;
+            } else {
+                totalKilos += cant;
+            }
+        });
+    } else {
+        const fbCant = Number(fallbackKilos) || 0;
+        if (esProductoAtado(fallbackProducto)) {
+            totalAtados = fbCant;
+        } else {
+            totalKilos = fbCant;
+        }
+    }
+    
+    return {
+        totalKilos: Math.round(totalKilos * 100) / 100,
+        totalAtados: Math.round(totalAtados * 100) / 100
+    };
+}
+
+// Genera el texto legible y unívoco de resumen de totales para UI, Comprobantes y WhatsApp
+function formatResumenTotales(totalesOrRecord) {
+    let totalKilos = 0;
+    let totalAtados = 0;
+    
+    if (totalesOrRecord && typeof totalesOrRecord === 'object') {
+        if ('totalKilos' in totalesOrRecord || 'totalAtados' in totalesOrRecord) {
+            totalKilos = Number(totalesOrRecord.totalKilos) || 0;
+            totalAtados = Number(totalesOrRecord.totalAtados) || 0;
+            // Si no tenía totalAtados explícito pero tiene array de productos, calcularlo
+            if (totalAtados === 0 && totalesOrRecord.productos && Array.isArray(totalesOrRecord.productos)) {
+                const calcs = calcularTotalesRecoleccion(totalesOrRecord.productos);
+                totalKilos = calcs.totalKilos;
+                totalAtados = calcs.totalAtados;
+            } else if (totalAtados === 0 && esProductoAtado(totalesOrRecord.producto)) {
+                totalAtados = totalKilos;
+                totalKilos = 0;
+            }
+        } else if (Array.isArray(totalesOrRecord.productos)) {
+            const calcs = calcularTotalesRecoleccion(totalesOrRecord.productos);
+            totalKilos = calcs.totalKilos;
+            totalAtados = calcs.totalAtados;
+        }
+    }
+    
+    if (totalKilos > 0 && totalAtados > 0) {
+        return `${formatKilosDisplay(totalKilos)} KG | ${totalAtados} ${totalAtados === 1 ? 'ATADO' : 'ATADOS'}`;
+    } else if (totalAtados > 0) {
+        return `${totalAtados} ${totalAtados === 1 ? 'ATADO' : 'ATADOS'}`;
+    } else {
+        return `${formatKilosDisplay(totalKilos)} KG`;
+    }
+}
+
+// Actualiza dinámicamente las etiquetas y placeholders del formulario del conductor según la materia prima
+function actualizarInterfazUnidadProducto(prod) {
+    const lbl = document.getElementById('kilos-label');
+    const badge = document.getElementById('kilos-unit-badge');
+    const hint = document.getElementById('kilos-atado-hint');
+    const btnReg = document.getElementById('btn-registrar-producto');
+    
+    if (esProductoAtado(prod)) {
+        if (lbl) lbl.textContent = 'Cantidad (Atados)';
+        if (badge) badge.textContent = 'ATADOS';
+        if (hint) hint.style.display = 'block';
+        if (kilosInput) {
+            kilosInput.placeholder = '1 - 5';
+        }
+        if (btnReg) btnReg.innerHTML = '➕ Registrar atados';
+    } else {
+        if (lbl) lbl.textContent = 'Cantidad (Kilos)';
+        if (badge) badge.textContent = 'KG';
+        if (hint) hint.style.display = 'none';
+        if (kilosInput) {
+            kilosInput.placeholder = '0';
+        }
+        if (btnReg) btnReg.innerHTML = '➕ Registrar producto';
+    }
+}
+
+// ==============================================================================
 // HOMOLOGACIÓN ESTÁNDAR DE RUTAS (v1.5.6)
 // ==============================================================================
 function homologarRuta(texto) {
@@ -991,6 +1104,10 @@ function renderDynamicProducts(prods) {
             currentProduct = pName;
             const selInput = document.getElementById('producto-seleccionado');
             if (selInput) selInput.value = currentProduct;
+
+            // Adaptar interfaz de unidad (Kg vs Atados)
+            actualizarInterfazUnidadProducto(currentProduct);
+
             if (kilosGroup) kilosGroup.style.display = 'block';
             if (kilosInput) {
                 kilosInput.focus();
@@ -1442,25 +1559,45 @@ btnRegistrarProducto.addEventListener('click', () => {
         return;
     }
     const kilosVal = parseKilosFloat(kilosInput.value);
-    if (!kilosInput.value || kilosVal <= 0) {
-        alert("Ingresa la cantidad en kilos (debe ser mayor a 0).");
-        kilosInput.focus();
-        return;
-    }
 
-    // Validación de plausibilidad de pesaje (protección contra errores tipográficos ej. 40.000 vs 40)
-    if (kilosVal > 2500) {
-        const confirmarKilos = confirm(`⚠️ ALERTA DE PLAUSIBILIDAD:\n\nHas ingresado ${formatKilosDisplay(kilosVal)} Kg para "${currentProduct}".\n\n¿Estás seguro de que esta cantidad es correcta y no un error de digitación?`);
-        if (!confirmarKilos) {
+    // Validación diferenciada según la materia prima: ATADOS (Leña) vs KG (Cárnicos)
+    if (esProductoAtado(currentProduct)) {
+        if (!kilosInput.value || kilosVal <= 0) {
+            alert("Ingresa la cantidad en atados (debe ser mayor a 0).");
             kilosInput.focus();
             return;
         }
+        // Regla Operativa Estricta: Un atado = un viaje de camión (Máximo 5 atados por recolección)
+        let atadosPrevios = 0;
+        collectedProducts.forEach(p => {
+            if (esProductoAtado(p.producto)) atadosPrevios += (Number(p.kilos) || 0);
+        });
+        if (atadosPrevios + kilosVal > 5) {
+            alert(`⚠️ LÍMITE DE CAPACIDAD EXCEDIDO:\n\nUn atado equivale a un viaje completo del camión. La cantidad total no debe sobrepasar 5 atados por viaje (ya tienes ${atadosPrevios} atado(s) registrado(s) e intentas agregar ${kilosVal}, sumando ${atadosPrevios + kilosVal} atados).\n\nPor favor verifica la cantidad ingresada.`);
+            kilosInput.focus();
+            return;
+        }
+    } else {
+        if (!kilosInput.value || kilosVal <= 0) {
+            alert("Ingresa la cantidad en kilos (debe ser mayor a 0).");
+            kilosInput.focus();
+            return;
+        }
+        // Validación de plausibilidad de pesaje (protección contra errores tipográficos ej. 40.000 vs 40)
+        if (kilosVal > 2500) {
+            const confirmarKilos = confirm(`⚠️ ALERTA DE PLAUSIBILIDAD:\n\nHas ingresado ${formatKilosDisplay(kilosVal)} Kg para "${currentProduct}".\n\n¿Estás seguro de que esta cantidad es correcta y no un error de digitación?`);
+            if (!confirmarKilos) {
+                kilosInput.focus();
+                return;
+            }
+        }
     }
     
-    // Guardar en la lista (redondeado a 2 decimales para evitar imprecisión de punto flotante)
+    // Guardar en la lista con su unidad respectiva
     collectedProducts.push({
         producto: currentProduct,
-        kilos: kilosVal
+        kilos: kilosVal,
+        unidad: esProductoAtado(currentProduct) ? 'Atado' : 'Kg'
     });
 
     // Mantener la lista de productos recolectados siempre organizada en orden alfabético
@@ -1472,6 +1609,7 @@ btnRegistrarProducto.addEventListener('click', () => {
     document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
     currentProduct = null;
     kilosInput.value = '';
+    actualizarInterfazUnidadProducto(null);
     if (kilosGroup) kilosGroup.style.display = 'none';
 });
 
@@ -1480,6 +1618,10 @@ function renderAddedProducts() {
         addedProductsDiv.style.display = 'block';
         productsListUl.innerHTML = '';
         collectedProducts.forEach((p, index) => {
+            const isAtado = esProductoAtado(p.producto);
+            const badgeCant = isAtado
+                ? `<strong style="color: #b45309; background: #fef3c7; padding: 2px 8px; border-radius: 4px; font-size: 0.9rem;">${p.kilos} ${p.kilos === 1 ? 'Atado' : 'Atados'}</strong>`
+                : `<strong style="color: #0284c7;">${formatKilosDisplay(p.kilos)} kg</strong>`;
             productsListUl.innerHTML += `
                 <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
                     <span style="font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
@@ -1487,7 +1629,7 @@ function renderAddedProducts() {
                         <span>${escapeHtml(p.producto)}</span>
                     </span>
                     <span style="display: flex; align-items: center; gap: 10px;">
-                        <strong style="color: #0284c7;">${formatKilosDisplay(p.kilos)} kg</strong>
+                        ${badgeCant}
                         <button type="button" onclick="eliminarProductoRegistrado(${index})" title="Borrar este producto" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; cursor: pointer;">✕ Borrar</button>
                     </span>
                 </li>
@@ -1644,22 +1786,32 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     }
     const sucursalName = obtenerPuntoSeleccionado();
     
-    // Auto-registrar cualquier producto que el usuario haya seleccionado y colocado kilos pero no haya hecho clic en +
+    // Auto-registrar cualquier producto que el usuario haya seleccionado y colocado cantidad pero no haya hecho clic en +
     const kilosPending = parseKilosFloat(kilosInput?.value);
     if (currentProduct && kilosInput && kilosInput.value && kilosPending > 0) {
-        if (kilosPending > 2500) {
-            const confirmarPending = confirm(`⚠️ ALERTA DE PLAUSIBILIDAD:\n\nHas ingresado ${formatKilosDisplay(kilosPending)} Kg para "${currentProduct}".\n\n¿Estás seguro de que esta cantidad es correcta y no un error tipográfico?`);
-            if (!confirmarPending) {
+        if (esProductoAtado(currentProduct)) {
+            if (kilosPending > 5) {
+                alert(`⚠️ LÍMITE DE CAPACIDAD EXCEDIDO:\n\nUn atado equivale a un viaje completo del camión. La cantidad máxima para LEÑA no debe sobrepasar 5 atados (has ingresado ${kilosPending} atados).\n\nPor favor verifica la cantidad ingresada.`);
                 kilosInput.focus();
                 return;
+            }
+        } else {
+            if (kilosPending > 2500) {
+                const confirmarPending = confirm(`⚠️ ALERTA DE PLAUSIBILIDAD:\n\nHas ingresado ${formatKilosDisplay(kilosPending)} Kg para "${currentProduct}".\n\n¿Estás seguro de que esta cantidad es correcta y no un error tipográfico?`);
+                if (!confirmarPending) {
+                    kilosInput.focus();
+                    return;
+                }
             }
         }
         collectedProducts.push({
             producto: currentProduct,
-            kilos: kilosPending
+            kilos: kilosPending,
+            unidad: esProductoAtado(currentProduct) ? 'Atado' : 'Kg'
         });
         currentProduct = null;
         kilosInput.value = '';
+        actualizarInterfazUnidadProducto(null);
         if (kilosGroup) kilosGroup.style.display = 'none';
         document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
         renderAddedProducts();
@@ -1667,14 +1819,18 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     
     // Validar que exista al menos un producto registrado
     if (collectedProducts.length === 0) {
-        alert("Debe registrar al menos un producto con su cantidad en kilos.");
+        alert("Debe registrar al menos un producto con su cantidad.");
         return;
     }
 
-    // Calcular totales redondeando a 2 decimales para evitar problemas de precisión en coma flotante (IEEE 754)
-    let totalKilos = 0;
-    collectedProducts.forEach(p => totalKilos += (Number(p.kilos) || 0));
-    totalKilos = Math.round(totalKilos * 100) / 100;
+    // SEPARACIÓN ESTRICTA: Kilos de carga cárnica vs Atados de Leña
+    const { totalKilos, totalAtados } = calcularTotalesRecoleccion(collectedProducts);
+
+    // Regla Operativa Estricta: Límite acumulado de Leña (Máximo 5 atados por viaje)
+    if (totalAtados > 5) {
+        alert(`⚠️ LÍMITE DE CAPACIDAD EXCEDIDO:\n\nEl total acumulado de LEÑA no puede sobrepasar 5 atados por viaje (total actual acumulado: ${totalAtados} atados).\n\nPor favor ajusta las cantidades registradas.`);
+        return;
+    }
 
     if (totalKilos > 10000) {
         const confirmarTotal = confirm(`⚠️ ALERTA DE CAPACIDAD:\n\nEl total acumulado de la recolección es de ${formatKilosDisplay(totalKilos)} Kg (${(totalKilos/1000).toFixed(1)} toneladas).\n\n¿Confirmas que este pesaje total es correcto?`);
@@ -1712,6 +1868,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         punto: homologarNombrePunto(sucursalName),
         productos: collectedProducts,
         totalKilos: totalKilos,
+        totalAtados: totalAtados,
         observaciones: observacionesVal,
         ubicacionGps: ubicacionGps,
         firma: firmaDataUrl,
@@ -1796,6 +1953,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         collectedProducts = [];
         renderAddedProducts();
         if (kilosGroup) kilosGroup.style.display = 'none';
+        actualizarInterfazUnidadProducto(null);
         document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
         if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
         
@@ -1824,14 +1982,17 @@ function renderCharts(records) {
     const kilosPorProducto = {};
 
     records.forEach(r => {
-        // Agrupar por proveedor
+        // Agrupar por proveedor: solo pesaje cárnico en Kg para no distorsionar tonelaje de planta
         const prov = (r.proveedor || 'Desconocido').replace('_', ' ');
-        kilosPorProveedor[prov] = Math.round(((kilosPorProveedor[prov] || 0) + (Number(r.totalKilos) || 0)) * 100) / 100;
+        const calcs = calcularTotalesRecoleccion(r.productos, r.totalKilos, r.producto);
+        kilosPorProveedor[prov] = Math.round(((kilosPorProveedor[prov] || 0) + calcs.totalKilos) * 100) / 100;
 
-        // Agrupar por producto
+        // Agrupar por producto identificando claramente si es Atados
         if (r.productos && Array.isArray(r.productos)) {
             r.productos.forEach(p => {
-                const prodName = p.producto || p.nombre || 'Otros';
+                const rawName = p.producto || p.nombre || 'Otros';
+                const isAtado = esProductoAtado(rawName);
+                const prodName = isAtado ? `${rawName} (Atados)` : rawName;
                 kilosPorProducto[prodName] = Math.round(((kilosPorProducto[prodName] || 0) + (Number(p.kilos) || 0)) * 100) / 100;
             });
         }
@@ -2008,7 +2169,7 @@ function renderRecordsInTable(records, tbody) {
 
         const provDisplay = data.proveedor || 'N/A';
         const sucDisplay = data.punto || data.sucursal || 'General';
-        const cleanTotalKg = isNovedad ? '<span style="color: #dc2626; font-weight: 700;">0 kg (Novedad)</span>' : `${formatKilosDisplay(data.totalKilos)} kg`;
+        const cleanTotalKg = isNovedad ? '<span style="color: #dc2626; font-weight: 700;">0 kg (Novedad)</span>' : `<span style="color: #0369a1; font-weight: 700;">${formatResumenTotales(data)}</span>`;
         const recordLocalId = data.id || '';
         const docId = data._docId || '';
         const photoOrSign = data.foto || data.firma || '';
@@ -2114,17 +2275,17 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
             if (data.productos && Array.isArray(data.productos)) {
                 productosStr = data.productos.map(p => {
                     const nom = p.producto || p.nombre || '';
-                    const kg = p.kilos ? ` (${p.kilos} kg)` : '';
-                    return nom + kg;
+                    const cant = p.kilos ? ` (${p.kilos} ${esProductoAtado(nom) ? 'atados' : 'kg'})` : '';
+                    return nom + cant;
                 }).join(', ');
             }
             productosStr = `"${productosStr}"`;
 
-            const totalKilos = data.totalKilos || 0;
+            const totalResumen = `"${formatResumenTotales(data)}"`;
             const observaciones = `"${(data.observaciones || '').replace(/"/g, '""')}"`;
             const estado = `"${data.estado || ''}"`;
 
-            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${sucursal},${productosStr},${totalKilos},${observaciones},${estado}\n`;
+            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${sucursal},${productosStr},${totalResumen},${observaciones},${estado}\n`;
         });
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -3262,15 +3423,20 @@ function mostrarComprobanteDigital(data) {
         const prodsSorted = data.productos.slice().sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
         prodsSorted.forEach(p => {
             const tr = document.createElement('tr');
+            const isAtado = esProductoAtado(p.producto);
+            const cantStr = isAtado
+                ? `${p.kilos} ${p.kilos === 1 ? 'ATADO' : 'ATADOS'}`
+                : `${formatKilosDisplay(p.kilos)} KG`;
+            const colorStr = isAtado ? '#b45309' : '#0284c7';
             tr.innerHTML = `
                 <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #1e293b;">${getEmojiForProduct(p.producto)} ${escapeHtml(p.producto)}</td>
-                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #0284c7;">${formatKilosDisplay(p.kilos)} KG</td>
+                <td style="padding: 6px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: ${colorStr};">${cantStr}</td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    document.getElementById('receipt-total-kilos').textContent = `${formatKilosDisplay(data.totalKilos)} KG`;
+    document.getElementById('receipt-total-kilos').textContent = formatResumenTotales(data);
 
     const obsContainer = document.getElementById('receipt-obs-container');
     if (data.observaciones && data.observaciones.trim() !== '') {
@@ -3323,9 +3489,15 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
     if (d.productos && Array.isArray(d.productos)) {
         const prodsSorted = d.productos.slice().sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
         prodsTxt = prodsSorted.map(p => {
-            return `  • ${getEmojiForProduct(p.producto)} ${p.producto}: *${formatKilosDisplay(p.kilos)} KG*`;
+            const isAtado = esProductoAtado(p.producto);
+            const cantStr = isAtado
+                ? `*${p.kilos} ${p.kilos === 1 ? 'Atado' : 'Atados'}*`
+                : `*${formatKilosDisplay(p.kilos)} KG*`;
+            return `  • ${getEmojiForProduct(p.producto)} ${p.producto}: ${cantStr}`;
         }).join('\n');
     }
+
+    const totalResumenStr = formatResumenTotales(d);
 
     const msg = `🌿 *PROTEINAGRO - COMPROBANTE DE RECOLECCIÓN*\n` +
         `-----------------------------------------\n` +
@@ -3338,7 +3510,7 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
         `-----------------------------------------\n` +
         `📦 *PRODUCTOS RECOLECTADOS:*\n${prodsTxt}\n` +
         `-----------------------------------------\n` +
-        `⚖️ *TOTAL RECOLECTADO: ${formatKilosDisplay(d.totalKilos)} KG*\n` +
+        `⚖️ *TOTAL RECOLECTADO: ${totalResumenStr}*\n` +
         (d.observaciones ? `📝 *Observaciones:* ${d.observaciones}\n` : '') +
         `✍️ *Firma Registrada:* OK\n` +
         `-----------------------------------------\n` +
@@ -3372,7 +3544,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.9&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.0&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -3637,7 +3809,7 @@ function initAdminSupportModal() {
             matches.forEach((m, idx) => {
                 const opt = document.createElement('option');
                 opt.value = idx;
-                opt.textContent = `Viaje #${idx + 1} (${m.fecha}) - ${m.conductor || 'Sin conductor'} (${formatKilosDisplay(m.totalKilos || 0)} kg)`;
+                opt.textContent = `Viaje #${idx + 1} (${m.fecha}) - ${m.conductor || 'Sin conductor'} (${formatResumenTotales(m)})`;
                 multipleSelect.appendChild(opt);
             });
             multipleSelect.onchange = () => {
@@ -3676,17 +3848,22 @@ function initAdminSupportModal() {
                 itemDiv.style.alignItems = 'center';
                 itemDiv.style.padding = '4px 0';
                 itemDiv.style.borderBottom = '1px dashed #f1f5f9';
+                const isAtado = esProductoAtado(p.producto);
+                const cantStr = isAtado ? `${p.kilos} ATADOS` : `${formatKilosDisplay(p.kilos)} KG`;
+                const colStr = isAtado ? '#b45309' : '#0284c7';
                 itemDiv.innerHTML = `
                     <span>${getEmojiForProduct(p.producto)} <strong>${escapeHtml(p.producto)}</strong></span>
-                    <span style="color: #0284c7; font-weight: 700;">${formatKilosDisplay(p.kilos)} KG</span>
+                    <span style="color: ${colStr}; font-weight: 700;">${cantStr}</span>
                 `;
                 prodsDiv.appendChild(itemDiv);
             });
         } else {
-            prodsDiv.innerHTML = `<div style="color: #64748b;">Producto: ${escapeHtml(rec.producto || 'N/A')} - ${formatKilosDisplay(rec.totalKilos || 0)} KG</div>`;
+            const isAtado = esProductoAtado(rec.producto);
+            const cantStr = isAtado ? `${rec.totalAtados || rec.totalKilos || 0} ATADOS` : `${formatKilosDisplay(rec.totalKilos || 0)} KG`;
+            prodsDiv.innerHTML = `<div style="color: #64748b;">Producto: ${escapeHtml(rec.producto || 'N/A')} - ${cantStr}</div>`;
         }
 
-        document.getElementById('admin-search-total').innerHTML = `⚖️ Total Recolectado: <span style="font-size: 1.25rem;">${formatKilosDisplay(rec.totalKilos)} KG</span>`;
+        document.getElementById('admin-search-total').innerHTML = `⚖️ Total Recolectado: <span style="font-size: 1.25rem;">${formatResumenTotales(rec)}</span>`;
     }
 
     btnViewVoucher.addEventListener('click', () => {
@@ -3833,7 +4010,8 @@ window.abrirModalEditarRecoleccion = function(docId, recordLocalId) {
             kilos: p.kilos
         }));
     } else if (rec.producto) {
-        prodsToRender = [{ producto: rec.producto, kilos: rec.totalKilos || 0 }];
+        const cantLegacy = esProductoAtado(rec.producto) ? (rec.totalAtados || rec.totalKilos || 0) : (rec.totalKilos || 0);
+        prodsToRender = [{ producto: rec.producto, kilos: cantLegacy }];
     } else {
         prodsToRender = [{ producto: 'DESPERDICIO', kilos: rec.totalKilos || 0 }];
     }
@@ -3901,10 +4079,39 @@ function addEditProductRow(prodName, kilosVal) {
     kilosInput.style.flex = '1';
     kilosInput.style.textAlign = 'right';
     kilosInput.style.fontWeight = '700';
-    kilosInput.value = kilosVal !== undefined ? formatKilosDisplay(kilosVal) : '0';
+    kilosInput.value = kilosVal !== undefined ? (esProductoAtado(cleanProdName) ? kilosVal : formatKilosDisplay(kilosVal)) : '0';
+
+    const unitBadge = document.createElement('span');
+    unitBadge.className = 'edit-prod-unit';
+    unitBadge.style.fontSize = '0.75rem';
+    unitBadge.style.fontWeight = '700';
+    unitBadge.style.minWidth = '45px';
+    unitBadge.style.textAlign = 'center';
+
+    const updateRowUnit = () => {
+        if (esProductoAtado(prodSelect.value)) {
+            unitBadge.textContent = 'Atados';
+            unitBadge.style.color = '#b45309';
+            unitBadge.style.background = '#fef3c7';
+            unitBadge.style.padding = '3px 6px';
+            unitBadge.style.borderRadius = '4px';
+            kilosInput.placeholder = '1 - 5';
+        } else {
+            unitBadge.textContent = 'KG';
+            unitBadge.style.color = '#0284c7';
+            unitBadge.style.background = '#e0f2fe';
+            unitBadge.style.padding = '3px 6px';
+            unitBadge.style.borderRadius = '4px';
+            kilosInput.placeholder = '0';
+        }
+    };
+    updateRowUnit();
 
     kilosInput.addEventListener('input', recalcularTotalEditKilos);
-    prodSelect.addEventListener('change', recalcularTotalEditKilos);
+    prodSelect.addEventListener('change', () => {
+        updateRowUnit();
+        recalcularTotalEditKilos();
+    });
 
     const btnRemove = document.createElement('button');
     btnRemove.type = 'button';
@@ -3928,26 +4135,40 @@ function addEditProductRow(prodName, kilosVal) {
 
     row.appendChild(prodSelect);
     row.appendChild(kilosInput);
+    row.appendChild(unitBadge);
     row.appendChild(btnRemove);
     container.appendChild(row);
 }
 
 function recalcularTotalEditKilos() {
     const rows = document.querySelectorAll('.edit-product-row');
-    let total = 0;
+    let totalKilos = 0;
+    let totalAtados = 0;
     rows.forEach(r => {
+        const prod = r.querySelector('.edit-prod-select')?.value;
         const input = r.querySelector('.edit-prod-kilos');
         if (input) {
             const val = parseKilosFloat(input.value) || 0;
-            total += val;
+            if (esProductoAtado(prod)) {
+                totalAtados += val;
+            } else {
+                totalKilos += val;
+            }
         }
     });
-    total = Math.round(total * 100) / 100;
+    totalKilos = Math.round(totalKilos * 100) / 100;
+    totalAtados = Math.round(totalAtados * 100) / 100;
     const totalEl = document.getElementById('edit-total-preview');
     if (totalEl) {
-        totalEl.innerHTML = `⚖️ Total Kilos: <span style="font-size: 1.15rem; color: #16a34a;">${formatKilosDisplay(total)} KG</span>`;
+        if (totalKilos > 0 && totalAtados > 0) {
+            totalEl.innerHTML = `⚖️ Total: <span style="font-size: 1.15rem; color: #16a34a;">${formatKilosDisplay(totalKilos)} KG</span> | 🪵 <span style="font-size: 1.15rem; color: #b45309;">${totalAtados} Atados</span>`;
+        } else if (totalAtados > 0) {
+            totalEl.innerHTML = `🪵 Total: <span style="font-size: 1.15rem; color: #b45309;">${totalAtados} Atados</span>`;
+        } else {
+            totalEl.innerHTML = `⚖️ Total Kilos: <span style="font-size: 1.15rem; color: #16a34a;">${formatKilosDisplay(totalKilos)} KG</span>`;
+        }
     }
-    return total;
+    return { totalKilos, totalAtados };
 }
 
 function initAdminEditModal() {
@@ -3992,29 +4213,52 @@ function initAdminEditModal() {
         const rows = document.querySelectorAll('.edit-product-row');
         const productos = [];
         let totalKilos = 0;
+        let totalAtados = 0;
         rows.forEach(r => {
             const prod = r.querySelector('.edit-prod-select')?.value;
             const kilos = parseKilosFloat(r.querySelector('.edit-prod-kilos')?.value) || 0;
             if (prod && kilos > 0) {
-                productos.push({ producto: prod.toUpperCase(), kilos: kilos });
-                totalKilos += kilos;
+                const isAtado = esProductoAtado(prod);
+                productos.push({
+                    producto: prod.toUpperCase(),
+                    kilos: kilos,
+                    unidad: isAtado ? 'Atado' : 'Kg'
+                });
+                if (isAtado) {
+                    totalAtados += kilos;
+                } else {
+                    totalKilos += kilos;
+                }
             }
         });
 
         if (productos.length === 0) {
-            alert("Debe incluir al menos un producto con kilos válidos mayores a 0.");
+            alert("Debe incluir al menos un producto con cantidad válida mayor a 0.");
             return;
         }
 
         totalKilos = Math.round(totalKilos * 100) / 100;
+        totalAtados = Math.round(totalAtados * 100) / 100;
 
         for (const p of productos) {
-            if (p.kilos > 2500) {
-                if (!confirm(`⚠️ ALERTA DE PLAUSIBILIDAD:\n\nEl producto "${p.producto}" tiene ${formatKilosDisplay(p.kilos)} Kg.\n\n¿Confirmas que este pesaje es correcto y no un error tipográfico?`)) {
+            if (esProductoAtado(p.producto)) {
+                if (p.kilos > 5) {
+                    alert(`⚠️ LÍMITE DE CAPACIDAD EXCEDIDO:\n\nUn atado equivale a un viaje completo del camión. La cantidad máxima para LEÑA no debe sobrepasar 5 atados (has ingresado ${p.kilos} atados).\n\nPor favor verifica la cantidad ingresada.`);
                     return;
+                }
+            } else {
+                if (p.kilos > 2500) {
+                    if (!confirm(`⚠️ ALERTA DE PLAUSIBILIDAD:\n\nEl producto "${p.producto}" tiene ${formatKilosDisplay(p.kilos)} Kg.\n\n¿Confirmas que este pesaje es correcto y no un error tipográfico?`)) {
+                        return;
+                    }
                 }
             }
         }
+        if (totalAtados > 5) {
+            alert(`⚠️ LÍMITE DE CAPACIDAD EXCEDIDO:\n\nEl total acumulado de LEÑA no puede sobrepasar 5 atados por viaje (total actual: ${totalAtados} atados).\n\nPor favor ajusta las cantidades registradas.`);
+            return;
+        }
+
         if (totalKilos > 10000) {
             if (!confirm(`⚠️ ALERTA DE CAPACIDAD:\n\nEl total acumulado de la recolección es de ${formatKilosDisplay(totalKilos)} Kg (${(totalKilos/1000).toFixed(1)} toneladas).\n\n¿Confirmas que este pesaje total es correcto?`)) {
                 return;
@@ -4038,6 +4282,7 @@ function initAdminEditModal() {
                 observaciones: observaciones,
                 productos: productos,
                 totalKilos: totalKilos,
+                totalAtados: totalAtados,
                 modificadoEn: new Date().toLocaleString(),
                 modificadoPor: 'Administrador'
             };
@@ -4474,12 +4719,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.6.9 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.7.0 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.6.9')
+            navigator.serviceWorker.register('/sw.js?v=1.7.0')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.6.9 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.7.0 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -4487,8 +4732,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.6.9 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.9&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.7.0 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.0&t=' + Date.now();
                                 }
                             };
                         }
@@ -4517,7 +4762,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.6.9&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.0&t=' + Date.now();
             }
         });
 
@@ -4526,7 +4771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.6.9&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.0&t=' + Date.now();
                 }
             }
         });
@@ -4696,6 +4941,7 @@ async function generarCierreDiarioAdmin() {
                                 recoleccionesDelDia.push({
                                     proveedor: r.proveedor || '',
                                     sucursal: r.sucursal || r.punto || '',
+                                    producto: r.materia || '',
                                     totalKilos: typeof r.totalKilos === 'number' ? r.totalKilos : parseKilosFloat(r.totalKilos),
                                     observaciones: r.observaciones || ''
                                 });
@@ -4756,6 +5002,7 @@ async function generarCierreDiarioAdmin() {
                                 recoleccionesDelDia.push({
                                     proveedor: cols[4] || '',
                                     sucursal: cols[5] || '',
+                                    producto: cols[6] || '',
                                     totalKilos: parseKilosFloat(cols[7] || '0'),
                                     observaciones: cols[8] || ''
                                 });
@@ -4798,6 +5045,9 @@ async function generarCierreDiarioAdmin() {
                         recoleccionesDelDia.push({
                             proveedor: data.proveedor || '',
                             sucursal: data.sucursal || data.punto || '',
+                            producto: data.producto || '',
+                            productos: data.productos,
+                            totalAtados: data.totalAtados,
                             totalKilos: typeof data.totalKilos === 'number' ? data.totalKilos : parseKilosFloat(data.totalKilos),
                             observaciones: data.observaciones || ''
                         });
@@ -4836,6 +5086,9 @@ async function generarCierreDiarioAdmin() {
                         recoleccionesDelDia.push({
                             proveedor: data.proveedor || '',
                             sucursal: data.sucursal || '',
+                            producto: data.producto || '',
+                            productos: data.productos,
+                            totalAtados: data.totalAtados,
                             totalKilos: typeof data.totalKilos === 'number' ? data.totalKilos : parseKilosFloat(data.totalKilos),
                             observaciones: data.observaciones || ''
                         });
@@ -4881,6 +5134,7 @@ async function generarCierreDiarioAdmin() {
         let visitadosNovedad = 0;
         let pendientes = 0;
         let kilosTotalesRuta = 0;
+        let atadosTotalesRuta = 0;
         let checklistHTML = '';
 
         if (puntosAsignados.length === 0) {
@@ -4906,15 +5160,19 @@ async function generarCierreDiarioAdmin() {
                 if (registrosVisita.length > 0) {
                     let esNovedad = true;
                     let kilosPunto = 0;
+                    let atadosPunto = 0;
                     let novedadStr = '';
 
                     registrosVisita.forEach(r => {
-                        const ks = r.totalKilos;
-                        if (ks > 0) {
+                        const calcs = calcularTotalesRecoleccion(r.productos, r.totalKilos, r.producto);
+                        if (r.totalAtados) calcs.totalAtados = Math.max(calcs.totalAtados, Number(r.totalAtados) || 0);
+
+                        if (calcs.totalKilos > 0 || calcs.totalAtados > 0) {
                             esNovedad = false;
-                            kilosPunto += ks;
+                            kilosPunto += calcs.totalKilos;
+                            atadosPunto += calcs.totalAtados;
                         }
-                        if (ks === 0 && r.observaciones) {
+                        if (calcs.totalKilos === 0 && calcs.totalAtados === 0 && r.observaciones) {
                             novedadStr = r.observaciones;
                         }
                     });
@@ -4922,8 +5180,17 @@ async function generarCierreDiarioAdmin() {
                     if (!esNovedad) {
                         visitadosExito++;
                         kilosTotalesRuta += kilosPunto;
+                        atadosTotalesRuta += atadosPunto;
                         estadoHtml = '<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">✅ ÉXITO</span>';
-                        kilosNovedadStr = `<span style="color:#1e293b;">Auditado en Base:</span> <strong>${formatKilosDisplay(kilosPunto)} kg</strong>`;
+                        let auditadoDetalle = '';
+                        if (kilosPunto > 0 && atadosPunto > 0) {
+                            auditadoDetalle = `<strong>${formatKilosDisplay(kilosPunto)} kg</strong> + <strong>${atadosPunto} atados</strong>`;
+                        } else if (atadosPunto > 0) {
+                            auditadoDetalle = `<strong>${atadosPunto} atados</strong>`;
+                        } else {
+                            auditadoDetalle = `<strong>${formatKilosDisplay(kilosPunto)} kg</strong>`;
+                        }
+                        kilosNovedadStr = `<span style="color:#1e293b;">Auditado en Base:</span> ${auditadoDetalle}`;
                     } else {
                         visitadosNovedad++;
                         estadoHtml = '<span style="background:#fef9c3; color:#854d0e; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">⚠️ NOVEDAD</span>';
@@ -4967,7 +5234,11 @@ async function generarCierreDiarioAdmin() {
             document.getElementById('cierre-porcentaje').style.color = '#ef4444';
         }
 
-        document.getElementById('cierre-kilos-totales').textContent = formatKilosDisplay(kilosTotalesRuta) + ' kg';
+        let cierreTotalesTexto = formatKilosDisplay(kilosTotalesRuta) + ' kg';
+        if (atadosTotalesRuta > 0) {
+            cierreTotalesTexto += ` + ${atadosTotalesRuta} atados`;
+        }
+        document.getElementById('cierre-kilos-totales').textContent = cierreTotalesTexto;
         document.getElementById('cierre-total-puntos').textContent = `${totalCubiertos} / ${totalPuntos}`;
         document.getElementById('cierre-checklist-body').innerHTML = checklistHTML;
 

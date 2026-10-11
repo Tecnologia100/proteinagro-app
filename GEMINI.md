@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.6.9)  
+> **Última Actualización:** Octubre 2026 (Versión 1.7.0)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -125,6 +125,41 @@
   - Reemplazo del cuadro modal bloqueante `SpreadsheetApp.getUi().alert(...)` por una notificación flotante no bloqueante `SpreadsheetApp.getActiveSpreadsheet().toast(...)` (5s) y nota en celda (`setNote`), eliminando los fallos por timeout de 30 segundos de Apps Script.
 - **Priorización de Mutaciones por POST:**
   - `eliminarRecoleccion` en `app.js` prioriza envío por `POST` manteniendo `GET` como fallback redundante con ID validado.
+
+### 11. Módulo de Unidades Diferenciadas: Soporte de Atados para Leña y Segregación Contable (`v1.7.0`)
+- **Naturaleza Operativa de la Leña:**
+  - La materia prima `LEÑA` no se pesa en kilogramos, sino que se cobra por **Atado** (unidad equivalente a un viaje completo de camión).
+  - Límite operativo infranqueable: **Máximo 5 atados por recolección**.
+- **Interfaz Reactiva en Formulario del Conductor (`app.js` / `index.html`):**
+  - Al seleccionar `🪵 LEÑA`:
+    - Etiqueta conmuta de *Cantidad (Kilos)* a *Cantidad (Atados)*.
+    - Badge indicador cambia de `KG` a `ATADOS`.
+    - Placeholder cambia a `1 - 5`.
+    - Botón de adición cambia a *➕ Registrar atados*.
+    - Banner informativo visible: *🪵 Atado de Leña: Equivale a 1 viaje completo de camión (Máximo 5 atados)*.
+  - Al seleccionar cualquier otra materia cárnica, retorna automáticamente a *Cantidad (Kilos)* y `KG`.
+- **Validaciones de Capacidad y Plausibilidad Inviolables:**
+  - Validación individual y acumulativa: Se bloquea la adición si la cantidad individual o acumulada en la recolección supera 5 atados (`kilosVal > 5`, `atadosPrevios + kilosVal > 5` o `totalAtados > 5`).
+  - Para productos en Kg, se mantiene la alerta anti-error tipográfico si supera 2.500 Kg o 10.000 Kg en el viaje.
+- **Segregación Aritmética y Contable Total:**
+  - En ningún punto del sistema se mezclan o suman kilogramos con atados de leña en una sola cifra.
+  - Se calculan y persisten campos independientes: `totalKilos` (peso cárnico en Kg) y `totalAtados` (unidades de atado), además del atributo `unidad: 'Atado' | 'Kg'` por cada línea de producto.
+  - Función de formateo unívoco `formatResumenTotales`:
+    - Recolección mixta: `X.XXX KG | Y ATADOS`.
+    - Recolección exclusiva de leña: `Y ATADOS` (o `1 ATADO`).
+    - Recolección cárnica estándar: `X.XXX KG`.
+- **Comprobantes Digitales y WhatsApp:**
+  - El modal de recibo digital y el soporte oficial administrativo discriminan cada renglón (`100 KG` en azul vs `2 ATADOS` en ámbar `#b45309`) y muestran el total segregado.
+  - El texto generado para compartir por WhatsApp refleja claramente los atados y el resumen exacto.
+- **Panel Administrativo y Edición:**
+  - En `admin-edit-modal`, cada fila renderiza un badge en tiempo real (`Atados` vs `KG`) que conmuta dinámicamente al cambiar el producto en el selector.
+  - La vista previa `recalcularTotalEditKilos` y la persistencia administran ambos totales de forma independiente.
+  - Compatibilidad retroactiva con registros históricos planos donde sólo existía `rec.producto` y `rec.totalKilos`.
+- **Cierre Diario, Gráficos y Exportación CSV:**
+  - El motor de Cierre Diario en 4 capas audita `kilosTotalesRuta` y `atadosTotalesRuta`, reportando por ejemplo `3.450 kg + 4 atados`.
+  - El gráfico de barras por proveedor (`chart-proveedor`) agrupa exclusivamente kilogramos de carga cárnica para no inflar artificialmente las toneladas recibidas en planta.
+  - El gráfico por producto (`chart-producto`) rotula la porción como `LEÑA (Atados)`.
+  - La exportación CSV especifica las unidades en los ítems y en la columna de total.
 
 ---
 
