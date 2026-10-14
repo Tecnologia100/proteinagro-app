@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.7.1)  
+> **Última Actualización:** Octubre 2026 (Versión 1.7.2)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -166,6 +166,24 @@
 - **Selector Rápido Táctil (1 a 5 Atados):** Botonera de pulsación directa `[1] [2] [3] [4] [5]` (`.atados-quick-selector` / `.btn-quick-atado`) integrada en el formulario del conductor. Facilita la operación en campo al registrar viajes de camión con un solo toque en pantalla táctil sin desplegar teclado virtual.
 - **Sincronización Bidireccional Reactiva:** El valor seleccionado por botón o ingresado manualmente conmuta el estado visual `.active` de los botones. Placeholder simplificado a `0` para una lectura visual limpia.
 - **Actualización de Caché PWA:** Bumping de versión a `v1.7.1` en `sw.js`, Service Worker y hashes de recursos para forzar la actualización transparente e inmediata en todos los dispositivos de conductores y administradores.
+
+### 13. Filtro por Frecuencia de Itinerario Semanal en Cierre Diario y Cobertura (`v1.7.2`)
+- **Problema Diagnosticado:**
+  Al auditar una fecha de la semana (por ejemplo, Martes en Ruta 4), el sistema cargaba ciegamente todos los 13 puntos semanales del catálogo de la ruta, incluyendo puntos exclusivos de Miércoles (Cañaveral Buga Merino, Sevillana Guacarí, Caribe Buga) o Jueves (Cañaveral Zarzal, Alberto Millán). Al aparecer como '❌ PENDIENTE' ('No ha llegado a la Data'), inflaban artificialmente el denominador y deprimían la cobertura real del 38% (3/8) al 23% (3/13).
+- **Causa Raíz Delimitada:**
+  1. *Falta de filtro por frecuencia en el cierre:* `MATRIZ_PUNTOS_RUTAS` leía la columna `Frecuencia_Dias`, pero `generarCierreDiarioAdmin` sólo filtraba por ruta y estado activo, ignorando el campo `frecuencia`.
+  2. *Desfase de zona horaria al instanciar fechas:* `new Date("YYYY-MM-DD")` en UTC produce las 00:00:00Z, que en Colombia (UTC-5) desfasa al día anterior (Lunes 19:00 en lugar de Martes). Corregido blindando la instanciación a `new Date(targetYear, targetMonth - 1, targetDay, 12, 0, 0)` a mediodía local.
+  3. *Evaluación flexible de días y rangos (`puntoAplicaParaDia`):* Normalización diacrítica (insensible a tildes, mayúsculas y espacios), interpretando rangos continuos ('Lunes a Sábado', 'Lunes a Viernes'), expresiones cotidianas ('Diario', 'Todos los días'), separadores con barras/comas/guiones ('Lunes / Viernes', 'Miércoles / Sábado') o días únicos.
+  4. *Conmutador Dinámico y Respeto a Visitas Reales:* Checkbox `#cierre-solo-dia` activo por defecto que filtra únicamente los puntos programados para el día auditado, pero **incluye automáticamente cualquier visita adicional o extra registrada en campo hoy** (con badge azul `⚡ Visita Adicional`) para que ningún kilo ni visita real quede excluida de la auditoría.
+- **Etiquetado e Indicadores Reactivos:**
+  - Píldora de día auditado `#cierre-dia-semana-pill` (ej. `📅 Día auditado: Martes`).
+  - Título dinámico `#cierre-titulo-cobertura` (`Progreso de Cobertura (Martes)` vs `Progreso de Cobertura (Semanal)`).
+  - Contador dinámico `#cierre-label-puntos` (`Puntos Programados (Martes): 3 / 8` vs `Puntos Asignados (Semanal): 3 / 13`).
+  - Badge de itinerario en cada fila del checklist: `📅 Frecuencia: ...` o `⚡ Visita Adicional (Prog: ...)`.
+  - Re-evaluación reactiva instantánea al cambiar el checkbox `#cierre-solo-dia` sin necesidad de volver a pulsar el botón.
+- **Verificación Técnica de Cobertura:**
+  - Ruta 4 en Martes: 8 puntos programados (5 diarios + 3 de martes). 3 cubiertos = 38% de cobertura (vs 23% anterior).
+  - Puntos de Miércoles y Jueves correctamente excluidos del denominador y del checklist de pendientes del día martes.
 
 ---
 

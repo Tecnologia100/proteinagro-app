@@ -3589,7 +3589,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.1&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.2&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -4765,12 +4765,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.7.1 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.7.2 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.7.1')
+            navigator.serviceWorker.register('/sw.js?v=1.7.2')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.7.1 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.7.2 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -4778,8 +4778,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.7.1 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.1&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.7.2 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.2&t=' + Date.now();
                                 }
                             };
                         }
@@ -4808,7 +4808,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.1&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.2&t=' + Date.now();
             }
         });
 
@@ -4817,7 +4817,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.1&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.2&t=' + Date.now();
                 }
             }
         });
@@ -4871,6 +4871,7 @@ function inicializarModuloCierreDiario() {
     const fechaInput = document.getElementById('cierre-fecha');
     const rutaSelect = document.getElementById('cierre-ruta');
     const btnGenerar = document.getElementById('btn-generar-cierre');
+    const chkSoloDia = document.getElementById('cierre-solo-dia');
 
     if (!fechaInput || !rutaSelect || !btnGenerar) return;
 
@@ -4880,6 +4881,17 @@ function inicializarModuloCierreDiario() {
     fechaInput.value = localISOTime;
 
     btnGenerar.addEventListener('click', generarCierreDiarioAdmin);
+
+    if (chkSoloDia && !chkSoloDia._hasListener) {
+        chkSoloDia._hasListener = true;
+        chkSoloDia.addEventListener('change', () => {
+            const fechaVal = fechaInput.value;
+            const rutaVal = rutaSelect.value;
+            if (fechaVal && rutaVal) {
+                generarCierreDiarioAdmin();
+            }
+        });
+    }
 }
 
 function actualizarSelectRutasCierre() {
@@ -4908,6 +4920,22 @@ function actualizarSelectRutasCierre() {
     if (currentVal && rutasUnicas.includes(currentVal)) {
         rutaSelect.value = currentVal;
     }
+}
+
+// Evalúa si la frecuencia de un punto de recolección aplica para un día específico de la semana (0 = Domingo, 1 = Lunes, ..., 6 = Sábado)
+function puntoAplicaParaDia(frecuencia, diaIdx) {
+    if (!frecuencia || String(frecuencia).trim() === '') return true;
+    const clean = String(frecuencia).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    const diaName = dias[diaIdx];
+
+    if (clean.includes('lunes a sabado') || clean.includes('lunes - sabado') || clean.includes('diario') || clean.includes('todos los dias')) {
+        return diaIdx >= 1 && diaIdx <= 6;
+    }
+    if (clean.includes('lunes a viernes') || clean.includes('lunes - viernes')) {
+        return diaIdx >= 1 && diaIdx <= 5;
+    }
+    return clean.includes(diaName);
 }
 
 async function generarCierreDiarioAdmin() {
@@ -5169,12 +5197,71 @@ async function generarCierreDiarioAdmin() {
             badgeFuente.style.color = badgeColor.text;
         }
 
-        // 3. Obtener puntos asignados en el catálogo para esta ruta
-        const puntosAsignados = MATRIZ_PUNTOS_RUTAS.filter(p => 
-            p &&
-            (p.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(p.ruta) === rutaHomologadaBuscada)) && 
-            (p.estado || 'Activo').toLowerCase() !== 'inactivo'
-        );
+        // Determinar día de la semana correspondiente a la fecha evaluada (12:00 mediodía para evitar desfases UTC)
+        const fechaObj = new Date(targetYear, targetMonth - 1, targetDay, 12, 0, 0);
+        const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const diaSemanaIndex = fechaObj.getDay();
+        const diaSemanaNombre = diasSemana[diaSemanaIndex];
+
+        // Actualizar píldora visual del día evaluado
+        const diaPill = document.getElementById('cierre-dia-semana-pill');
+        if (diaPill) {
+            diaPill.style.display = 'inline-block';
+            diaPill.textContent = `📅 Día auditado: ${diaSemanaNombre}`;
+        }
+
+        const soloDiaProgramado = document.getElementById('cierre-solo-dia') ? document.getElementById('cierre-solo-dia').checked : true;
+
+        // Helper para comprobar si un punto del catálogo tuvo registros reales en campo hoy
+        const puntoTieneVisitaHoy = (puntoInfo) => {
+            return recoleccionesDelDia.some(r => {
+                const provR = normTexto(r.proveedor);
+                const provP = normTexto(puntoInfo.proveedor);
+                const puntR = normTexto(r.sucursal);
+                const puntP = normTexto(puntoInfo.punto);
+
+                const matchProv = (provR === provP || provR.includes(provP) || provP.includes(provR));
+                const matchPunt = (puntR === puntP || puntR.includes(puntP) || puntP.includes(puntR));
+                return matchProv && matchPunt;
+            });
+        };
+
+        // 3. Obtener puntos asignados en el catálogo para esta ruta filtrados por itinerario semanal
+        let puntosAsignados = MATRIZ_PUNTOS_RUTAS.filter(p => {
+            if (!p || (p.estado || 'Activo').toLowerCase() === 'inactivo') return false;
+            
+            const matchRuta = (p.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(p.ruta) === rutaHomologadaBuscada));
+            if (!matchRuta) return false;
+
+            if (soloDiaProgramado) {
+                const esProgramadoHoy = puntoAplicaParaDia(p.frecuencia, diaSemanaIndex);
+                const fueVisitadoHoy = puntoTieneVisitaHoy(p);
+                return esProgramadoHoy || fueVisitadoHoy;
+            }
+            return true;
+        });
+
+        // Incluir cualquier visita registrada en campo que no esté en la matriz oficial de puntos
+        recoleccionesDelDia.forEach(r => {
+            const yaEnLista = puntosAsignados.some(p => {
+                const provR = normTexto(r.proveedor);
+                const provP = normTexto(p.proveedor);
+                const puntR = normTexto(r.sucursal);
+                const puntP = normTexto(p.punto);
+                return (provR === provP || provR.includes(provP) || provP.includes(provR)) &&
+                       (puntR === puntP || puntR.includes(puntP) || puntP.includes(puntR));
+            });
+            if (!yaEnLista) {
+                puntosAsignados.push({
+                    ruta: r.ruta || rutaStr,
+                    proveedor: r.proveedor,
+                    punto: r.sucursal,
+                    frecuencia: 'Visita Extra',
+                    estado: 'Activo',
+                    esAdicional: true
+                });
+            }
+        });
         
         let visitadosExito = 0;
         let visitadosNovedad = 0;
@@ -5184,7 +5271,7 @@ async function generarCierreDiarioAdmin() {
         let checklistHTML = '';
 
         if (puntosAsignados.length === 0) {
-            checklistHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #64748b;">No hay puntos de recolección asignados a esta ruta en el catálogo.</td></tr>';
+            checklistHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #64748b;">No hay puntos de recolección programados para el día ${diaSemanaNombre} en esta ruta.</td></tr>`;
         } else {
             puntosAsignados.forEach(puntoInfo => {
                 // Buscar si este punto tiene registros HOY con coincidencia flexible
@@ -5250,10 +5337,21 @@ async function generarCierreDiarioAdmin() {
                     bgColor = 'background-color: #fff1f2;';
                 }
 
+                let tagFrecuencia = '';
+                const esProgramadoHoy = puntoAplicaParaDia(puntoInfo.frecuencia, diaSemanaIndex);
+                if (puntoInfo.esAdicional || (!esProgramadoHoy && registrosVisita.length > 0)) {
+                    tagFrecuencia = `<div style="font-size: 11px; color: #0284c7; margin-top: 3px; font-weight: 600;">⚡ Visita Adicional (Prog: ${puntoInfo.frecuencia || 'No programado'})</div>`;
+                } else if (puntoInfo.frecuencia) {
+                    tagFrecuencia = `<div style="font-size: 11px; color: #64748b; margin-top: 3px;">📅 Frecuencia: ${puntoInfo.frecuencia}</div>`;
+                }
+
                 checklistHTML += `<tr style="${bgColor}">
                     <td>${estadoHtml}</td>
                     <td style="font-weight: 600;">${puntoInfo.proveedor || 'Sin proveedor'}</td>
-                    <td>${puntoInfo.punto || 'Sin punto'}</td>
+                    <td>
+                        <div style="font-weight: 600;">${puntoInfo.punto || 'Sin punto'}</div>
+                        ${tagFrecuencia}
+                    </td>
                     <td>${kilosNovedadStr}</td>
                 </tr>`;
             });
@@ -5267,6 +5365,15 @@ async function generarCierreDiarioAdmin() {
         document.getElementById('cierre-resultados').style.display = 'block';
         document.getElementById('cierre-porcentaje').textContent = porcentaje + '%';
         
+        const titProgreso = document.getElementById('cierre-titulo-cobertura');
+        if (titProgreso) {
+            titProgreso.textContent = soloDiaProgramado ? `Progreso de Cobertura (${diaSemanaNombre})` : 'Progreso de Cobertura (Semanal)';
+        }
+        const lblPuntos = document.getElementById('cierre-label-puntos');
+        if (lblPuntos) {
+            lblPuntos.textContent = soloDiaProgramado ? `Puntos Programados (${diaSemanaNombre})` : 'Puntos Asignados (Semanal)';
+        }
+
         const progressBar = document.getElementById('cierre-progress-bar');
         progressBar.style.width = porcentaje + '%';
         if (porcentaje === 100) {

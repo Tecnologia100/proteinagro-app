@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.6.8`  
+> **Versión Actual:** `v=1.7.2`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -207,7 +207,15 @@ PROTEINAGRO/
 
 ## 📜 7. Historial de Versiones y Changelog
 
-### `v=1.7.1` (Octubre 2026) - Versión Actual
+### `v=1.7.2` (Octubre 2026) - Versión Actual
+- **Filtro por Frecuencia de Itinerario Semanal en Cierre Diario:**
+  - **Exclusión de Puntos de Otros Días:** Al auditar una fecha y ruta específica (ej. Martes en Ruta 4), el sistema filtra los puntos programados basándose en la columna `Frecuencia_Dias` de Google Sheets mediante la función `puntoAplicaParaDia()`.
+  - **Cálculo Exacto de Cobertura:** Puntos pertenecientes a otros días (ej. Miércoles o Jueves) ya no aparecen indebidamente como `❌ PENDIENTE` ni inflan el denominador de puntos asignados, corrigiendo la cobertura de Ruta 4 un día Martes del 23% (3/13) al 38% real (3/8).
+  - **Inclusión Automática de Visitas Reales / Extras:** Cualquier visita de campo con recolección efectuada hoy se incluye en el cálculo y checklist con etiqueta distintiva `⚡ Visita Adicional`.
+  - **Blindaje de Zona Horaria:** Extracción segura de componentes de fecha `new Date(Y, M - 1, D, 12, 0, 0)` evitando desfases UTC-5 en la determinación del día de la semana.
+  - **Conmutador Reactivo y Feedback Visual:** Checkbox `#cierre-solo-dia` activo por defecto con re-evaluación instantánea al conmutar, píldora `#cierre-dia-semana-pill` y actualización dinámica de títulos (`Progreso de Cobertura (Martes)` y `Puntos Programados (Martes)`).
+
+### `v=1.7.1` (Octubre 2026)
 - **Optimización Visual y Selector Táctil Rápido de Atados:**
   - **Eliminación de Colisión en Campo de Entrada:** Corrección del traslape entre el texto/placeholder y el indicador `ATADOS` mediante `.input-with-unit.unit-atados .huge-input` (`padding-right: 130px`) y badge tipo pastilla color ámbar (`#fef3c7`, borde `#fde68a`, texto `#b45309`).
   - **Botonera Táctil Rápida (1 a 5 Atados):** Selector directo `[1] [2] [3] [4] [5]` en el formulario del conductor que asigna el valor con un solo clic/toque, evitando el despliegue del teclado virtual en dispositivos móviles.
