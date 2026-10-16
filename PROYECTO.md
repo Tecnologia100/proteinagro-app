@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.7.2`  
+> **Versión Actual:** `v=1.7.3`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -760,6 +760,21 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - El gráfico por producto tipifica la categoría como `LEÑA (Atados)`.
   - Exportación CSV enriquecida con desglose por ítem y total segregado.
   - Modal de edición administrativa (`admin-edit-modal`) con badge reactivo por renglón y recálculo dinámico independiente.
+
+## 🛡️ 20. Blindaje de Capacidad de Hoja y Corrección de Conciliador (`v1.7.3`)
+> **Fecha de Implementación:** 16 de Octubre de 2026  
+> **Archivos Asociados:** [`Code.gs`](./Code.gs), [`CONCILIADOR.html`](./CONCILIADOR.html), [`GEMINI.md`](./GEMINI.md)  
+> **Objetivo:** Blindar la inserción de recolecciones contra agotamiento de renglones en Google Sheets cuando se eliminan filas vacías al final de la hoja, y registrar la versión saneada de `CONCILIADOR.html` en el repositorio Git.
+
+- **Auto-Expansión Dinámica de Renglones en Google Sheets (`Code.gs`):**
+  - Detección preventiva de renglones antes de persistir (`filaFinalRequerida > maxFilasActuales`).
+  - Inserción automática atómica (`sheet.insertRowsAfter`) que garantiza que los envíos de los conductores jamás fallen por falta de espacio en la cuadrícula.
+- **Aclaración Operativa del Botón Nativo:**
+  - El aviso `Añade [ 1000 ] filas más al final` es un comportamiento normal de Google Sheets al tocar el fondo de la cuadrícula.
+  - Al pulsar "Añadir", Google Sheets añade espacio en blanco; la app siempre ubica el último dato real en Columna B (`Fecha_Hora`) y escribe de forma estrictamente secuencial y contigua.
+- **Saneamiento de `CONCILIADOR.html`:**
+  - Corrección de la URL de conexión en vivo con Google Sheets (GViz JSONP), erradicando el error de sintaxis `Uncaught SyntaxError: Unexpected identifier 'https'`.
+  - Integración en el repositorio para trazabilidad completa.
 
 ---
 

@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.7.2)  
+> **Última Actualización:** Octubre 2026 (Versión 1.7.3)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -184,6 +184,18 @@
 - **Verificación Técnica de Cobertura:**
   - Ruta 4 en Martes: 8 puntos programados (5 diarios + 3 de martes). 3 cubiertos = 38% de cobertura (vs 23% anterior).
   - Puntos de Miércoles y Jueves correctamente excluidos del denominador y del checklist de pendientes del día martes.
+
+### 14. Blindaje de Capacidad de Hoja y Corrección de Conciliador (`v1.7.3`)
+- **Auto-Expansión Dinámica de Renglones en Google Sheets (`Code.gs`):**
+  - Si un usuario elimina filas vacías sobrantes al final de `Recolecciones`, la cuadrícula de la hoja se ajusta exactamente al último registro.
+  - Al ingresar nuevas recolecciones, `sheet.getRange(targetRow + 1, ...).setValues(...)` fallaría con excepción `INVALID_RANGE` si `filaFinalRequerida > maxFilasActuales`.
+  - Se implementó detección proactiva de capacidad: si `filaFinalRequerida > maxFilasActuales`, Apps Script invoca automáticamente `sheet.insertRowsAfter(maxFilasActuales, Math.max(filasFaltantes, 200))` antes de persistir, garantizando que **jamás se rechace o pierda una recolección por falta de renglones en la hoja**.
+- **Aclaración Operativa de Cuadrícula en Google Sheets:**
+  - El botón inferior `Añade [ 1000 ] filas más al final` es un componente nativo de Google Sheets cuando una hoja agota sus filas disponibles.
+  - Al pulsar "Añadir", Google Sheets simplemente agrega espacio en blanco al final de la cuadrícula. El backend de ProteinAgro busca siempre el último registro real en la Columna B (`Fecha_Hora`), por lo que **nunca saltará filas vacías** y seguirá escribiendo de forma 100% continua y secuencial.
+- **Saneamiento y Control de Versiones de `CONCILIADOR.html`:**
+  - Se corrigió el error de sintaxis en `fetchDataViaJSONP` (donde la URL `script.src = `https:` quedó accidentalmente truncada, provocando `Uncaught SyntaxError: Unexpected identifier 'https' (Línea 398)`).
+  - Se integró el archivo [`CONCILIADOR.html`](./CONCILIADOR.html) en la raíz del repositorio Git para control de versiones y respaldo permanente.
 
 ---
 

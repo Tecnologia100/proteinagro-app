@@ -557,6 +557,13 @@ function guardarRecoleccionSheet(ss, rawPayload) {
 
     // 3. Escritura atómica en lote (1 sola llamada setValues para todas las materias primas del viaje)
     if (filasNuevas.length > 0) {
+      // Blindaje de capacidad: asegurar que la hoja tenga suficientes renglones antes de escribir
+      var maxFilasActuales = sheet.getMaxRows();
+      var filaFinalRequerida = targetRow + filasNuevas.length;
+      if (filaFinalRequerida > maxFilasActuales) {
+        var filasFaltantes = filaFinalRequerida - maxFilasActuales;
+        sheet.insertRowsAfter(maxFilasActuales, Math.max(filasFaltantes, 200));
+      }
       sheet.getRange(targetRow + 1, 1, filasNuevas.length, 12).setValues(filasNuevas);
     }
 
