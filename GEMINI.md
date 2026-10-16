@@ -196,6 +196,9 @@
 - **Saneamiento y Control de Versiones de `CONCILIADOR.html`:**
   - Se corrigió el error de sintaxis en `fetchDataViaJSONP` (donde la URL `script.src = `https:` quedó accidentalmente truncada, provocando `Uncaught SyntaxError: Unexpected identifier 'https' (Línea 398)`).
   - Se integró el archivo [`CONCILIADOR.html`](./CONCILIADOR.html) en la raíz del repositorio Git para control de versiones y respaldo permanente.
+- **Unificación Monolítica Anti-Conflicto en Apps Script (`Code.gs`):**
+  - Se consolidaron todas las funciones del Conciliador (`getConciliadorWebAppUrl`, `configurarUrlWebApp`, `abrirConciliadorFlotante`, `abrirConciliacionDirectaFlotante`, `abrirDescargaPlantillaSheets`, `getDashboardDataRaw`, `homologarProveedor`) y los dos menús (`📊 Conciliador` y `🚀 ProteinAgro`) en un único `onOpen()` dentro de `Code.gs`. Esto erradica el conflicto donde múltiples archivos `.gs` sobreescribían el menú o `doGet`.
+  - Se blindó la lógica de enrutamiento en `doGet(e)`: si un usuario visita la URL en el navegador sin parámetros, abre el Conciliador visual; y si la PWA solicita catálogos con cache-buster `?t=...` o ejecuta mutaciones, responde con el JSON correspondiente sin interferencias.
 
 ---
 

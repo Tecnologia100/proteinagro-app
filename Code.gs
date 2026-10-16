@@ -6,8 +6,11 @@ function doGet(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // 0. Si se solicita la vista del Conciliador / Dashboard (soporte integrado sin conflicto)
-    if (e && e.parameter && (e.parameter.view === 'conciliador' || e.parameter.view === 'dashboard')) {
+    // 0. Si se solicita la vista del Conciliador o si se abre sin parámetros en navegador
+    var isConciliador = (e && e.parameter && (e.parameter.view === 'conciliador' || e.parameter.view === 'dashboard'));
+    var hasAppAction = (e && e.parameter && (e.parameter.action || e.parameter.payload || e.parameter.fecha || e.parameter.id || e.parameter.t || e.parameter.format === 'json'));
+
+    if (isConciliador || !hasAppAction) {
       return HtmlService.createHtmlOutputFromFile('CONCILIADOR')
         .setTitle('Conciliador de Materias y Proveedores')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -2010,19 +2013,7 @@ function migrarRuta1SantaElenaHttp(ss) {
   }
 }
 
-// Menú personalizado en Google Sheets para ejecución con 1 solo clic
-function onOpen() {
-  try {
-    SpreadsheetApp.getUi()
-      .createMenu("🚀 ProteinAgro")
-      .addItem("Reclasificar Ruta 1 (Santa Elena)", "migrarRuta1_SantaElena")
-      .addItem("Actualizar Tarifario Ruta 1 (Opción 1)", "migrarTarifasRuta1")
-      .addItem("🔧 Reparar Duplicados de Septiembre", "repararDuplicadosSeptiembre")
-      .addToUi();
-  } catch (e) {
-    // Modo headless / web app
-  }
-}
+// (onOpen movido al final unificado con Conciliador)
 
 // ==============================================================================
 // ACTUALIZACIÓN DE TARIFAS RUTA 1: SANTA ELENA / CAVASA (OPCIÓN 1)
@@ -2395,3 +2386,359 @@ function repararDuplicadosSeptiembreHttp(ss) {
 }
 
 
+
+// ==============================================================================
+// MENÚ INTEGRADO DE GOOGLE SHEETS: CONCILIADOR + MANTENIMIENTO PROTEINAGRO
+// ==============================================================================
+function onOpen() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+    
+    // 1. Menú Oficial del Conciliador (Operación Diaria)
+    ui.createMenu('📊 Conciliador')
+      .addItem('🗔 Abrir aquí en Sheets (Ventana Flotante)', 'abrirConciliadorFlotante')
+      .addItem('⚖️ Conciliar Proveedor con Excel (Directo)', 'abrirConciliacionDirectaFlotante')
+      .addSeparator()
+      .addItem('🚀 Abrir Conciliador (Ventana Aparte)', 'abrirConciliadorNuevaVentana')
+      .addItem('📋 Descargar Plantilla Oficial (.xlsx)', 'abrirDescargaPlantillaSheets')
+      .addSeparator()
+      .addItem('⚙️ Configurar URL del Web App', 'configurarUrlWebApp')
+      .addToUi();
+
+    // 2. Menú de Mantenimiento ProteinAgro (Herramientas Técnicas)
+    ui.createMenu('🚀 ProteinAgro')
+      .addItem('Reclasificar Ruta 1 (Santa Elena)', 'migrarRuta1_SantaElena')
+      .addItem('Actualizar Tarifario Ruta 1 (Opción 1)', 'migrarTarifasRuta1')
+      .addItem('🔧 Reparar Duplicados de Septiembre', 'repararDuplicadosSeptiembre')
+      .addSeparator()
+      .addItem('🧹 Homologar Rutas y Limpiar Kilos', 'homologarRutasYLimpiarSheet')
+      .addItem('🥩 Corregir Kilos Convertidos a Fechas', 'corregirKilosFechasSheet')
+      .addItem('💰 Liquidar Recolecciones Pendientes', 'liquidarRecoleccionesPendientes')
+      .addItem('📋 Organizar Rutas y Planta San Joaquín', 'restaurarEncabezadosPuntosRutas')
+      .addToUi();
+  } catch (e) {
+    Logger.log('Error creando menús: ' + e.toString());
+  }
+}
+
+// ==============================================================================
+// FUNCIONES Y MENÚS DEL SISTEMA CONCILIADOR (INTEGRADO PROTEINAGRO)
+// ==============================================================================
+
+var SPREADSHEET_ID_DB = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+
+function getConciliadorWebAppUrl() {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty("CONCILIADOR_URL");
+  if (!url) {
+    try {
+      url = ScriptApp.getService().getUrl();
+    } catch (e) {
+      Logger.log("ScriptApp.getService().getUrl() no disponible: " + e.toString());
+    }
+  }
+  if (!url || url.indexOf("macros/s") === -1) {
+    url = "https://script.google.com/macros/s/AKfycbx4X0yiSS7Tisgyn2Xn2NuAlB9uWRwAP019Jurc4TvSyBseg3un47xA2d6o0rFs0Y5o9A/exec";
+  }
+  if (url.indexOf("view=conciliador") === -1) {
+    url += (url.indexOf("?") === -1 ? "?" : "&") + "view=conciliador";
+  }
+  return url;
+}
+
+function configurarUrlWebApp() {
+  var ui = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var actual = props.getProperty("CONCILIADOR_URL") || "";
+  var prompt = ui.prompt(
+    "Configurar URL del Web App",
+    "Pega aquí la URL de la implementación (/exec) del Web App:\n(Actual: " + (actual || "No configurada") + ")",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (prompt.getSelectedButton() === ui.Button.OK) {
+    var nueva = prompt.getResponseText().trim();
+    if (nueva && nueva.indexOf("https://") === 0) {
+      props.setProperty("CONCILIADOR_URL", nueva);
+      ui.alert("✅ URL configurada correctamente.\n" + nueva);
+    } else if (!nueva) {
+      props.deleteProperty("CONCILIADOR_URL");
+      ui.alert("Se eliminó la URL personalizada. Se usará la detección automática.");
+    } else {
+      ui.alert("⚠️ La URL debe iniciar con https://");
+    }
+  }
+}
+
+function getConciliadorHtmlOutput() {
+  try {
+    return HtmlService.createHtmlOutputFromFile('CONCILIADOR');
+  } catch(e1) {
+    try {
+      return HtmlService.createHtmlOutputFromFile('CONCILIADOR.html');
+    } catch(e2) {
+      throw new Error("No se encontró el archivo HTML 'CONCILIADOR'. Asegúrate de que existe en el panel izquierdo de Apps Script.");
+    }
+  }
+}
+
+function abrirConciliadorNuevaVentana() {
+  var url = getConciliadorWebAppUrl();
+  var htmlContent = '<!DOCTYPE html><html><head><base target="_blank">' +
+    '<style>' +
+    '  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8fafc; color: #1e293b; }' +
+    '  .btn { display: inline-flex; align-items: center; gap: 8px; background: #0f172a; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: all 0.2s; }' +
+    '  .btn:hover { background: #1e293b; transform: translateY(-1px); }' +
+    '  p { margin: 8px 0 16px 0; color: #64748b; font-size: 13px; text-align: center; }' +
+    '</style>' +
+    '</head>' +
+    '<body>' +
+    '  <h3 style="margin: 0; color: #0f172a;">🚀 Abriendo Conciliador...</h3>' +
+    '  <p>Si la ventana no se abrió automáticamente, haz clic en el botón:</p>' +
+    '  <a href="' + url + '" target="_blank" class="btn" id="btnOpen">Abrir Conciliador en Pantalla Completa ↗</a>' +
+    '  <script>' +
+    '    window.onload = function() {' +
+    '      try {' +
+    '        var win = window.open("' + url + '", "_blank");' +
+    '        if (win) {' +
+    '          setTimeout(function() { google.script.host.close(); }, 800);' +
+    '        }' +
+    '      } catch(e) {}' +
+    '    };' +
+    '  </script>' +
+    '</body>' +
+    '</html>';
+
+  var htmlOutput = HtmlService.createHtmlOutput(htmlContent)
+    .setWidth(460)
+    .setHeight(215);
+    
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, '🚀 Conciliador - Ventana Aparte');
+}
+
+function abrirConciliadorFlotante() {
+  var html = getConciliadorHtmlOutput()
+    .setWidth(1350)
+    .setHeight(850)
+    .setTitle('📊 Conciliador de Materias y Proveedores');
+  SpreadsheetApp.getUi().showModelessDialog(html, '📊 Conciliador de Materias y Proveedores (Flotante)');
+}
+
+function abrirConciliacionDirectaFlotante() {
+  var html = getConciliadorHtmlOutput()
+    .setWidth(1350)
+    .setHeight(850)
+    .setTitle('⚖️ Conciliar Proveedor con Excel');
+  html.append('<script>setTimeout(function(){ if(typeof abrirModalConciliacion==="function") abrirModalConciliacion(); }, 500);</script>');
+  SpreadsheetApp.getUi().showModelessDialog(html, '⚖️ Conciliar Proveedor con Excel (Flotante)');
+}
+
+function abrirDescargaPlantillaSheets() {
+  var htmlContent = '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+    '  <base target="_top">' +
+    '  <style>' +
+    '    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 18px; margin: 0; background: #f8fafc; color: #1e293b; text-align: center; }' +
+    '    .title { font-size: 16px; font-weight: 700; color: #1e3a8a; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 8px; }' +
+    '    .desc { font-size: 12.5px; color: #64748b; margin-bottom: 16px; line-height: 1.4; }' +
+    '    .actions { display: flex; gap: 10px; margin-top: 20px; }' +
+    '    .btn { flex: 1; padding: 10px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; border: none; text-align: center; }' +
+    '    .btn-primary { background: #0f172a; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }' +
+    '    .btn-primary:hover { background: #1e293b; }' +
+    '    .btn-secondary { background: #e2e8f0; color: #334155; }' +
+    '    .btn-secondary:hover { background: #cbd5e1; }' +
+    '    #status { font-size: 12px; margin-top: 10px; text-align: center; color: #15803d; font-weight: 600; min-height: 18px; }' +
+    '  </style>' +
+    '  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>' +
+    '  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>' +
+    '</head>' +
+    '<body>' +
+    '  <div class="title">📋 Plantilla Estándar de Conciliación (.xlsx)</div>' +
+    '  <div class="desc">Descarga la plantilla oficial en Excel lista para registrar o pegar los despachos de cualquier proveedor (Matriz diaria tipo Frigorivalle con autosumas y formato vertical).</div>' +
+    '  <div class="actions">' +
+    '    <button class="btn btn-secondary" onclick="google.script.host.close()">Cerrar</button>' +
+    '    <button class="btn btn-primary" id="btnDescargar" onclick="generarPlantilla()">📥 Descargar Plantilla (.xlsx)</button>' +
+    '  </div>' +
+    '  <div id="status"></div>' +
+    '  <script>' +
+    '    async function generarPlantilla() {' +
+    '      var btn = document.getElementById("btnDescargar");' +
+    '      var status = document.getElementById("status");' +
+    '      btn.disabled = true;' +
+    '      status.innerText = "⏳ Generando archivo Excel oficial...";' +
+    '      try {' +
+    '        var wb = new ExcelJS.Workbook();' +
+    '        wb.creator = "PROTEINAGRO S.A.S.";' +
+    '        var wsMat = wb.addWorksheet("PLANTILLA_CONSOLIDADO");' +
+    '        wsMat.views = [{ showGridLines: true }];' +
+    '        wsMat.columns = [' +
+    '          { width: 14 }, { width: 20 }, { width: 14 }, { width: 16 }, { width: 16 },' +
+    '          { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 18 }, { width: 28 }' +
+    '        ];' +
+    '        wsMat.addRow(["PROTEINAGRO S.A.S. - PLANTILLA ESTÁNDAR DE CONCILIACIÓN DE PROVEEDORES"]);' +
+    '        wsMat.addRow(["Proveedor: FRIGORIVALLE / SANTA HELENA / PROVEEDOR GENERAL"]);' +
+    '        wsMat.addRow([]);' +
+    '        wsMat.addRow(["FECHA", "TIQUETE / REMISIÓN", "SEBO (kg)", "HUESO BLANCO (kg)", "GORDANA (kg)", "HUESO DE CERDO (kg)", "CABEZAS (kg)", "MANTECA (kg)", "EMPELLA (kg)", "TOTAL DÍA (kg)", "OBSERVACIONES"]);' +
+    '        var headerRow = wsMat.getRow(4);' +
+    '        headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };' +
+    '        headerRow.alignment = { vertical: "middle", horizontal: "center" };' +
+    '        headerRow.eachCell(function(cell) { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F497D" } }; });' +
+    '        for (var d = 1; d <= 30; d++) {' +
+    '          var r = wsMat.addRow([d + "-sep", "", "", "", "", "", "", "", "", { formula: "SUM(C" + (d+4) + ":I" + (d+4) + ")" }, ""]);' +
+    '          r.getCell(1).alignment = { horizontal: "center" };' +
+    '        }' +
+    '        var totRow = wsMat.addRow(["TOTAL GENERAL", "", { formula: "SUM(C5:C34)" }, { formula: "SUM(D5:D34)" }, { formula: "SUM(E5:E34)" }, { formula: "SUM(F5:F34)" }, { formula: "SUM(G5:G34)" }, { formula: "SUM(H5:H34)" }, { formula: "SUM(I5:I34)" }, { formula: "SUM(J5:J34)" }, ""]);' +
+    '        totRow.font = { bold: true };' +
+    '        var buf = await wb.xlsx.writeBuffer();' +
+    '        var blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });' +
+    '        saveAs(blob, "PLANTILLA_OFICIAL_CONCILIACION_PROVEEDORES.xlsx");' +
+    '        status.innerText = "✅ Descargada con éxito. Cerrando ventana...";' +
+    '        setTimeout(function() { google.script.host.close(); }, 1800);' +
+    '      } catch(e) {' +
+    '        status.innerText = "❌ Error: " + e.message;' +
+    '        btn.disabled = false;' +
+    '      }' +
+    '    }' +
+    '  </script>' +
+    '</body>' +
+    '</html>';
+
+  var htmlOutput = HtmlService.createHtmlOutput(htmlContent)
+    .setWidth(520)
+    .setHeight(280);
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, '📋 Descargar Plantilla Oficial');
+}
+
+function getDashboardDataRaw() {
+  try {
+    var ss = null;
+    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch(eAct) {}
+    if (!ss || !ss.getSheetByName("Recolecciones")) {
+      ss = SpreadsheetApp.openById(SPREADSHEET_ID_DB);
+    }
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) {
+      return { success: false, error: "No se encontró la pestaña 'Recolecciones' en DB_App_Conductores." };
+    }
+
+    var values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) {
+      return { success: true, data: [], proveedores: [] };
+    }
+
+    var headers = values[0];
+    var colMap = { fecha: -1, proveedor: -1, punto: -1, materia: -1, kg: -1, precio: -1, valor: -1, id: -1, gps: -1 };
+
+    for (var c = 0; c < headers.length; c++) {
+      var h = String(headers[c] || "").trim().toLowerCase();
+      if (/fecha/i.test(h) && colMap.fecha === -1) colMap.fecha = c;
+      else if (/proveedor/i.test(h) && colMap.proveedor === -1) colMap.proveedor = c;
+      else if (/^punto/i.test(h) && colMap.punto === -1) colMap.punto = c;
+      else if (/materia|producto/i.test(h) && colMap.materia === -1) colMap.materia = c;
+      else if (/^kg|kilos|peso/i.test(h) && colMap.kg === -1) colMap.kg = c;
+      else if (/precio|tarifa/i.test(h) && colMap.precio === -1) colMap.precio = c;
+      else if (/valor|total/i.test(h) && colMap.valor === -1) colMap.valor = c;
+      else if (/^id/i.test(h) && colMap.id === -1) colMap.id = c;
+      else if (/gps|ubicaci/i.test(h) && colMap.gps === -1) colMap.gps = c;
+    }
+
+    if (colMap.fecha === -1) colMap.fecha = 1;
+    if (colMap.proveedor === -1) colMap.proveedor = 4;
+    if (colMap.punto === -1) colMap.punto = 5;
+    if (colMap.materia === -1) colMap.materia = 6;
+    if (colMap.kg === -1) colMap.kg = 7;
+    if (colMap.precio === -1) colMap.precio = 10;
+    if (colMap.valor === -1) colMap.valor = 11;
+
+    var timeZone = ss.getSpreadsheetTimeZone() || "America/Bogota";
+    var data = [];
+    var proveedoresSet = {};
+
+    for (var vi = 1; vi < values.length; vi++) {
+      var row = values[vi];
+      var rawProv = String(row[colMap.proveedor] || "").trim();
+      var rawFecha = row[colMap.fecha];
+      var rawMat = String(row[colMap.materia] || "").trim();
+
+      if (!rawProv && !rawFecha && !rawMat) continue;
+
+      var fechaStr = "";
+      if (rawFecha instanceof Date && !isNaN(rawFecha.getTime())) {
+        fechaStr = Utilities.formatDate(rawFecha, timeZone, "d/M/yyyy");
+      } else if (rawFecha) {
+        fechaStr = String(rawFecha).trim().split(/\s+/)[0];
+      }
+
+      var provClean = homologarProveedor(rawProv);
+      var rawKg = row[colMap.kg];
+      var kg = 0;
+      if (typeof rawKg === 'number') kg = rawKg;
+      else if (rawKg) kg = parseFloat(String(rawKg).replace(/\./g, '').replace(',', '.')) || 0;
+
+      var rawPrecio = colMap.precio !== -1 ? row[colMap.precio] : 0;
+      var precio = 0;
+      if (typeof rawPrecio === 'number') precio = rawPrecio;
+      else if (rawPrecio) precio = parseFloat(String(rawPrecio).replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+      if (precio > 0 && precio < 20) precio = Math.round(precio * 1000);
+
+      var rawVal = colMap.valor !== -1 ? row[colMap.valor] : 0;
+      var valor = 0;
+      if (typeof rawVal === 'number') valor = rawVal;
+      else if (rawVal) valor = parseFloat(String(rawVal).replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+      if ((!valor || valor < kg * 50) && kg > 0 && precio > 0) valor = kg * precio;
+
+      if (provClean) proveedoresSet[provClean] = true;
+
+      data.push({
+        FECHA: fechaStr,
+        PROVEEDOR: provClean,
+        PUNTO: String(row[colMap.punto] || "").trim(),
+        MATERIA: rawMat,
+        KG: kg,
+        PRECIO: precio,
+        VALOR: valor,
+        ID: colMap.id !== -1 ? String(row[colMap.id] || "").trim() : ""
+      });
+    }
+
+    var provList = Object.keys(proveedoresSet).sort(function(a, b) {
+      return a.localeCompare(b, 'es', { sensitivity: 'base' });
+    });
+
+    return {
+      success: true,
+      data: data,
+      proveedores: provList
+    };
+  } catch (err) {
+    Logger.log("Error en getDashboardDataRaw: " + err.toString());
+    return {
+      success: false,
+      error: err.toString(),
+      data: [],
+      proveedores: []
+    };
+  }
+}
+
+function homologarProveedor(nombreOriginal) {
+  if (!nombreOriginal) return "";
+  var raw = String(nombreOriginal).trim();
+  if (!raw) return "";
+  var key = raw.toUpperCase();
+  try {
+    key = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  } catch(e) {}
+  key = key.replace(/\s*-\s*/g, " - ").replace(/\s*\/\s*/g, " / ").replace(/\s+/g, " ").trim();
+
+  if (key.indexOf("FRIGORIVALLE") !== -1 && key.indexOf("CANAVERAL") === -1) return "Frigorivalle";
+  if (key.indexOf("CANAVERAL") !== -1 || key.indexOf("CAÑAVERAL") !== -1) return "Supertienda Cañaveral";
+  if (key.indexOf("SEVILLANA") !== -1) return "Sevillana";
+  if (key.indexOf("CARIBE") !== -1) return "Caribe";
+  if (key.indexOf("MIGAN CAPITAL") !== -1 || key.indexOf("LA MONTANA") !== -1) return "Migan Capital";
+  if (key.indexOf("BODEGA SANTA ELENA") !== -1 || key.indexOf("BODEGA SANTA HELENA") !== -1) return "Bodega Santa Elena";
+  if (key.indexOf("SANTA ELENA") !== -1 || key.indexOf("SANTA HELENA") !== -1) return "Santa Elena";
+  if (key.indexOf("BELALCAZAR") !== -1) return "Belalcazar";
+  if (key.indexOf("MERCAMIO") !== -1) return "Mercamio";
+  return aNombrePropio(raw);
+}
