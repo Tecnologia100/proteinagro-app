@@ -457,6 +457,50 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         }
       }
     }
+
+    // Detección de Novedad "Cliente Cancela Servicio"
+    var causalStr = String(data.causal || '').trim();
+    var esCancelacionCliente = (
+      causalStr.toLowerCase().indexOf('cliente cancela') !== -1 ||
+      (data.tipo === 'Novedad' && String(observaciones).toLowerCase().indexOf('cliente cancela') !== -1) ||
+      (productos && productos.some(function(p) {
+        var n = typeof p === 'object' ? String(p.producto || '') : String(p || '');
+        return n.toLowerCase().indexOf('cliente cancela') !== -1;
+      }))
+    );
+
+    // REGLA DE NEGOCIO: "Cliente Cancela Servicio" sólo antes de arribo / pesaje
+    // Si ya existe un pesaje registrado con carga (> 0 Kg) en el día para este punto/proveedor, rechazar.
+    if (esCancelacionCliente && lastRowData > 1) {
+      var numRowsToCheck = lastRowData - 1;
+      var checkData = sheet.getRange(2, 1, numRowsToCheck, 8).getValues();
+      var normTargetProv = normalizarTexto(proveedor);
+      var normTargetPunto = normalizarTexto(punto);
+      var incomingDateStr = normalizarFechaDia(fecha) || normalizarFechaDia(new Date());
+
+      for (var r = checkData.length - 1; r >= 0; r--) {
+        var rowId = String(checkData[r][0] || '').trim();
+        if (rowId && id && rowId === id) continue; // Idempotencia: omitir el mismo registro si es reintento
+
+        var rowFecha = normalizarFechaDia(checkData[r][1]);
+        if (rowFecha && incomingDateStr && rowFecha === incomingDateStr) {
+          var rowProv = normalizarTexto(checkData[r][4]);
+          var rowPunt = normalizarTexto(checkData[r][5]);
+
+          var matchProv = (rowProv === normTargetProv || rowProv.indexOf(normTargetProv) !== -1 || normTargetProv.indexOf(rowProv) !== -1);
+          var matchPunt = (rowPunt === normTargetPunto || rowPunt.indexOf(normTargetPunto) !== -1 || normTargetPunto.indexOf(rowPunt) !== -1);
+
+          if (matchProv && matchPunt) {
+            var rowKg = parseKilosNumero(checkData[r][7]);
+            var rowProd = String(checkData[r][6] || '').toLowerCase();
+            var esNovRow = (rowId.indexOf('NOV-') === 0 || rowProd.indexOf('visita fallida') !== -1 || rowProd.indexOf('novedad') !== -1);
+            if (rowKg > 0 && !esNovRow) {
+              throw new Error("No se puede cancelar el servicio: El vehículo ya arribó o ya existe una recolección registrada para este punto hoy");
+            }
+          }
+        }
+      }
+    }
     
     // Determinar la última fila real con datos (basada en Columna B 'Fecha_Hora') para evitar saltos por filas vacías
     var targetRow = 1;
@@ -510,8 +554,11 @@ function guardarRecoleccionSheet(ss, rawPayload) {
 
       // Búsqueda inteligente en memoria (Tarifas primero, fallback a histórico si hace falta)
       var precio = '';
+      var valor = '';
       if (esNovedad) {
+        prodKilos = 0;
         precio = 0;
+        valor = 0;
       } else {
         var pTarifa = buscarPrecioEnCatalogoTarifas(catalogoTarifas, proveedor, punto, prodNombre);
         if (pTarifa !== null && pTarifa > 0) {
@@ -523,11 +570,9 @@ function guardarRecoleccionSheet(ss, rawPayload) {
           }
           precio = buscarPrecioEnHistorico(catalogoHistorico, proveedor, punto, prodNombre);
         }
-      }
-
-      var valor = '';
-      if (precio !== '' && !isNaN(parseFloat(precio)) && prodKilos > 0) {
-        valor = Math.round(parseFloat(precio) * prodKilos * 100) / 100;
+        if (precio !== '' && !isNaN(parseFloat(precio)) && prodKilos > 0) {
+          valor = Math.round(parseFloat(precio) * prodKilos * 100) / 100;
+        }
       }
       
       // Formato "Nombre Propio" automático (Title Case estilo =NOMPROPIO)
@@ -576,7 +621,8 @@ function guardarRecoleccionSheet(ss, rawPayload) {
       "filas": filasNuevas.length
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
+    var errMsg = err.message || err.toString();
+    return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": errMsg}))
       .setMimeType(ContentService.MimeType.JSON);
   } finally {
     if (lockAcquired) {
@@ -897,6 +943,36 @@ function normalizarTexto(str) {
   s = s.replace(/\s+/g, ' ');
   s = s.replace(/\s*-\s*/g, '-');
   return s;
+}
+
+// Normaliza cualquier representación de fecha a formato ISO YYYY-MM-DD para comparaciones seguras de día
+function normalizarFechaDia(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    var y = val.getFullYear();
+    var m = ('0' + (val.getMonth() + 1)).slice(-2);
+    var d = ('0' + val.getDate()).slice(-2);
+    return y + '-' + m + '-' + d;
+  }
+  var str = String(val).trim().split(' ')[0] || '';
+  if (str.indexOf('/') !== -1) {
+    var p = str.split('/');
+    if (p.length === 3) {
+      if (p[0].length === 4) {
+        return p[0] + '-' + ('0' + parseInt(p[1], 10)).slice(-2) + '-' + ('0' + parseInt(p[2], 10)).slice(-2);
+      }
+      return p[2] + '-' + ('0' + parseInt(p[1], 10)).slice(-2) + '-' + ('0' + parseInt(p[0], 10)).slice(-2);
+    }
+  } else if (str.indexOf('-') !== -1) {
+    var p = str.split('-');
+    if (p.length === 3) {
+      if (p[0].length === 4) {
+        return p[0] + '-' + ('0' + parseInt(p[1], 10)).slice(-2) + '-' + ('0' + parseInt(p[2], 10)).slice(-2);
+      }
+      return p[2] + '-' + ('0' + parseInt(p[1], 10)).slice(-2) + '-' + ('0' + parseInt(p[0], 10)).slice(-2);
+    }
+  }
+  return '';
 }
 
 // Parser de precios adaptado al formato colombiano (punto o coma como miles, símbolo $)

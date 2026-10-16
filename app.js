@@ -2205,10 +2205,13 @@ function renderRecordsInTable(records, tbody) {
     adminRecordsCache = records;
     records.forEach(data => {
         const fechaTexto = formatFechaParaMostrar(data.fecha || data.timestamp);
-        const isNovedad = data.tipo === 'Novedad' || data.estado === 'Visita Fallida' || (data.id && String(data.id).startsWith('NOV-'));
+        const isNovedad = data.tipo === 'Novedad' || data.estado === 'Visita Fallida' || data.estado === 'Servicio Cancelado' || (data.id && String(data.id).startsWith('NOV-'));
+        const isCancelado = data.estado === 'Servicio Cancelado' || (isNovedad && (data.causal === 'Cliente Cancela Servicio' || (data.observaciones && data.observaciones.toLowerCase().includes('cliente cancela'))));
         const badgeClass = isNovedad ? 'badge-novedad' : (data.estado === 'Sincronizado' ? 'badge-online' : 'badge-offline');
-        const badgeText = isNovedad ? '⚠️ Visita Fallida' : (data.estado || 'Sincronizado');
-        const badgeStyle = isNovedad ? 'style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 700;"' : '';
+        const badgeText = isCancelado ? '🚫 Servicio Cancelado' : (isNovedad ? '⚠️ Visita Fallida' : (data.estado || 'Sincronizado'));
+        const badgeStyle = isCancelado 
+            ? 'style="background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; font-weight: 700;"' 
+            : (isNovedad ? 'style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 700;"' : '');
         const ruta = data.ruta ? homologarRuta(data.ruta) : 'N/A';
         const obsText = data.observaciones ? data.observaciones : '-';
 
@@ -2461,7 +2464,9 @@ async function sincronizarPendientesAGoogleSheets(silent = true) {
                 backupList[idx].sync_sheets = true;
                 backupList[idx].sync_sheets_at = Date.now();
                 if (backupList[idx].estado === 'Offline') {
-                    backupList[idx].estado = (backupList[idx].tipo === 'Novedad' || String(backupList[idx].id || '').startsWith('NOV-')) ? 'Visita Fallida' : 'Sincronizado';
+                    const esNov = backupList[idx].tipo === 'Novedad' || String(backupList[idx].id || '').startsWith('NOV-');
+                    const esCanc = backupList[idx].causal === 'Cliente Cancela Servicio' || (backupList[idx].observaciones && backupList[idx].observaciones.toLowerCase().includes('cliente cancela'));
+                    backupList[idx].estado = esNov ? (esCanc ? 'Servicio Cancelado' : 'Visita Fallida') : 'Sincronizado';
                 }
                 syncSuccessCount++;
             } else {
@@ -4383,6 +4388,85 @@ function initAdminEditModal() {
 }
 
 // ==============================================================================
+// VERIFICAR SI YA EXISTE PESAJE / CARGA REGISTRADA HOY PARA UN PUNTO (v1.7.4)
+// ==============================================================================
+function verificarPesajePrevioHoy(proveedor, punto) {
+    try {
+        const norm = (t) => String(t || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        const provNorm = norm(proveedor);
+        const puntNorm = norm(punto);
+        if (!provNorm || !puntNorm) return false;
+
+        // 1. Pesaje en curso en memoria activa del formulario
+        if (typeof collectedProducts !== 'undefined' && Array.isArray(collectedProducts) && collectedProducts.length > 0) {
+            const curProvSel = document.getElementById('proveedor');
+            const curProv = norm(curProvSel?.options[curProvSel.selectedIndex]?.text || curProvSel?.value || '');
+            const curPunto = norm(typeof obtenerPuntoSeleccionado === 'function' ? obtenerPuntoSeleccionado() : '');
+            const matchCurProv = (curProv === provNorm || curProv.includes(provNorm) || provNorm.includes(curProv));
+            const matchCurPunto = (curPunto === puntNorm || curPunto.includes(puntNorm) || puntNorm.includes(curPunto));
+            if (matchCurProv && matchCurPunto) {
+                return true;
+            }
+        }
+
+        const now = new Date();
+        const todayDay = now.getDate();
+        const todayMonth = now.getMonth();
+        const todayYear = now.getFullYear();
+
+        const esRegistroHoyConCarga = (r) => {
+            if (!r) return false;
+            const d = parseFechaRecoleccion(r.fecha || r.timestamp);
+            if (isNaN(d.getTime()) || d.getTime() === 0) return false;
+            if (d.getDate() !== todayDay || d.getMonth() !== todayMonth || d.getFullYear() !== todayYear) {
+                return false;
+            }
+
+            const rProv = norm(r.proveedor);
+            const rPunt = norm(r.sucursal || r.punto);
+            const matchProv = (rProv === provNorm || rProv.includes(provNorm) || provNorm.includes(rProv));
+            const matchPunt = (rPunt === puntNorm || rPunt.includes(puntNorm) || puntNorm.includes(rPunt));
+            if (!matchProv || !matchPunt) return false;
+
+            // Ignorar si es novedad o visita fallida (0 kg)
+            const esNov = r.tipo === 'Novedad' || String(r.id || '').startsWith('NOV-') || r.estado === 'Visita Fallida' || r.estado === 'Servicio Cancelado';
+            if (esNov) return false;
+
+            let kilos = 0;
+            let atados = 0;
+            if (typeof calcularTotalesRecoleccion === 'function') {
+                const calcs = calcularTotalesRecoleccion(r.productos, r.totalKilos, r.producto);
+                kilos = calcs.totalKilos || 0;
+                atados = (r.totalAtados && Number(r.totalAtados)) || calcs.totalAtados || 0;
+            } else {
+                kilos = typeof r.totalKilos === 'number' ? r.totalKilos : (parseFloat(r.totalKilos) || 0);
+                atados = Number(r.totalAtados) || 0;
+            }
+
+            return (kilos > 0 || atados > 0 || r.estado === 'Sincronizado');
+        };
+
+        // 2. Verificar en LocalStorage (recolecciones_backup)
+        const localBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+        if (localBackup.some(esRegistroHoyConCarga)) {
+            return true;
+        }
+
+        // 3. Verificar en registros admin / memoria si existen
+        if (typeof adminRecordsCache !== 'undefined' && Array.isArray(adminRecordsCache)) {
+            if (adminRecordsCache.some(esRegistroHoyConCarga)) {
+                return true;
+            }
+        }
+
+        return false;
+    } catch (e) {
+        console.warn("⚠️ Error en verificarPesajePrevioHoy:", e);
+        return false;
+    }
+}
+
+// ==============================================================================
 // MÓDULO DE REPORTE DE NOVEDADES Y VISITAS FALLIDAS (v1.4.2)
 // ==============================================================================
 function initNovedadesModal() {
@@ -4410,8 +4494,47 @@ function initNovedadesModal() {
 
     let capturedNovedadPhoto = null;
 
+    const actualizarVistaEvidenciaSegunCausal = (causal) => {
+        const ayudaFoto = document.getElementById('novedad-foto-ayuda');
+        const fotoLabel = document.getElementById('novedad-foto-label');
+        if (causal === 'Cliente Cancela Servicio') {
+            if (ayudaFoto) {
+                ayudaFoto.textContent = 'ℹ️ Para cancelación antes de arribo, puede adjuntar captura de la llamada/mensaje o ingresar una nota explicativa abajo.';
+                ayudaFoto.style.display = 'block';
+                ayudaFoto.style.color = '#0284c7';
+            }
+            if (fotoLabel) fotoLabel.innerHTML = '📸 Captura / Foto <span style="font-size: 0.75rem; color: #64748b; font-weight: normal;">(Opcional con nota)</span>';
+        } else {
+            if (ayudaFoto) {
+                ayudaFoto.textContent = 'Tome una foto clara del local cerrado, vía, báscula o motivo que impidió la recolección.';
+                ayudaFoto.style.display = 'block';
+                ayudaFoto.style.color = '#64748b';
+            }
+            if (fotoLabel) fotoLabel.innerHTML = '📸 Foto de Constancia / Evidencia <span style="color: #ef4444;">*</span>';
+        }
+    };
+
+    causalSelect?.addEventListener('change', () => {
+        const causal = causalSelect.value;
+        const provName = resumenProv?.textContent || '';
+        const puntoName = resumenPunto?.textContent || '';
+
+        if (causal === 'Cliente Cancela Servicio') {
+            if (verificarPesajePrevioHoy(provName, puntoName)) {
+                alert("⚠️ No se puede cancelar el servicio: El vehículo ya arribó o ya existe una recolección registrada para este punto hoy.");
+                causalSelect.value = '';
+                actualizarVistaEvidenciaSegunCausal('');
+                return;
+            }
+            actualizarVistaEvidenciaSegunCausal(causal);
+        } else {
+            actualizarVistaEvidenciaSegunCausal(causal);
+        }
+    });
+
     const cerrarModal = () => {
         modal.style.display = 'none';
+        actualizarVistaEvidenciaSegunCausal('');
     };
 
     btnCerrar?.addEventListener('click', cerrarModal);
@@ -4494,6 +4617,7 @@ function initNovedadesModal() {
         if (previewBox) previewBox.style.display = 'none';
         if (previewImg) previewImg.src = '';
         if (btnTomarFoto) btnTomarFoto.style.display = 'flex';
+        actualizarVistaEvidenciaSegunCausal('');
 
         // Verificación de GPS en vivo
         if (gpsBadge) {
@@ -4583,9 +4707,36 @@ function initNovedadesModal() {
             return;
         }
 
-        if (!capturedNovedadPhoto) {
-            alert("⚠️ Es obligatorio tomar o adjuntar una foto de constancia / evidencia para registrar la visita fallida.");
-            return;
+        const esCancelacionCliente = (causal === 'Cliente Cancela Servicio');
+        const provSel = document.getElementById('proveedor');
+        let provName = provSel?.value || '';
+        if (provSel?.value === 'OTRO') {
+            provName = document.getElementById('custom-proveedor')?.value.trim() || 'Otro Proveedor';
+        } else if (provSel && provSel.selectedIndex >= 0) {
+            provName = provSel.options[provSel.selectedIndex].text;
+        }
+        const puntoName = obtenerPuntoSeleccionado();
+
+        // Regla de negocio: "Cliente Cancela Servicio" sólo antes de arribo / pesaje
+        if (esCancelacionCliente) {
+            if (verificarPesajePrevioHoy(provName, puntoName)) {
+                alert("⚠️ No se puede cancelar el servicio: El vehículo ya arribó o ya existe una recolección registrada para este punto hoy.");
+                causalSelect.value = '';
+                actualizarVistaEvidenciaSegunCausal('');
+                return;
+            }
+            const obsUserCheck = (obsTextarea?.value || '').trim();
+            if (!capturedNovedadPhoto && !obsUserCheck) {
+                alert("⚠️ Para 'Cliente Cancela Servicio', adjunte captura del mensaje/llamada o ingrese una nota explicativa en el campo de Observaciones.");
+                obsTextarea?.focus();
+                return;
+            }
+        } else {
+            // Regla estricta sin regresiones: Foto obligatoria para todas las demás novedades
+            if (!capturedNovedadPhoto) {
+                alert("⚠️ Es obligatorio tomar o adjuntar una foto de constancia / evidencia para registrar la visita fallida.");
+                return;
+            }
         }
 
         const spinner = btnGuardar?.querySelector('.spinner');
@@ -4611,15 +4762,6 @@ function initNovedadesModal() {
                 rutaName = rutaSel.options[rutaSel.selectedIndex].text;
             }
 
-            const provSel = document.getElementById('proveedor');
-            let provName = provSel?.value || '';
-            if (provSel?.value === 'OTRO') {
-                provName = document.getElementById('custom-proveedor')?.value.trim() || 'Otro Proveedor';
-            } else if (provSel && provSel.selectedIndex >= 0) {
-                provName = provSel.options[provSel.selectedIndex].text;
-            }
-
-            const puntoName = obtenerPuntoSeleccionado();
             const ubicacionGps = await obtenerUbicacionGpsActual();
 
             const fechaTexto = (() => {
@@ -4633,11 +4775,18 @@ function initNovedadesModal() {
                 return d + '/' + m + '/' + y + ' ' + hh + ':' + mm + ':' + ss;
             })();
 
-            // Subir evidencia a Firebase Storage si hay internet
-            let fotoURL = capturedNovedadPhoto;
-            if (navigator.onLine) {
-                fotoURL = await subirEvidenciaNovedadAStorage(capturedNovedadPhoto, recordId);
+            // Subir evidencia a Firebase Storage si hay foto e internet
+            let fotoURL = capturedNovedadPhoto || '';
+            if (capturedNovedadPhoto && navigator.onLine) {
+                try {
+                    fotoURL = await subirEvidenciaNovedadAStorage(capturedNovedadPhoto, recordId);
+                } catch (eStorage) {
+                    console.warn("Storage upload failed, keeping base64/local:", eStorage);
+                }
             }
+
+            const estadoNovedad = esCancelacionCliente ? 'Servicio Cancelado' : 'Visita Fallida';
+            const productoNombre = esCancelacionCliente ? 'Visita Fallida: Cliente Cancela Servicio' : `Visita Fallida: ${causal}`;
 
             const dataNovedad = {
                 id: recordId,
@@ -4650,7 +4799,7 @@ function initNovedadesModal() {
                 punto: homologarNombrePunto(puntoName),
                 causal: causal,
                 productos: [{
-                    producto: `Visita Fallida: ${causal}`,
+                    producto: productoNombre,
                     kilos: 0
                 }],
                 totalKilos: 0,
@@ -4659,7 +4808,7 @@ function initNovedadesModal() {
                 foto: fotoURL,
                 firma: fotoURL, // Compatibilidad con comprobante y vista previa
                 fecha: fechaTexto,
-                estado: navigator.onLine ? 'Visita Fallida' : 'Offline'
+                estado: navigator.onLine ? estadoNovedad : 'Offline'
             };
 
             // 1. Guardar en respaldo local (LocalStorage)
@@ -4682,7 +4831,7 @@ function initNovedadesModal() {
                             if (idx !== -1) {
                                 curBackup[idx].sync_sheets = true;
                                 curBackup[idx].sync_sheets_at = Date.now();
-                                curBackup[idx].estado = 'Visita Fallida';
+                                curBackup[idx].estado = estadoNovedad;
                                 localStorage.setItem('recolecciones_backup', JSON.stringify(curBackup));
                             }
                         } catch(e) {}
@@ -5326,9 +5475,16 @@ async function generarCierreDiarioAdmin() {
                         kilosNovedadStr = `<span style="color:#1e293b;">Auditado en Base:</span> ${auditadoDetalle}`;
                     } else {
                         visitadosNovedad++;
-                        estadoHtml = '<span style="background:#fef9c3; color:#854d0e; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">⚠️ NOVEDAD</span>';
-                        kilosNovedadStr = `<span style="color:#854d0e; font-size:13px;">${novedadStr || 'Visita Fallida (0 kg)'}</span>`;
-                        bgColor = 'background-color: #fefce8;';
+                        const esCancelado = registrosVisita.some(r => r.estado === 'Servicio Cancelado' || (r.observaciones && r.observaciones.toLowerCase().includes('cancela')) || (r.producto && r.producto.toLowerCase().includes('cancela')) || (r.causal && r.causal.toLowerCase().includes('cancela')));
+                        if (esCancelado) {
+                            estadoHtml = '<span style="background:#fee2e2; color:#991b1b; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">🚫 CANCELADO</span>';
+                            kilosNovedadStr = `<span style="color:#991b1b; font-size:13px; font-weight: 600;">${novedadStr || 'Cliente Cancela Servicio (0 kg)'}</span>`;
+                            bgColor = 'background-color: #fff1f2;';
+                        } else {
+                            estadoHtml = '<span style="background:#fef9c3; color:#854d0e; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px;">⚠️ NOVEDAD</span>';
+                            kilosNovedadStr = `<span style="color:#854d0e; font-size:13px;">${novedadStr || 'Visita Fallida (0 kg)'}</span>`;
+                            bgColor = 'background-color: #fefce8;';
+                        }
                     }
                 } else {
                     pendientes++;

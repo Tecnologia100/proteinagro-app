@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.7.3)  
+> **Última Actualización:** Octubre 2026 (Versión 1.7.4)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -199,6 +199,20 @@
 - **Unificación Monolítica Anti-Conflicto en Apps Script (`Code.gs`):**
   - Se consolidaron todas las funciones del Conciliador (`getConciliadorWebAppUrl`, `configurarUrlWebApp`, `abrirConciliadorFlotante`, `abrirConciliacionDirectaFlotante`, `abrirDescargaPlantillaSheets`, `getDashboardDataRaw`, `homologarProveedor`) y los dos menús (`📊 Conciliador` y `🚀 ProteinAgro`) en un único `onOpen()` dentro de `Code.gs`. Esto erradica el conflicto donde múltiples archivos `.gs` sobreescribían el menú o `doGet`.
   - Se blindó la lógica de enrutamiento en `doGet(e)`: si un usuario visita la URL en el navegador sin parámetros, abre el Conciliador visual; y si la PWA solicita catálogos con cache-buster `?t=...` o ejecuta mutaciones, responde con el JSON correspondiente sin interferencias.
+
+### 15. Novedad 'Cliente Cancela Servicio' y Validación de Estado Previo al Arribo (`v1.7.4`)
+- **Regla de Negocio y Condición de Disparo:**
+  - La causal `"Cliente Cancela Servicio"` sólo puede registrarse **antes de que el vehículo llegue al punto** (servicio asignado / en ruta de desplazamiento hacia el origen, sin arribo marcado ni inicio de pesaje).
+- **Validación Bidireccional Anti-Inconsistencias (Cliente y Backend):**
+  - *Frontend (`app.js`):* `verificarPesajePrevioHoy` evalúa la memoria local y el formulario activo. Si el punto ya tiene pesaje (> 0 Kg) o recolección registrada hoy, la selección de la causal o el intento de envío es bloqueado de inmediato alertando al conductor.
+  - *Backend Webhook (`Code.gs`):* `guardarRecoleccionSheet` escanea cronológicamente la hoja `Recolecciones`. Si para la fecha evaluada ya existe un pesaje con carga para ese proveedor y punto, se rechaza la transacción con excepción: `"No se puede cancelar el servicio: El vehículo ya arribó o ya existe una recolección registrada para este punto hoy"`.
+- **Flexibilidad de Evidencia en Ruta:**
+  - Al ocurrir antes de llegar al establecimiento físico, la interfaz (`actualizarVistaEvidenciaSegunCausal`) conmuta el campo de fotografía para permitir adjuntar captura del mensaje/llamada del cliente o ingresar una nota explicativa detallada.
+- **Segregación Contable y Liberación de Itinerario:**
+  - La novedad se registra con `0 Kg`, `Precio = 0` y `Valor = 0`, asignando el estado `'Servicio Cancelado'`.
+  - En el Cierre Diario y Cobertura, el punto computa en `visitadosNovedad` sumando a `totalCubiertos` con badge visual `🚫 CANCELADO`, liberando al conductor y vehículo de la parada sin sumar kilos ficticios a la planta.
+- **Cero Regresiones Garantizado:**
+  - Todas las demás causales habituales (`Establecimiento Cerrado`, `Sin Materia Prima Disponible (0 Kg)`, etc.) mantienen su flujo original intacto con captura fotográfica obligatoria del establecimiento en sitio.
 
 ---
 
