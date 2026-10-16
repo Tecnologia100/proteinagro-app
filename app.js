@@ -2600,39 +2600,81 @@ async function resincronizarTodoAGoogleSheets() {
             return;
         }
 
-        // 4. Consultar qué IDs ya existen en Google Sheets
+        // 4. Consultar qué IDs ya existen en Google Sheets (Capa 1: Webhook, Capa 2: GViz CSV en vivo)
         let existingIdsInSheets = new Set();
         try {
             const checkUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=getRecolecciones&t=${Date.now()}`;
             const res = await fetch(checkUrl);
             if (res.ok) {
-                const jsonCheck = await res.json();
-                if (jsonCheck && Array.isArray(jsonCheck.recolecciones)) {
-                    jsonCheck.recolecciones.forEach(r => {
-                        if (r.id) existingIdsInSheets.add(String(r.id));
-                    });
+                const text = await res.text();
+                if (text && !text.trim().startsWith('<')) {
+                    const jsonCheck = JSON.parse(text);
+                    if (jsonCheck && Array.isArray(jsonCheck.recolecciones)) {
+                        jsonCheck.recolecciones.forEach(r => {
+                            if (r.id) existingIdsInSheets.add(String(r.id).replace(/^'/, '').trim());
+                        });
+                    }
                 }
             }
         } catch(eCheck) {
-            console.warn("No se pudo verificar IDs en Sheets:", eCheck);
+            console.warn("No se pudo verificar IDs en Sheets vía Webhook:", eCheck);
         }
 
-        // 5. Filtrar registros que faltan en Google Sheets
-        let faltantes = listaTotal.filter(item => {
-            const id = String(item.id || item._docId || '');
-            if (!id) return false;
-            if (existingIdsInSheets.size > 0) {
-                return !existingIdsInSheets.has(id);
+        // Capa 2: Fallback vía Google Sheets GViz CSV si el Webhook no devolvió IDs
+        if (existingIdsInSheets.size === 0) {
+            try {
+                const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+                const gvizUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Recolecciones&t=${Date.now()}`;
+                const resGviz = await fetch(gvizUrl);
+                if (resGviz.ok) {
+                    const csvText = await resGviz.text();
+                    if (csvText && !csvText.trim().startsWith('<!DOCTYPE') && !csvText.trim().startsWith('<html')) {
+                        const rows = csvText.split(/\r?\n/);
+                        for (let i = 1; i < rows.length; i++) {
+                            const line = rows[i].trim();
+                            if (!line) continue;
+                            let idVal = '';
+                            if (line.startsWith('"')) {
+                                const endQ = line.indexOf('"', 1);
+                                if (endQ !== -1) idVal = line.substring(1, endQ);
+                            } else {
+                                idVal = line.split(',')[0];
+                            }
+                            idVal = idVal.replace(/^'/, '').trim();
+                            if (idVal) existingIdsInSheets.add(idVal);
+                        }
+                        console.log(`✅ ${existingIdsInSheets.size} IDs únicos verificados en Google Sheets vía GViz.`);
+                    }
+                }
+            } catch (eGviz) {
+                console.warn("No se pudo verificar IDs en Sheets vía GViz CSV:", eGviz);
             }
-            return item.sync_sheets !== true;
-        });
+        }
+
+        // 5. Filtrar registros que REALMENTE faltan en Google Sheets
+        let faltantes = [];
+        if (existingIdsInSheets.size > 0) {
+            faltantes = listaTotal.filter(item => {
+                const id = String(item.id || item._docId || '').replace(/^'/, '').trim();
+                if (!id) return false;
+                return !existingIdsInSheets.has(id);
+            });
+        } else {
+            // Si ambas capas fallaron (sin red), filtrar únicamente pendientes locales explícitos
+            faltantes = localBackup.filter(item => {
+                return item && (item.sync_sheets === false || item.estado === 'Offline');
+            });
+            if (faltantes.length === 0) {
+                alert("⚠️ No fue posible verificar la base de datos de Google Sheets en vivo.\n\nPor favor compruebe su conexión a Internet e intente de nuevo.");
+                return;
+            }
+        }
 
         if (faltantes.length === 0) {
-            const forzar = confirm(`✅ Todos los registros (${listaTotal.length}) ya se encuentran sincronizados con Google Sheets.\n\nPara evitar generar filas duplicadas, no es necesario volver a enviarlos.\n\n¿Desea FORZAR el re-envío de todos modos?`);
-            if (!forzar) return;
-            faltantes = [...listaTotal];
+            alert(`✅ Todos los registros (${listaTotal.length} auditados) ya se encuentran registrados en Google Sheets.\n\nPara evitar generar filas duplicadas, no es necesario re-sincronizar.`);
+            return;
         } else {
-            const confirmar = confirm(`Se detectaron ${faltantes.length} registro(s) en la nube pendientes de ingresar a Google Sheets (de ${listaTotal.length} auditados).\n\n¿Desea enviarlos a Google Sheets ahora?`);
+            const confirmar = confirm(`Se detectaron ${faltantes.length} registro(s) pendientes de ingresar a Google Sheets (de ${listaTotal.length} auditados).\n\n¿Desea enviarlos a Google Sheets ahora?`);
             if (!confirmar) return;
         }
 

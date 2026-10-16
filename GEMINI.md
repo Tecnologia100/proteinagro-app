@@ -214,6 +214,18 @@
 - **Cero Regresiones Garantizado:**
   - Todas las demás causales habituales (`Establecimiento Cerrado`, `Sin Materia Prima Disponible (0 Kg)`, etc.) mantienen su flujo original intacto con captura fotográfica obligatoria del establecimiento en sitio.
 
+### 16. Blindaje de Re-Sincronización con Verificación Dual (Webhook + GViz CSV) (`v1.7.4`)
+- **Problema Diagnosticado:**
+  Al pulsar el botón administrativo *"🔄 Re-sincronizar Sheets"*, el sistema alertaba: *"Se detectaron 199 registro(s) en la nube pendientes de ingresar a Google Sheets (de 200 auditados)"*, a pesar de que dichos registros ya se encontraban físicamente en la hoja `Recolecciones`.
+- **Causa Raíz:**
+  1. La consulta al Webhook (`action=getRecolecciones`) fallaba o devolvía HTML, dejando vacío el conjunto `existingIdsInSheets` (`size === 0`).
+  2. Al estar vacío, el sistema evaluaba ciegamente `item.sync_sheets !== true`. Los 200 registros consultados de Firestore en la nube no poseen dicho atributo booleano (que solo se usa en `localStorage` del dispositivo local), provocando que 199 documentos históricos se marcaran erróneamente como "pendientes".
+- **Solución Implementada:**
+  1. *Verificación Dual en 2 Capas:* Si la Capa 1 (Webhook Apps Script) no devuelve IDs, se activa inmediatamente la Capa 2 consultando directamente Google Sheets GViz CSV en vivo (`tqx=out:csv&sheet=Recolecciones`).
+  2. *Detección de IDs Existentes:* GViz extrae los más de 1.150 IDs únicos registrados en la hoja de cálculo.
+  3. *Erradicación de Falsos Positivos:* Si un ID ya está en Google Sheets, se descarta de la lista de faltantes.
+  4. *Prevención de Re-envíos Falsos:* Si ambas capas fallan (sin conexión), el sistema solo evalúa registros locales que estén explícitamente marcados como `Offline` o `sync_sheets: false`, y si todos están en orden, alerta que no es necesario re-sincronizar para proteger la hoja contra duplicados.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
