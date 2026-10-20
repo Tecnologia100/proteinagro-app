@@ -1,3 +1,4 @@
+var isAutoSyncRunning = false;
 // === CONFIGURACIÓN DE FIREBASE & GOOGLE SHEETS ===
 // TODO: Reemplazar con credenciales reales en producción
 const firebaseConfig = {
@@ -193,77 +194,118 @@ function formatearNombreTitulo(str) {
 
 // Diccionario canónico para homologación estricta de proveedores (mayúsculas, minúsculas y ortografía)
 const CANONICOS_PROVEEDORES = {
-    'angeloparedesproteincol': 'Angelo Paredes Proteincol',
-    'albertomillan': 'Alberto Millan',
-    'augustomunoz': 'Augusto Muñoz',
-    'baratoncarnesberlin': 'Baratón Carnes Berlín',
-    'barbaragomez': 'Barbara Gomez',
-    'belalcazar': 'Belalcazar',
-    'bodegasantaelena': 'Bodega Santa Elena',
+    'agropecuariarcarnesmaiale': 'Agropecuaria R. Carnes Maiale',
+    'albertomillan': 'Alberto Millán',
     'alejandrogaray': 'Alejandro Garay',
+    'angeloparedes': 'Angelo Paredes',
+    'arcesiogiraldo': 'Arcesio Giraldo',
+    'augustomunoz': 'Augusto Muñoz',
+    'autoserviciosurtimercar': 'Autoservicio Surtimercar',
+    'baratoncarnesberlin': 'Baratón Carnes Berlín',
+    'barbaragomez': 'Bárbara Gómez',
+    'belalcazar': 'Belalcázar',
+    'belalcazarbolivar': 'Belalcázar Bolívar',
+    'belalcazarcarnesyderibadosoccidente': 'Belalcázar Carnes y Derivados Occidente',
+    'belalcazarcarnesyderivadosoccidente': 'Belalcázar Carnes y Derivados Occidente',
+    'belalcazargaleria': 'Belalcázar Galería',
+    'belalcazarguabinas': 'Belalcázar Guabinas',
+    'belalcazarguacanday': 'Belalcázar Guacanday',
+    'belalcazarprincipal': 'Belalcázar Principal',
+    'belalcazarrozo': 'Belalcázar Rozo',
+    'belalcazaruribe': 'Belalcázar Uribe',
+    'belomo': 'Belomo',
     'caribe': 'Caribe',
+    'caribebuga': 'Caribe Buga',
+    'caribecarnesyderivadosdeocc': 'Caribe Carnes y Derivados de Occ.',
     'carloscaicedo': 'Carlos Caicedo',
-    'carlosmartinez': 'Carlos Martinez',
     'carlosrebolledo': 'Carlos Rebolledo',
+    'carneshernancho': 'Carnes Hernancho',
     'carnesmaiale': 'Carnes Maiale',
     'carniceriafabianlopezaguilaroja': 'Carnicería Fabián López (Águila Roja)',
-    'carnicoslafama': 'Carnicos La Fama',
+    'carnicoslafama': 'Cárnicos La Fama',
     'cavasa': 'Cavasa',
-    'centralhenrymartinez': 'Central Henry Martinez',
+    'centralhenrymartinez': 'Central Henry Martínez',
     'ciudaddelcampo': 'Ciudad del Campo',
     'ciudadeladelrio': 'Ciudadela del Río',
-    'comercializadorarye': 'Comercializadora R y E',
+    'comercializadorarye': 'Comercializadora R Y E',
     'crhistiancedeno': 'Crhistian Cedeño',
+    'cristiancedeno': 'Crhistian Cedeño',
+    'cuentasevillana': 'Sevillana',
     'diegobuitrago': 'Diego Buitrago',
-    'distribuidoradecarnesmillan': 'Distribuidora de Carnes Millan',
+    'distribuidoracarnesmillan': 'Distribuidora de Carnes Millán',
+    'distribuidoradecarnesmillan': 'Distribuidora de Carnes Millán',
     'districarneslg': 'Districarnes LG',
     'edinsonaguirre': 'Edinson Aguirre',
     'elrebajon': 'El Rebajón',
-    'fabianlopez': 'Fabian Lopez',
-    'freddyfernandez': 'Freddy Fernandez',
-    'freddyhernandez': 'Freddy Hernandez',
+    'estivenrivera': 'Estiven Rivera',
+    'fabianlopez': 'Fabián López',
+    'fabianrodas': 'Fabián Rodas',
+    'fernandolenis': 'Fernando Lenis',
+    'fredyfernandez': 'Fredy Fernández',
+    'frigocarnesdelvallesas': 'Frigocarnes del Valle SAS',
     'frigorivalle': 'Frigorivalle',
-    'gildardotejada': 'Gildardo Tejada',
+    'general': 'General',
     'graxpro': 'Graxpro',
+    'guacarisevillana': 'Guacarí Sevillana',
+    'guacarysevillana': 'Guacarí Sevillana',
     'hebergamboa': 'Heber Gamboa',
+    'henrrymartinez': 'Henry Martínez',
+    'henrymartinez': 'Henry Martínez',
     'hernandohidalgo': 'Hernando Hidalgo',
     'jaimezuluaga': 'Jaime Zuluaga',
-    'jairomosquera': 'Jairo Mosquera',
-    'jhonatanmartinez': 'Jhonatan Martinez',
-    'jhoanatanmartinez': 'Jhonatan Martinez',
+    'jhonatanmartinez': 'Jhonatan Martínez',
+    'jhonfredypineda': 'Jhon Fredy Pineda',
+    'jhonjairobarela': 'Jhon Jairo Barela',
+    'jhonvaldez': 'Jhon Valdez',
+    'jimmysanclemente': 'Yimi Sanclemente',
     'jorgeadrianrodasvillagorgona': 'Jorge Adrián Rodas (Villagorgona)',
-    'josealexpareja': 'Jose Alex Pareja',
-    'julianluna': 'Julian Luna',
+    'josealexanderpareja': 'José Alexander Pareja',
+    'josealexpareja': 'José Alexander Pareja',
     'lacosechademitierra': 'La Cosecha de Mi Tierra',
+    'lacosechamitierra': 'La Cosecha de Mi Tierra',
     'laesperanza': 'La Esperanza',
-    'lagrancolombia': 'La Gran Colombia',
+    'lamontana': 'La Montaña',
     'lareserva': 'La Reserva',
+    'lasevillana': 'Sevillana',
+    'lasevillanacarnesyderivadosdeocc': 'Sevillana Carnes y Derivados de Occ.',
+    'lasevillanafrigorivalle': 'Sevillana Frigorivalle',
+    'lenaeuler': 'Leña Euler',
     'loslagos': 'Los Lagos',
-    'mariaelsialegria': 'Maria Elsi Alegria',
-    'martinperez': 'Martin Perez',
     'mercamio': 'Mercamio',
-    'mercaunion': 'Mercaunion',
+    'mercaunion': 'Mercaunión',
     'migancapital': 'Migan Capital',
-    'miguelangelotero': 'Miguel Angel Otero',
-    'milsongonsalez': 'Milson Gonsalez',
-    'milsongonzalez': 'Milson Gonsalez',
+    'miguelangelotero': 'Miguel Ángel Otero',
+    'milsongonsalez': 'Milson González',
+    'milsongonzalez': 'Milson González',
     'miltonmunoz': 'Milton Muñoz',
-    'miriamcuaran': 'Miriam Cuaran',
+    'miriamcuaran': 'Miriam Cuarán',
+    'nutrialimentoscarnicossas': 'Nutrialimentos Cárnicos SAS',
     'nutrialimentosvaldezvillagorgona': 'Nutrialimentos Valdez (Villagorgona)',
+    'olimpica': 'Olímpica',
+    'olimpicacanaveral': 'Olímpica / Cañaveral',
+    'olimpicaguadalupe': 'Olímpica Guadalupe',
+    'olimpicaloslagos': 'Olímpica Los Lagos',
+    'orlandocastaneda': 'Orlando Castañeda',
     'orlandogiraldo': 'Orlando Giraldo',
-    'orlandomartinez': 'Orlando Martinez',
-    'oscarlara': 'Oscar Lara',
+    'orlandomartinez': 'Orlando Martínez',
     'ricardogil': 'Ricardo Gil',
     'santaelena': 'Santa Elena',
     'sevillana': 'Sevillana',
+    'sevillanacarnesyderivadosdeocc': 'Sevillana Carnes y Derivados de Occ.',
+    'sevillanafrigorivalle': 'Sevillana Frigorivalle',
+    'sevillanaisraelplaza': 'Sevillana Israel Plaza',
+    'sevillanalourdes': 'Sevillana Lourdes',
+    'sevillanapalmira': 'Sevillana Palmira',
+    'sevillanapasoancho': 'Sevillana Pasoancho',
     'sevillanarepublicadeisrael': 'Sevillana República de Israel',
     'sevillanasantaelena': 'Sevillana Santa Elena',
+    'supercarneslapaz': 'Super Carnes La Paz',
     'supercarneslosandes': 'Super Carnes Los Andes',
+    'supercarnespuntorojo': 'Super Carnes Punto Rojo',
     'supertiendacanaveral': 'Supertienda Cañaveral',
     'supertiendacanaveralfrigorivalle': 'Supertienda Cañaveral - Frigorivalle',
-    'wilmerbustamante': 'Wilmer Bustamante',
+    'yeniferdiazvillagorgona': 'Yénifer Díaz (Villagorgona)',
     'yimisanclemente': 'Yimi Sanclemente',
-    'yeniferdiazvillagorgona': 'Yénifer Díaz (Villagorgona)'
 };
 
 function homologarNombreProveedor(texto) {
@@ -1464,6 +1506,27 @@ async function sincronizarCatalogosDesdeGviz() {
         // 2. Sincronizar Puntos_Rutas directamente vía Gviz CSV (&headers=1 para no perder la fila 1 de Ruta 1)
         await refrescarPuntosRutasDesdeSheets();
 
+        // 3. Sincronizar catálogo maestro desacoplado desde Tarifas vía Gviz CSV
+        try {
+            const tarifUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Tarifas&headers=1&t=${Date.now()}`;
+            const resTarif = await fetch(tarifUrl);
+            if (resTarif.ok) {
+                const csvTarif = await resTarif.text();
+                const linesT = csvTarif.split(/\r?\n/).filter(l => l.trim().length > 0);
+                const provsTarif = [];
+                for (let i = 1; i < linesT.length; i++) {
+                    const cols = linesT[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+                    if (cols[1]) provsTarif.push(cols[1]);
+                }
+                if (provsTarif.length > 0) {
+                    actualizarCatalogoMaestroProveedores(provsTarif);
+                    console.log("✅ Catálogo maestro enriquecido desde Tarifas (Gviz):", provsTarif.length);
+                }
+            }
+        } catch(eTar) {
+            console.warn("Aviso Gviz Tarifas:", eTar);
+        }
+
         // 3. Sincronizar Rutas Oficiales directamente vía Gviz CSV (Garantiza Rutas 1 a 7 y Planta San Joaquín)
         try {
             const rutasUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Rutas&headers=1&t=${Date.now()}`;
@@ -1536,6 +1599,9 @@ async function cargarCatalogosDinamicos() {
                 if (text && (text.trim().startsWith('{') || text.trim().startsWith('['))) {
                     const data = JSON.parse(text);
                     if (data && data.productos && data.productos.length > 0) {
+                        if (data.proveedores && Array.isArray(data.proveedores)) {
+                            actualizarCatalogoMaestroProveedores(data.proveedores);
+                        }
                         if (data.puntos_rutas && data.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(data.puntos_rutas);
                         renderDynamicProducts(data.productos);
                     if (data.conductores && data.conductores.length > 0) {
@@ -2433,7 +2499,7 @@ async function enviarAGoogleSheets(data) {
 }
 
 // === SISTEMA DE AUTO-SINCRONIZACIÓN AUTOMÁTICA EN SEGUNDO PLANO (CADA 5 MINUTOS) ===
-let isAutoSyncRunning = false;
+var isAutoSyncRunning = false;
 
 async function sincronizarPendientesAGoogleSheets(silent = true) {
     if (isAutoSyncRunning) return;
@@ -2848,76 +2914,144 @@ const DEFAULT_RUTAS_DATA = {
 };
 
 const TODOS_LOS_PROVEEDORES = [
-    "Alberto Millan",
+    "Agropecuaria R. Carnes Maiale",
+    "Alberto Millán",
     "Alejandro Garay",
-    "Angelo Paredes Proteincol",
+    "Angelo Paredes",
+    "Arcesio Giraldo",
     "Augusto Muñoz",
+    "Autoservicio Surtimercar",
     "Baratón Carnes Berlín",
-    "Barbara Gomez",
-    "Belalcazar",
-    "Bodega Santa Elena",
+    "Belalcázar",
+    "Belalcázar Bolívar",
+    "Belalcázar Carnes y Derivados Occidente",
+    "Belalcázar Galería",
+    "Belalcázar Guabinas",
+    "Belalcázar Guacanday",
+    "Belalcázar Principal",
+    "Belalcázar Rozo",
+    "Belalcázar Uribe",
+    "Belomo",
+    "Bárbara Gómez",
     "Caribe",
+    "Caribe Buga",
+    "Caribe Carnes y Derivados de Occ.",
     "Carlos Caicedo",
-    "Carlos Martinez",
     "Carlos Rebolledo",
+    "Carnes Hernancho",
     "Carnes Maiale",
     "Carnicería Fabián López (Águila Roja)",
-    "Carnicos La Fama",
     "Cavasa",
-    "Central Henry Martinez",
+    "Central Henry Martínez",
     "Ciudad del Campo",
     "Ciudadela del Río",
-    "Comercializadora R y E",
+    "Comercializadora R Y E",
     "Crhistian Cedeño",
+    "Cárnicos La Fama",
     "Diego Buitrago",
-    "Distribuidora de Carnes Millan",
+    "Distribuidora de Carnes Millán",
     "Districarnes LG",
     "Edinson Aguirre",
     "El Rebajón",
-    "Fabian Lopez",
-    "Freddy Fernandez",
-    "Freddy Hernandez",
+    "Estiven Rivera",
+    "Fabián López",
+    "Fabián Rodas",
+    "Fernando Lenis",
+    "Fredy Fernández",
+    "Frigocarnes del Valle SAS",
     "Frigorivalle",
-    "Gildardo Tejada",
+    "General",
     "Graxpro",
+    "Guacarí Sevillana",
     "Heber Gamboa",
+    "Henry Martínez",
     "Hernando Hidalgo",
     "Jaime Zuluaga",
-    "Jairo Mosquera",
-    "Jhonatan Martinez",
+    "Jhon Fredy Pineda",
+    "Jhon Jairo Barela",
+    "Jhon Valdez",
+    "Jhonatan Martínez",
     "Jorge Adrián Rodas (Villagorgona)",
-    "Jose Alex Pareja",
-    "Julian Luna",
+    "José Alexander Pareja",
     "La Cosecha de Mi Tierra",
     "La Esperanza",
-    "La Gran Colombia",
+    "La Montaña",
     "La Reserva",
+    "Leña Euler",
     "Los Lagos",
-    "Maria Elsi Alegria",
-    "Martin Perez",
     "Mercamio",
-    "Mercaunion",
+    "Mercaunión",
     "Migan Capital",
-    "Miguel Angel Otero",
-    "Milson Gonsalez",
+    "Miguel Ángel Otero",
+    "Milson González",
     "Milton Muñoz",
-    "Miriam Cuaran",
+    "Miriam Cuarán",
+    "Nutrialimentos Cárnicos SAS",
     "Nutrialimentos Valdez (Villagorgona)",
+    "Olímpica",
+    "Olímpica / Cañaveral",
+    "Olímpica Guadalupe",
+    "Olímpica Los Lagos",
+    "Orlando Castañeda",
     "Orlando Giraldo",
-    "Orlando Martinez",
-    "Oscar Lara",
+    "Orlando Martínez",
     "Ricardo Gil",
     "Santa Elena",
     "Sevillana",
+    "Sevillana Carnes y Derivados de Occ.",
+    "Sevillana Frigorivalle",
+    "Sevillana Israel Plaza",
+    "Sevillana Lourdes",
+    "Sevillana Palmira",
+    "Sevillana Pasoancho",
     "Sevillana República de Israel",
     "Sevillana Santa Elena",
+    "Super Carnes La Paz",
     "Super Carnes Los Andes",
+    "Super Carnes Punto Rojo",
     "Supertienda Cañaveral",
     "Supertienda Cañaveral - Frigorivalle",
-    "Wilmer Bustamante",
     "Yimi Sanclemente",
-    "Yénifer Díaz (Villagorgona)"
+    "Yénifer Díaz (Villagorgona)",
 ];
+
+// Catálogo Maestro Desacoplado de Proveedores (Totalmente independiente de Puntos_Rutas)
+const CATALOGO_MAESTRO_PROVEEDORES = new Set(TODOS_LOS_PROVEEDORES);
+
+// Restaurar proveedores persistidos en caché local
+try {
+    const cachedProvs = localStorage.getItem('proteinagro_catalogo_proveedores');
+    if (cachedProvs) {
+        const parsedP = JSON.parse(cachedProvs);
+        if (Array.isArray(parsedP)) {
+            parsedP.forEach(p => {
+                if (p) CATALOGO_MAESTRO_PROVEEDORES.add(homologarNombreProveedor(p));
+            });
+        }
+    }
+} catch (e) {}
+
+function actualizarCatalogoMaestroProveedores(listaNuevos) {
+    if (!Array.isArray(listaNuevos) || listaNuevos.length === 0) return false;
+    let huboCambios = false;
+    listaNuevos.forEach(p => {
+        if (!p) return;
+        const pNorm = homologarNombreProveedor(p);
+        if (pNorm && pNorm !== 'PROVEEDOR GENERAL' && !CATALOGO_MAESTRO_PROVEEDORES.has(pNorm)) {
+            CATALOGO_MAESTRO_PROVEEDORES.add(pNorm);
+            huboCambios = true;
+        }
+    });
+    if (huboCambios) {
+        try {
+            localStorage.setItem('proteinagro_catalogo_proveedores', JSON.stringify(Array.from(CATALOGO_MAESTRO_PROVEEDORES)));
+        } catch (e) {}
+        const rutaActual = document.getElementById('ruta')?.value || '';
+        populardropdownProveedoresPorRuta(rutaActual);
+    }
+    return huboCambios;
+}
+
 
 let savedRutasConfig = null;
 try {
@@ -3237,20 +3371,44 @@ function getPuntosParaRuta(rutaSeleccionada) {
 }
 
 function getTodosLosProveedores() {
-    const oficiales = getProveedoresOficialesSheets();
-    if (oficiales && oficiales.length > 0) {
-        return oficiales;
-    }
-    const provsSet = new Set(TODOS_LOS_PROVEEDORES);
-    Object.values(PUNTO_TO_PROVEEDOR_MAP).forEach(prov => {
-        if (prov && prov !== 'PROVEEDOR GENERAL') provsSet.add(prov);
-    });
-    for (const rt in PROVEEDORES_POR_RUTA) {
-        (PROVEEDORES_POR_RUTA[rt] || []).forEach(prov => {
-            if (prov && prov !== 'PROVEEDOR GENERAL') provsSet.add(prov);
+    const provsSet = new Set();
+    
+    // 1. Catálogo maestro desacoplado
+    if (typeof CATALOGO_MAESTRO_PROVEEDORES !== 'undefined') {
+        CATALOGO_MAESTRO_PROVEEDORES.forEach(p => {
+            const clean = homologarNombreProveedor(p);
+            if (clean && clean !== 'PROVEEDOR GENERAL') provsSet.add(clean);
         });
     }
+
+    // 2. Proveedores en la matriz de puntos
+    if (Array.isArray(MATRIZ_PUNTOS_RUTAS)) {
+        MATRIZ_PUNTOS_RUTAS.forEach(it => {
+            if (!it || it.estado === 'Inactivo') return;
+            const clean = homologarNombreProveedor(it.proveedor);
+            if (clean && clean !== 'PROVEEDOR GENERAL') provsSet.add(clean);
+        });
+    }
+
+    // 3. Fallback estático
+    if (Array.isArray(TODOS_LOS_PROVEEDORES)) {
+        TODOS_LOS_PROVEEDORES.forEach(p => {
+            const clean = homologarNombreProveedor(p);
+            if (clean && clean !== 'PROVEEDOR GENERAL') provsSet.add(clean);
+        });
+    }
+
+    // 4. Mapas adicionales
+    Object.values(PUNTO_TO_PROVEEDOR_MAP).forEach(prov => {
+        const clean = homologarNombreProveedor(prov);
+        if (clean && clean !== 'PROVEEDOR GENERAL') provsSet.add(clean);
+    });
+
     return Array.from(provsSet).filter(p => p && p.trim() !== '').sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+}
+
+function getProveedoresOficialesSheets() {
+    return getTodosLosProveedores();
 }
 
 function getProveedoresParaRuta(rutaSeleccionada) {
@@ -3449,37 +3607,68 @@ function populardropdownProveedoresPorRuta(rutaSeleccionada, mostrandoTodos = fa
     const proveedorSelect = document.getElementById('proveedor');
     if (!proveedorSelect) return;
 
+    const valorPrevio = proveedorSelect.value;
     proveedorSelect.disabled = false;
     proveedorSelect.innerHTML = '<option value="" disabled selected>Seleccione el proveedor</option>';
 
-    const listaProveedores = mostrandoTodos ? getTodosLosProveedores() : getProveedoresParaRuta(rutaSeleccionada);
+    const todosLosProveedores = getTodosLosProveedores();
+    const proveedoresEnRuta = (rutaSeleccionada && rutaSeleccionada !== 'OTRA') 
+        ? getProveedoresParaRuta(rutaSeleccionada) 
+        : [];
 
     const norm = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-    const provsUnicos = new Map();
-    listaProveedores.forEach(p => {
-        const clean = homologarNombreProveedor(p);
-        const k = norm(clean);
-        if (k && !provsUnicos.has(k)) provsUnicos.set(k, clean);
-    });
+    const setEnRuta = new Set(proveedoresEnRuta.map(p => norm(p)));
+    const otrosProveedores = todosLosProveedores.filter(p => !setEnRuta.has(norm(p)));
 
-    Array.from(provsUnicos.values()).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' })).forEach(prov => {
-        const opt = document.createElement('option');
-        opt.value = prov;
-        opt.textContent = prov;
-        proveedorSelect.appendChild(opt);
-    });
+    if (proveedoresEnRuta.length > 0) {
+        // 1. Grupo: Proveedores programados en la ruta actual
+        const grpRuta = document.createElement('optgroup');
+        grpRuta.label = `📍 EN TU RUTA PROGRAMADA (${proveedoresEnRuta.length})`;
+        proveedoresEnRuta.forEach(prov => {
+            const opt = document.createElement('option');
+            opt.value = prov;
+            opt.textContent = `⭐ ${prov}`;
+            grpRuta.appendChild(opt);
+        });
+        proveedorSelect.appendChild(grpRuta);
 
-    if (!mostrandoTodos && rutaSeleccionada && rutaSeleccionada !== 'OTRA') {
-        const optTodos = document.createElement('option');
-        optTodos.value = 'TODOS';
-        optTodos.textContent = '📋 -- Mostrar todos los proveedores --';
-        proveedorSelect.appendChild(optTodos);
+        // 2. Grupo: Todos los demás proveedores del sistema (Acceso libre total)
+        if (otrosProveedores.length > 0) {
+            const grpOtros = document.createElement('optgroup');
+            grpOtros.label = `🏬 OTROS PROVEEDORES DEL CATÁLOGO (${otrosProveedores.length})`;
+            otrosProveedores.forEach(prov => {
+                const opt = document.createElement('option');
+                opt.value = prov;
+                opt.textContent = prov;
+                grpOtros.appendChild(opt);
+            });
+            proveedorSelect.appendChild(grpOtros);
+        }
+    } else {
+        // Si no hay ruta seleccionada o es "OTRA", listado completo alfabético
+        todosLosProveedores.forEach(prov => {
+            const opt = document.createElement('option');
+            opt.value = prov;
+            opt.textContent = prov;
+            proveedorSelect.appendChild(opt);
+        });
     }
 
+    // Opción manual para proveedor no registrado
     const optOtro = document.createElement('option');
     optOtro.value = 'OTRO';
-    optOtro.textContent = '➕ Otro Proveedor...';
+    optOtro.textContent = '➕ Otro Proveedor No Listado...';
     proveedorSelect.appendChild(optOtro);
+
+    // Restaurar valor previo si aún es válido
+    if (valorPrevio && valorPrevio !== 'TODOS') {
+        for (let i = 0; i < proveedorSelect.options.length; i++) {
+            if (proveedorSelect.options[i].value === valorPrevio) {
+                proveedorSelect.selectedIndex = i;
+                break;
+            }
+        }
+    }
 }
 
 // Alias de compatibilidad

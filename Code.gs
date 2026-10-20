@@ -27,6 +27,11 @@ function doGet(e) {
       return obtenerRecoleccionesHttp(ss, e.parameter.fecha, e.parameter.ruta);
     }
 
+    // 0.035 Obtener Catálogo Maestro Desacoplado de Proveedores (Totalmente independiente de Puntos_Rutas)
+    if (e && e.parameter && (e.parameter.action === 'getProveedores' || e.parameter.action === 'getCatalogoProveedores')) {
+      return getCatalogoProveedoresHttp(ss);
+    }
+
     // 0.04 Si viene una petición de eliminación por ID
     if (e && e.parameter && e.parameter.action === 'deleteRecoleccion' && e.parameter.id) {
       return eliminarRecoleccionSheet(ss, e.parameter.id);
@@ -232,14 +237,29 @@ function doGet(e) {
       ];
     }
 
+    // 5. Catálogo Maestro Integral de Proveedores (Totalmente desacoplado de Puntos_Rutas)
+    var catalogoMap = obtenerCatalogoProveedoresCompleto(ss);
+    var sheetRec = ss.getSheetByName("Recolecciones");
+    if (sheetRec && sheetRec.getLastRow() > 1) {
+      var rData = sheetRec.getRange(2, 5, sheetRec.getLastRow() - 1, 1).getValues();
+      for (var ri = 0; ri < rData.length; ri++) {
+        var rp = homologarProveedor(rData[ri][0]);
+        if (rp) catalogoMap[rp] = true;
+      }
+    }
+    var listaProveedoresCompleta = Object.keys(catalogoMap).sort(function(a, b) {
+      return a.localeCompare(b, 'es', { sensitivity: 'base' });
+    });
+
     var output = {
-      version: "1.4.2-anti-duplicados",
+      version: "1.4.3-desacoplado-proveedores",
       productos: productos,
       conductores: conductores,
       conductores_detalle: conductoresDetalle,
       admin_clave: adminClave,
       rutas: rutas,
-      puntos_rutas: puntosRutas
+      puntos_rutas: puntosRutas,
+      proveedores: listaProveedoresCompleta
     };
 
     return ContentService.createTextOutput(JSON.stringify(output))
@@ -2797,7 +2817,198 @@ function getDashboardDataRaw() {
   }
 }
 
+var MAPA_HOMOLOGACION_PROVEEDORES = {
+  "AGROPECUARIA R. CARNES MAIALE": "Agropecuaria R. Carnes Maiale",
+  "ALBERTO MILLAN": "Alberto Millán",
+  "ALEJANDRO GARAY": "Alejandro Garay",
+  "ANGELO PAREDES": "Angelo Paredes",
+  "ARCESIO GIRALDO": "Arcesio Giraldo",
+  "AUGUSTO MUNOZ": "Augusto Muñoz",
+  "AUTOSERVICIO SURTIMERCAR": "Autoservicio Surtimercar",
+  "BARATON CARNES BERLIN": "Baratón Carnes Berlín",
+  "BARBARA GOMEZ": "Bárbara Gómez",
+  "BELALCAZAR": "Belalcázar",
+  "BELALCAZAR BOLIVAR": "Belalcázar Bolívar",
+  "BELALCAZAR CARNES Y DERIBADOS OCCIDENTE": "Belalcázar Carnes y Derivados Occidente",
+  "BELALCAZAR GALERIA": "Belalcázar Galería",
+  "BELALCAZAR GUABINAS": "Belalcázar Guabinas",
+  "BELALCAZAR GUACANDAY": "Belalcázar Guacanday",
+  "BELALCAZAR PRINCIPAL": "Belalcázar Principal",
+  "BELALCAZAR ROZO": "Belalcázar Rozo",
+  "BELALCAZAR URIBE": "Belalcázar Uribe",
+  "BELOMO": "Belomo",
+  "CARIBE": "Caribe",
+  "CARIBE BUGA": "Caribe Buga",
+  "CARIBE CARNES Y DERIVADOS DE OCC.": "Caribe Carnes y Derivados de Occ.",
+  "CARLOS CAICEDO": "Carlos Caicedo",
+  "CARLOS REBOLLEDO": "Carlos Rebolledo",
+  "CARNES HERNANCHO": "Carnes Hernancho",
+  "CARNES MAIALE": "Carnes Maiale",
+  "CARNICERIA FABIAN LOPEZ (AGUILA ROJA)": "Carnicería Fabián López (Águila Roja)",
+  "CARNICOS LA FAMA": "Cárnicos La Fama",
+  "CAVASA": "Cavasa",
+  "CENTRAL HENRY MARTINEZ": "Central Henry Martínez",
+  "CIUDAD DEL CAMPO": "Ciudad del Campo",
+  "CIUDADELA DEL RIO": "Ciudadela del Río",
+  "COMERCIALIZADORA R Y E": "Comercializadora R Y E",
+  "CRHISTIAN CEDENO": "Crhistian Cedeño",
+  "CRISTIAN CEDENO": "Crhistian Cedeño",
+  "CUENTA SEVILLANA": "Sevillana",
+  "DIEGO BUITRAGO": "Diego Buitrago",
+  "DISTRIBUIDORA CARNES MILLAN": "Distribuidora de Carnes Millán",
+  "DISTRIBUIDORA DE CARNES MILLAN": "Distribuidora de Carnes Millán",
+  "DISTRICARNES LG": "Districarnes LG",
+  "EDINSON AGUIRRE": "Edinson Aguirre",
+  "EL REBAJON": "El Rebajón",
+  "ESTIVEN RIVERA": "Estiven Rivera",
+  "FABIAN LOPEZ": "Fabián López",
+  "FABIAN RODAS": "Fabián Rodas",
+  "FERNANDO LENIS": "Fernando Lenis",
+  "FREDY FERNANDEZ": "Fredy Fernández",
+  "FRIGOCARNES DEL VALLE SAS": "Frigocarnes del Valle SAS",
+  "FRIGORIVALLE": "Frigorivalle",
+  "GENERAL": "General",
+  "GRAXPRO": "Graxpro",
+  "GUACARY SEVILLANA": "Guacarí Sevillana",
+  "HEBER GAMBOA": "Heber Gamboa",
+  "HENRRY MARTINEZ": "Henry Martínez",
+  "HERNANDO HIDALGO": "Hernando Hidalgo",
+  "JAIME ZULUAGA": "Jaime Zuluaga",
+  "JHON FREDY PINEDA": "Jhon Fredy Pineda",
+  "JHON JAIRO BARELA": "Jhon Jairo Barela",
+  "JHON VALDEZ": "Jhon Valdez",
+  "JHONATAN MARTINEZ": "Jhonatan Martínez",
+  "JIMMY SANCLEMENTE": "Yimi Sanclemente",
+  "YIMI SANCLEMENTE": "Yimi Sanclemente",
+  "JORGE ADRIAN RODAS (VILLAGORGONA)": "Jorge Adrián Rodas (Villagorgona)",
+  "JOSE ALEX PAREJA": "José Alexander Pareja",
+  "JOSE ALEXANDER PAREJA": "José Alexander Pareja",
+  "LA COSECHA DE MI TIERRA": "La Cosecha de Mi Tierra",
+  "LA COSECHA MI TIERRA": "La Cosecha de Mi Tierra",
+  "LA ESPERANZA": "La Esperanza",
+  "LA MONTANA": "La Montaña",
+  "LA RESERVA": "La Reserva",
+  "LA SEVILLANA": "Sevillana",
+  "LA SEVILLANA CARNES Y DERIVADOS DE OCC": "Sevillana Carnes y Derivados de Occ.",
+  "LA SEVILLANA FRIGORIVALLE": "Sevillana Frigorivalle",
+  "LENA EULER": "Leña Euler",
+  "LOS LAGOS": "Los Lagos",
+  "MERCAMIO": "Mercamio",
+  "MERCAUNION": "Mercaunión",
+  "MIGAN CAPITAL": "Migan Capital",
+  "MIGUEL ANGEL OTERO": "Miguel Ángel Otero",
+  "MILSON GONSALEZ": "Milson González",
+  "MILTON MUNOZ": "Milton Muñoz",
+  "MIRIAM CUARAN": "Miriam Cuarán",
+  "NUTRIALIMENTOS CARNICOS SAS": "Nutrialimentos Cárnicos SAS",
+  "NUTRIALIMENTOS VALDEZ (VILLAGORGONA)": "Nutrialimentos Valdez (Villagorgona)",
+  "OLIMPICA": "Olímpica",
+  "OLIMPICA / CANAVERAL": "Olímpica / Cañaveral",
+  "OLIMPICA GUADALUPE": "Olímpica Guadalupe",
+  "OLIMPICA LOS LAGOS": "Olímpica Los Lagos",
+  "ORLANDO CASTANEDA": "Orlando Castañeda",
+  "ORLANDO GIRALDO": "Orlando Giraldo",
+  "ORLANDO MARTINEZ": "Orlando Martínez",
+  "RICARDO GIL": "Ricardo Gil",
+  "SANTA ELENA": "Santa Elena",
+  "SEVILLANA": "Sevillana",
+  "SEVILLANA ISRAEL PLAZA": "Sevillana Israel Plaza",
+  "SEVILLANA LOURDES": "Sevillana Lourdes",
+  "SEVILLANA PALMIRA": "Sevillana Palmira",
+  "SEVILLANA PASOANCHO": "Sevillana Pasoancho",
+  "SEVILLANA REPUBLICA DE ISRAEL": "Sevillana República de Israel",
+  "SEVILLANA SANTA ELENA": "Sevillana Santa Elena",
+  "SUPER CARNES LA PAZ": "Super Carnes La Paz",
+  "SUPER CARNES LOS ANDES": "Super Carnes Los Andes",
+  "SUPER CARNES PUNTO ROJO": "Super Carnes Punto Rojo",
+  "SUPERTIENDA CANAVERAL": "Supertienda Cañaveral",
+  "SUPERTIENDA CANAVERAL - FRIGORIVALLE": "Supertienda Cañaveral - Frigorivalle",
+  "YENIFER DIAZ (VILLAGORGONA)": "Yénifer Díaz (Villagorgona)"
+};
+
+/**
+ * Obtiene el catálogo maestro integral de proveedores de ProteinAgro,
+ * totalmente desacoplado de los filtros visuales o restricciones de Puntos_Rutas.
+ * Lee Puntos_Rutas (Col B), Tarifas (Col B) y el mapa oficial de homologación.
+ */
+function obtenerCatalogoProveedoresCompleto(ss) {
+  var provSet = {};
+
+  // 1. Catálogo Maestro Puntos_Rutas (Columna B: Proveedor)
+  try {
+    var sheetPuntos = ss.getSheetByName("Puntos_Rutas");
+    if (sheetPuntos && sheetPuntos.getLastRow() > 1) {
+      var prData = sheetPuntos.getRange(2, 2, sheetPuntos.getLastRow() - 1, 1).getValues();
+      for (var pi = 0; pi < prData.length; pi++) {
+        var pProv = homologarProveedor(prData[pi][0]);
+        if (pProv) provSet[pProv] = true;
+      }
+    }
+  } catch (ePuntos) {
+    Logger.log("Aviso: no se pudo leer Puntos_Rutas para catálogo: " + ePuntos);
+  }
+
+  // 2. Catálogo Tarifas (Columna B: Proveedor)
+  try {
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
+      var tarData = sheetTarifas.getRange(2, 2, sheetTarifas.getLastRow() - 1, 1).getValues();
+      for (var ti = 0; ti < tarData.length; ti++) {
+        var tProv = homologarProveedor(tarData[ti][0]);
+        if (tProv) provSet[tProv] = true;
+      }
+    }
+  } catch (eTarifas) {
+    Logger.log("Aviso: no se pudo leer Tarifas para catálogo: " + eTarifas);
+  }
+
+  // 3. Diccionario oficial en memoria
+  if (typeof MAPA_HOMOLOGACION_PROVEEDORES === 'object') {
+    for (var k in MAPA_HOMOLOGACION_PROVEEDORES) {
+      var ofProv = MAPA_HOMOLOGACION_PROVEEDORES[k];
+      if (ofProv) provSet[ofProv] = true;
+    }
+  }
+
+  return provSet;
+}
+
+function getCatalogoProveedoresHttp(ss) {
+  try {
+    var provSet = obtenerCatalogoProveedoresCompleto(ss);
+    var sheetRec = ss.getSheetByName("Recolecciones");
+    if (sheetRec && sheetRec.getLastRow() > 1) {
+      var rData = sheetRec.getRange(2, 5, sheetRec.getLastRow() - 1, 1).getValues();
+      for (var ri = 0; ri < rData.length; ri++) {
+        var rp = homologarProveedor(rData[ri][0]);
+        if (rp) provSet[rp] = true;
+      }
+    }
+    var lista = Object.keys(provSet).sort(function(a, b) {
+      return a.localeCompare(b, 'es', { sensitivity: 'base' });
+    });
+    return ContentService.createTextOutput(JSON.stringify({ success: true, proveedores: lista }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString(), proveedores: [] }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 function homologarProveedor(nombreOriginal) {
+  if (!nombreOriginal) return "";
+  var raw = String(nombreOriginal).trim();
+  if (!raw) return "";
+  var key = raw.toUpperCase();
+  try {
+    key = key.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  } catch(e) {}
+  key = key.replace(/\s*-\s*/g, " - ").replace(/\s*\/\s*/g, " / ").replace(/\s+/g, " ").trim();
+
+  if (typeof MAPA_HOMOLOGACION_PROVEEDORES === 'object' && MAPA_HOMOLOGACION_PROVEEDORES[key]) {
+    return MAPA_HOMOLOGACION_PROVEEDORES[key];
+  }
+
   if (!nombreOriginal) return "";
   var raw = String(nombreOriginal).trim();
   if (!raw) return "";
