@@ -208,16 +208,16 @@ function doGet(e) {
       productos = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HARINA CARNE", "HUESO BLANCO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
     }
     if (conductores.length === 0) {
-      conductores = ["Ricardo Sepulveda", "Hernando Prado", "Emer Rodriguez", "Jairo Peña", "Carolina", "Luz Elena Lopez", "Francisco Larrahondo", "Daniela"];
+      conductores = ["Ricardo Sepulveda", "Hernando Prado", "Emer Rodriguez", "Jairo Peña", "Carolina Becerra", "Luz Elena Lopez", "Francisco Larrahondo", "Daniela Marquez"];
       conductoresDetalle = [
         { nombre: "Ricardo Sepulveda", clave: "1649" },
         { nombre: "Hernando Prado", clave: "8063" },
         { nombre: "Emer Rodriguez", clave: "6860" },
         { nombre: "Jairo Peña", clave: "5301" },
-        { nombre: "Carolina", clave: "1306" },
+        { nombre: "Carolina Becerra", clave: "1306" },
         { nombre: "Luz Elena Lopez", clave: "6700" },
         { nombre: "Francisco Larrahondo", clave: "1234" },
-        { nombre: "Daniela", clave: "1234" }
+        { nombre: "Daniela Marquez", clave: "3016" }
       ];
     }
     if (rutas.length === 0) {

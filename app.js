@@ -301,14 +301,16 @@ const DEFAULT_CONDUCTORES_AUTH = {
     "Hernando Prado": "8063",
     "Emer Rodriguez": "6860",
     "Jairo Peña": "5301",
+    "Carolina Becerra": "1306",
     "Carolina": "1306",
     "Carolina ": "1306",
     "Luz Elena Lopez": "6700",
     "Luz elena lopez": "6700",
     "Francisco Larrahondo": "1234",
     "francisco larrahondo": "1234",
-    "Daniela": "1234",
-    "Daniela ": "1234"
+    "Daniela Marquez": "3016",
+    "Daniela": "3016",
+    "Daniela ": "3016"
 };
 
 let CONDUCTORES_AUTH = Object.assign({}, DEFAULT_CONDUCTORES_AUTH);
@@ -324,11 +326,17 @@ try {
             // Limpiar claves dummy obsoletas ('1234') para conductores con contraseña oficial asignada
             Object.keys(parsed).forEach(k => {
                 const cleanKey = k.trim();
-                if (parsed[k] === '1234' && DEFAULT_CONDUCTORES_AUTH[cleanKey] && DEFAULT_CONDUCTORES_AUTH[cleanKey] !== '1234') {
+                if (cleanKey.toLowerCase() === 'daniela' || cleanKey.toLowerCase() === 'daniela marquez') {
+                    parsed[k] = '3016';
+                } else if (cleanKey.toLowerCase() === 'carolina' || cleanKey.toLowerCase() === 'carolina becerra') {
+                    parsed[k] = '1306';
+                } else if (parsed[k] === '1234' && DEFAULT_CONDUCTORES_AUTH[cleanKey] && DEFAULT_CONDUCTORES_AUTH[cleanKey] !== '1234') {
                     parsed[k] = DEFAULT_CONDUCTORES_AUTH[cleanKey];
                 }
             });
             CONDUCTORES_AUTH = Object.assign({}, DEFAULT_CONDUCTORES_AUTH, parsed);
+            if (CONDUCTORES_AUTH['Daniela Marquez']) CONDUCTORES_AUTH['Daniela'] = CONDUCTORES_AUTH['Daniela Marquez'];
+            if (CONDUCTORES_AUTH['Carolina Becerra']) CONDUCTORES_AUTH['Carolina'] = CONDUCTORES_AUTH['Carolina Becerra'];
         }
     }
     const cachedAdmin = localStorage.getItem('proteinagro_admin_clave');
@@ -950,10 +958,10 @@ const DEFAULT_CONDUCTORES = [
     "Hernando Prado",
     "Emer Rodriguez",
     "Jairo Peña",
-    "Carolina",
+    "Carolina Becerra",
     "Luz Elena Lopez",
     "Francisco Larrahondo",
-    "Daniela"
+    "Daniela Marquez"
 ];
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
@@ -1337,6 +1345,8 @@ async function sincronizarCredencialesDesdeGviz() {
                             if (nombre.trim() !== nombre) {
                                 CONDUCTORES_AUTH[nombre.trim()] = clave;
                             }
+                            if (nombre === 'Carolina Becerra') CONDUCTORES_AUTH['Carolina'] = clave;
+                            if (nombre === 'Daniela Marquez') CONDUCTORES_AUTH['Daniela'] = clave;
                         }
                     }
                 }
@@ -1504,11 +1514,10 @@ async function sincronizarCatalogosDesdeGviz() {
 }
 
 async function cargarCatalogosDinamicos() {
-    // Eliminar cachés obsoletas para garantizar sincronicidad 100% en vivo con Google Sheets
+    // Eliminar cachés temporales de catálogo si se requiere refresco
     try {
         localStorage.removeItem('proteinagro_catalogos_cache');
         localStorage.removeItem('proteinagro_rutas_config');
-        localStorage.removeItem('proteinagro_conductores_cache');
     } catch(e) {}
 
     // Sincronizar credenciales en vivo directamente desde Google Sheets Gviz
@@ -1589,8 +1598,25 @@ async function cargarCatalogosDinamicos() {
     // Garantizar credenciales oficiales por defecto
     CONDUCTORES_AUTH = Object.assign({}, DEFAULT_CONDUCTORES_AUTH, CONDUCTORES_AUTH);
 
+    // Determinar la lista de conductores más confiable (priorizar caché sincronizado sobre DEFAULT_CONDUCTORES)
+    let fallbackDrivers = DEFAULT_CONDUCTORES;
+    try {
+        const cachedDrivers = localStorage.getItem('proteinagro_conductores_cache');
+        if (cachedDrivers) {
+            const parsedDrivers = JSON.parse(cachedDrivers);
+            if (Array.isArray(parsedDrivers) && parsedDrivers.length > 0) {
+                fallbackDrivers = parsedDrivers.map(d => {
+                    const norm = aNombrePropio(d);
+                    if (norm.toLowerCase() === 'carolina') return 'Carolina Becerra';
+                    if (norm.toLowerCase() === 'daniela') return 'Daniela Marquez';
+                    return norm;
+                });
+            }
+        }
+    } catch(e) {}
+
     renderDynamicProducts(DEFAULT_PRODUCTOS);
-    renderDynamicDrivers(DEFAULT_CONDUCTORES);
+    renderDynamicDrivers(fallbackDrivers);
     renderDynamicRoutes(DEFAULT_RUTAS);
 }
 
@@ -3636,7 +3662,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.4&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.5&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -3994,7 +4020,21 @@ window.abrirModalEditarRecoleccion = function(docId, recordLocalId) {
     // 1. Popular Conductor
     const condSelect = document.getElementById('edit-conductor');
     condSelect.innerHTML = '';
-    const driversList = (typeof DEFAULT_CONDUCTORES !== 'undefined' ? DEFAULT_CONDUCTORES : []);
+    let driversList = (typeof DEFAULT_CONDUCTORES !== 'undefined' ? DEFAULT_CONDUCTORES : []);
+    try {
+        const cached = localStorage.getItem('proteinagro_conductores_cache');
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                driversList = parsed.map(d => {
+                    const norm = aNombrePropio(d);
+                    if (norm.toLowerCase() === 'carolina') return 'Carolina Becerra';
+                    if (norm.toLowerCase() === 'daniela') return 'Daniela Marquez';
+                    return norm;
+                });
+            }
+        }
+    } catch(e) {}
     driversList.forEach(d => {
         const cleanD = aNombrePropio(d);
         const opt = document.createElement('option');
@@ -4430,7 +4470,7 @@ function initAdminEditModal() {
 }
 
 // ==============================================================================
-// VERIFICAR SI YA EXISTE PESAJE / CARGA REGISTRADA HOY PARA UN PUNTO (v1.7.4)
+// VERIFICAR SI YA EXISTE PESAJE / CARGA REGISTRADA HOY PARA UN PUNTO (v1.7.5)
 // ==============================================================================
 function verificarPesajePrevioHoy(proveedor, punto) {
     try {
@@ -4932,7 +4972,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cachedDrivers) {
             const parsed = JSON.parse(cachedDrivers);
             if (Array.isArray(parsed) && parsed.length > 0) {
-                initialDrivers = parsed.map(d => aNombrePropio(d));
+                initialDrivers = parsed.map(d => {
+                    const norm = aNombrePropio(d);
+                    if (norm.toLowerCase() === 'carolina') return 'Carolina Becerra';
+                    if (norm.toLowerCase() === 'daniela') return 'Daniela Marquez';
+                    return norm;
+                });
             }
         }
     } catch(e) {}
@@ -4956,12 +5001,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.7.4 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.7.5 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.7.4')
+            navigator.serviceWorker.register('/sw.js?v=1.7.5')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.7.4 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.7.5 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -4969,8 +5014,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.7.4 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.4&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.7.5 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.5&t=' + Date.now();
                                 }
                             };
                         }
@@ -4999,7 +5044,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.4&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.5&t=' + Date.now();
             }
         });
 
@@ -5008,7 +5053,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.4&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.5&t=' + Date.now();
                 }
             }
         });

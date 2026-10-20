@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.7.4)  
+> **Última Actualización:** Octubre 2026 (Versión 1.7.5)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -225,6 +225,21 @@
   2. *Detección de IDs Existentes:* GViz extrae los más de 1.150 IDs únicos registrados en la hoja de cálculo.
   3. *Erradicación de Falsos Positivos:* Si un ID ya está en Google Sheets, se descarta de la lista de faltantes.
   4. *Prevención de Re-envíos Falsos:* Si ambas capas fallan (sin conexión), el sistema solo evalúa registros locales que estén explícitamente marcados como `Offline` o `sync_sheets: false`, y si todos están en orden, alerta que no es necesario re-sincronizar para proteger la hoja contra duplicados.
+
+### 17. Sincronización Oficial de Conductores y Blindaje Anti-Sobreescritura (`v1.7.5`)
+- **Problema Diagnosticado:**
+  En la aplicación móvil / TWA, los nombres de los conductores no coincidían con la pestaña `Conductores` de Google Sheets: aparecían "Carolina" y "Daniela" en lugar de sus nombres oficiales completos "Carolina Becerra" y "Daniela Marquez", y el PIN asignado a Daniela en la app no admitía el acceso con su contraseña oficial `3016`.
+- **Causa Raíz:**
+  1. *Truncamiento en Configuración Predeterminada:* `DEFAULT_CONDUCTORES` y `DEFAULT_CONDUCTORES_AUTH` en `app.js` y `Code.gs` contenían los nombres truncados `"Carolina"` y `"Daniela"`, y a Daniela se le asignaba la clave dummy `'1234'`.
+  2. *Sobreescritura Destructiva en Flujo de Inicio (`cargarCatalogosDinamicos`):* `sincronizarCredencialesDesdeGviz()` leía en vivo los 8 conductores con nombres completos desde Google Sheets vía GViz CSV y los renderizaba. Sin embargo, inmediatamente después, `cargarCatalogosDinamicos()` intentaba consultar el Webhook Apps Script (`GOOGLE_SHEETS_WEBHOOK_URL`). Al retornar HTML (`CONCILIADOR`) en peticiones GET, la función caía en el bloque de fallback y ejecutaba ciegamente `renderDynamicDrivers(DEFAULT_CONDUCTORES)`, sobreescribiendo los 8 conductores recién leídos con los nombres truncados heredados.
+  3. *Eliminación Innecesaria de Caché Offline:* La línea `localStorage.removeItem('proteinagro_conductores_cache')` purgaba la memoria local en cada inicio de la app, degradando la capacidad offline.
+  4. *Modal de Edición Administrativa:* `#edit-conductor` leía directamente `DEFAULT_CONDUCTORES` en lugar de la lista en memoria o sincronizada.
+- **Solución Implementada:**
+  1. *Alineación de Catálogo y Credenciales:* `DEFAULT_CONDUCTORES` actualizado a los 8 conductores oficiales de la hoja (`Ricardo Sepulveda`, `Hernando Prado`, `Emer Rodriguez`, `Jairo Peña`, `Carolina Becerra`, `Luz Elena Lopez`, `Francisco Larrahondo`, `Daniela Marquez`). `DEFAULT_CONDUCTORES_AUTH` mapea sus claves exactas (`1649`, `8063`, `6860`, `5301`, `1306`, `6700`, `1234`, `3016`) preservando alias para retrocompatibilidad total.
+  2. *Blindaje Anti-Sobreescritura:* En el fallback de `cargarCatalogosDinamicos()`, se prioriza la lista sincronizada en caché (`proteinagro_conductores_cache`) y `DEFAULT_CONDUCTORES` homologado, impidiendo que los selectores de conductores se degraden.
+  3. *Migración Proactiva de Caché Local:* Al cargar el DOM, si el almacenamiento local aún conserva `"Carolina"` o `"Daniela"`, se mapean de inmediato a `"Carolina Becerra"` y `"Daniela Marquez"` sin latencia, y las claves dummy `'1234'` se actualizan automáticamente al PIN oficial `3016`.
+  4. *Sincronización en Edición Administrativa:* `#edit-conductor` lee la fuente oficial sincronizada.
+  5. *Bumping Global a `v1.7.5` y Limpieza:* Parámetros de caché actualizados en `index.html`, `app.js` y `sw.js` para forzar la recarga transparente en todos los dispositivos móviles y navegadores.
 
 ---
 

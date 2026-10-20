@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.7.4`  
+> **Versión Actual:** `v=1.7.5`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -776,6 +776,22 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - Corrección de la URL de conexión en vivo con Google Sheets (GViz JSONP), erradicando el error de sintaxis `Uncaught SyntaxError: Unexpected identifier 'https'`.
   - Integración en el repositorio para trazabilidad completa.
 
+## 👥 21. Sincronización Oficial de Conductores y Blindaje Anti-Sobreescritura (`v1.7.5`)
+> **Fecha de Implementación:** Octubre 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`Code.gs`](./Code.gs), [`index.html`](./index.html), [`sw.js`](./sw.js), [`GEMINI.md`](./GEMINI.md)  
+> **Objetivo:** Alinear los 8 conductores oficiales de la hoja de cálculo `Conductores` de Google Sheets con la Progressive Web App / TWA, erradicar la sobreescritura con nombres obsoletos/truncados, sincronizar contraseñas oficiales (especialmente Daniela Marquez PIN 3016) y asegurar persistencia offline.
+
+- **Conformación Oficial de Conductores (Google Sheets):**
+  - `Ricardo Sepulveda` (PIN: `1649`)
+  - `Hernando Prado` (PIN: `8063`)
+  - `Emer Rodriguez` (PIN: `6860`)
+  - `Jairo Peña` (PIN: `5301`)
+  - `Carolina Becerra` (PIN: `1306`)
+  - `Luz Elena Lopez` (PIN: `6700`)
+  - `Francisco Larrahondo` (PIN: `1234`)
+  - `Daniela Marquez` (PIN: `3016`)
+- **Blindaje Anti-Sobreescritura:** Se neutralizó la condición en `cargarCatalogosDinamicos()` que al fallar la consulta al Webhook sobreescribía los selectores con valores truncados heredados.
+- **Migración Inmediata en Memoria Local:** Los clientes con versiones cacheadas antiguas migran instantáneamente a nombres propios completos y claves oficiales.
 ---
 
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
