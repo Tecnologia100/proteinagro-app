@@ -273,6 +273,7 @@ const CANONICOS_PROVEEDORES = {
     'loslagos': 'Los Lagos',
     'mercamio': 'Mercamio',
     'mercaunion': 'Mercaunión',
+    'megancapital': 'Migan Capital',
     'migancapital': 'Migan Capital',
     'miguelangelotero': 'Miguel Ángel Otero',
     'milsongonsalez': 'Milson González',
@@ -319,10 +320,20 @@ function homologarNombreProveedor(texto) {
     return formatearNombreTitulo(s);
 }
 
+const CANONICOS_PUNTOS = {
+    'lantanademorichal': 'La Montaña Morichal',
+    'lamontanamorichal': 'La Montaña Morichal',
+    'lamontanademorichal': 'La Montaña Morichal',
+    'ciudadeladelrio': 'Ciudadela del Río'
+};
+
 function homologarNombrePunto(texto) {
     if (!texto) return '';
     const s = String(texto).trim();
     if (!s) return '';
+    const norm = str => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const k = norm(s);
+    if (CANONICOS_PUNTOS[k]) return CANONICOS_PUNTOS[k];
     return formatearNombreTitulo(s);
 }
 
@@ -897,6 +908,47 @@ function homologarRuta(texto) {
     return s;
 }
 
+// ==============================================================================
+// SUB-RUTAS HERMANAS CON EL MISMO NÚMERO (Ruta 2 Norte / Sur) (v1.7.7)
+// Solo lógica cliente: NO altera los valores de ruta persistidos.
+// ==============================================================================
+function normalizarClaveRuta(texto) {
+    return String(texto || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+}
+
+// Retorna 'NORTE', 'SUR' o null. NORTE tiene prioridad porque la etiqueta histórica
+// "RUTA 2: Cali (Norte / Sur / Oriente juanchito)" corresponde a la Ruta 2 Norte.
+function getSubRuta(texto) {
+    if (!texto) return null;
+    const clean = String(texto).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    if (/\bNORTE\b/.test(clean)) return 'NORTE';
+    if (/\bSUR\b/.test(clean)) return 'SUR';
+    return null;
+}
+
+function getNumeroRuta(texto) {
+    const m = String(texto || '').match(/RUTA\s*(\d+)/i);
+    return m ? m[1] : null;
+}
+
+// Compara dos rutas respetando sub-rutas hermanas (mismo número, distinto Norte/Sur)
+function rutasCoinciden(a, b) {
+    const na = normalizarClaveRuta(a);
+    const nb = normalizarClaveRuta(b);
+    if (!na || !nb) return false;
+    if (na === nb) return true;
+    const numA = getNumeroRuta(a);
+    const numB = getNumeroRuta(b);
+    if (numA && numB) {
+        if (numA !== numB) return false;
+        const subA = getSubRuta(a);
+        const subB = getSubRuta(b);
+        if (subA && subB && subA !== subB) return false;
+        return true;
+    }
+    return na.includes(nb) || nb.includes(na);
+}
+
 // Formatea el valor mientras el conductor escribe en el campo #kilos conservando el cursor
 function formatKilosInputLive(inputEl) {
     if (!inputEl) return;
@@ -1008,6 +1060,7 @@ const DEFAULT_CONDUCTORES = [
 const DEFAULT_RUTAS = [
     "RUTA 1: Santa Elena / Cavasa",
     "RUTA 2: Cali (Norte / Centro / Sur / Oriente)",
+    "RUTA 2: Cali Sur / Oriente/ Juanchito)",
     "RUTA 3: Puerto Tejada / Villarica / Jamundí / Pance",
     "RUTA 4: Buga / Roldanillo / Zarzal / Tuluá",
     "RUTA 5: Palmira / Villagorgona / Carmelo",
@@ -1251,6 +1304,27 @@ function renderDynamicDrivers(drivers) {
     }
 }
 
+function obtenerEtiquetaRutaVisible(r, routes) {
+    const num = getNumeroRuta(r);
+    if (!num) return r;
+    const hermanas = Array.isArray(routes) ? routes.filter(x => getNumeroRuta(x) === num) : [];
+    if (hermanas.length < 2) return r;
+    const freqs = [];
+    if (Array.isArray(MATRIZ_PUNTOS_RUTAS) && MATRIZ_PUNTOS_RUTAS.length > 0) {
+        MATRIZ_PUNTOS_RUTAS.forEach(it => {
+            if (!it || it.estado === 'Inactivo') return;
+            if (rutasCoinciden(it.ruta, r) && it.frecuencia) {
+                const f = String(it.frecuencia).trim();
+                if (f && !freqs.includes(f)) freqs.push(f);
+            }
+        });
+    }
+    if (freqs.length > 0) {
+        return `${r}  ·  📅 ${freqs.join(' / ')}`;
+    }
+    return r;
+}
+
 function renderDynamicRoutes(routes) {
     const select = document.getElementById('ruta');
     if (!select) return;
@@ -1259,7 +1333,7 @@ function renderDynamicRoutes(routes) {
     routes.forEach(r => {
         const opt = document.createElement('option');
         opt.value = r;
-        opt.textContent = r;
+        opt.textContent = obtenerEtiquetaRutaVisible(r, routes);
         select.appendChild(opt);
     });
     const optOtra = document.createElement('option');
@@ -1325,7 +1399,16 @@ function procesarPuntosRutasDinamicos(puntosArray) {
         }
     });
 
-    const activeRuta = document.getElementById('ruta')?.value || '';
+    const selectRutaEl = document.getElementById('ruta');
+    if (selectRutaEl && selectRutaEl.options.length > 0) {
+        const currentRoutes = Array.from(selectRutaEl.options).map(o => o.value).filter(v => v && v !== 'OTRA');
+        Array.from(selectRutaEl.options).forEach(opt => {
+            if (opt.value && opt.value !== 'OTRA') {
+                opt.textContent = obtenerEtiquetaRutaVisible(opt.value, currentRoutes);
+            }
+        });
+    }
+    const activeRuta = selectRutaEl?.value || '';
     populardropdownProveedoresPorRuta(activeRuta);
     const activeProv = document.getElementById('proveedor')?.value || '';
     if (activeProv && activeProv !== 'OTRO' && activeProv !== 'TODOS') {
@@ -1535,20 +1618,15 @@ async function sincronizarCatalogosDesdeGviz() {
                 const csvRutas = await resRutas.text();
                 const lines = csvRutas.split(/\r?\n/).filter(l => l.trim().length > 0);
                 const gvizRutas = [];
-                const seenRutaNums = new Set();
+                const seenRutaKeys = new Set();
                 for (let i = 1; i < lines.length; i++) {
                     const row = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
                     const rName = row[0];
                     const rEstado = (row[1] || 'Activo').toLowerCase();
                     if (rName && rEstado !== 'inactivo') {
-                        const rMatch = rName.match(/RUTA\s*(\d+)/i);
-                        const rNum = rMatch ? rMatch[1] : null;
-                        if (rNum) {
-                            if (!seenRutaNums.has(rNum)) {
-                                seenRutaNums.add(rNum);
-                                gvizRutas.push(rName);
-                            }
-                        } else if (!gvizRutas.includes(rName)) {
+                        const rKey = normalizarClaveRuta(rName);
+                        if (rKey && !seenRutaKeys.has(rKey)) {
+                            seenRutaKeys.add(rKey);
                             gvizRutas.push(rName);
                         }
                     }
@@ -3254,63 +3332,72 @@ function getPuntosParaProveedor(rutaSeleccionada, proveedorSeleccionado) {
     const matchNum = rutaSeleccionada ? rutaSeleccionada.match(/RUTA\s*(\d+)/i) : null;
     const rutaNum = matchNum ? matchNum[1] : null;
 
-    const puntosEncontrados = [];
-
-    const rutaCoincide = (itRutaStr) => {
+    const rutaCoincideExacta = (itRutaStr) => {
         if (!normRuta || normRuta === 'otra') return true;
-        const itRuta = cleanStr(itRutaStr);
-        if (itRuta === normRuta || normRuta.includes(itRuta) || itRuta.includes(normRuta)) return true;
-        if (rutaNum) {
-            const itNumMatch = (itRutaStr || '').match(/RUTA\s*(\d+)/i);
-            if (itNumMatch && itNumMatch[1] === rutaNum) return true;
-        }
-        return false;
+        return rutasCoinciden(itRutaStr, rutaSeleccionada);
+    };
+
+    const rutaCoincideHermana = (itRutaStr) => {
+        if (!normRuta || normRuta === 'otra' || !rutaNum) return false;
+        return !rutaCoincideExacta(itRutaStr) && getNumeroRuta(itRutaStr) === rutaNum;
     };
 
     // 1. Buscar en la matriz consolidada de Google Sheets
     if (Array.isArray(MATRIZ_PUNTOS_RUTAS) && MATRIZ_PUNTOS_RUTAS.length > 0) {
-        // Pase 1: Coincidencia EXACTA del nombre del proveedor en la ruta seleccionada
+        const puntosSubRuta = [];
+        const puntosHermana = [];
+
+        // Pase 1: Coincidencia EXACTA del nombre del proveedor en la sub-ruta seleccionada (y hermanas del mismo número después)
+        for (const it of MATRIZ_PUNTOS_RUTAS) {
+            if (it.estado === 'Inactivo') continue;
+            const itProv = cleanStr(it.proveedor);
+            const itPunto = (it.punto || '').trim();
+            if (!itPunto || itProv !== normProv) continue;
+
+            if (rutaCoincideExacta(it.ruta)) {
+                if (!puntosSubRuta.includes(itPunto)) puntosSubRuta.push(itPunto);
+            } else if (rutaCoincideHermana(it.ruta)) {
+                if (!puntosHermana.includes(itPunto)) puntosHermana.push(itPunto);
+            }
+        }
+
+        // Pase 2: Coincidencia flexible (substring) si no hubo exacta en la ruta
+        if (puntosSubRuta.length === 0 && puntosHermana.length === 0) {
+            for (const it of MATRIZ_PUNTOS_RUTAS) {
+                if (it.estado === 'Inactivo') continue;
+                const itProv = cleanStr(it.proveedor);
+                const itPunto = (it.punto || '').trim();
+                if (!itPunto || !(itProv.includes(normProv) || normProv.includes(itProv))) continue;
+
+                if (rutaCoincideExacta(it.ruta)) {
+                    if (!puntosSubRuta.includes(itPunto)) puntosSubRuta.push(itPunto);
+                } else if (rutaCoincideHermana(it.ruta)) {
+                    if (!puntosHermana.includes(itPunto)) puntosHermana.push(itPunto);
+                }
+            }
+        }
+
+        if (puntosSubRuta.length > 0 || puntosHermana.length > 0) {
+            puntosSubRuta.sort((a, b) => a.localeCompare(b));
+            const extrasHermana = puntosHermana.filter(p => !puntosSubRuta.includes(p)).sort((a, b) => a.localeCompare(b));
+            return [...puntosSubRuta, ...extrasHermana];
+        }
+
+        // Pase 3: Fallback si el proveedor está registrado en la matriz pero en otra ruta
+        const puntosFallback = [];
         for (const it of MATRIZ_PUNTOS_RUTAS) {
             if (it.estado === 'Inactivo') continue;
             const itProv = cleanStr(it.proveedor);
             const itPunto = (it.punto || '').trim();
             if (!itPunto) continue;
 
-            if (rutaCoincide(it.ruta) && itProv === normProv) {
-                if (!puntosEncontrados.includes(itPunto)) puntosEncontrados.push(itPunto);
+            if (itProv === normProv || itProv.includes(normProv) || normProv.includes(itProv)) {
+                if (!puntosFallback.includes(itPunto)) puntosFallback.push(itPunto);
             }
         }
 
-        // Pase 2: Coincidencia flexible (substring) si no hubo exacta en la ruta
-        if (puntosEncontrados.length === 0) {
-            for (const it of MATRIZ_PUNTOS_RUTAS) {
-                if (it.estado === 'Inactivo') continue;
-                const itProv = cleanStr(it.proveedor);
-                const itPunto = (it.punto || '').trim();
-                if (!itPunto) continue;
-
-                if (rutaCoincide(it.ruta) && (itProv.includes(normProv) || normProv.includes(itProv))) {
-                    if (!puntosEncontrados.includes(itPunto)) puntosEncontrados.push(itPunto);
-                }
-            }
-        }
-
-        // Pase 3: Fallback si el proveedor está registrado en la matriz pero en otra ruta
-        if (puntosEncontrados.length === 0) {
-            for (const it of MATRIZ_PUNTOS_RUTAS) {
-                if (it.estado === 'Inactivo') continue;
-                const itProv = cleanStr(it.proveedor);
-                const itPunto = (it.punto || '').trim();
-                if (!itPunto) continue;
-
-                if (itProv === normProv || itProv.includes(normProv) || normProv.includes(itProv)) {
-                    if (!puntosEncontrados.includes(itPunto)) puntosEncontrados.push(itPunto);
-                }
-            }
-        }
-
-        if (puntosEncontrados.length > 0) {
-            return puntosEncontrados.sort((a, b) => a.localeCompare(b));
+        if (puntosFallback.length > 0) {
+            return puntosFallback.sort((a, b) => a.localeCompare(b));
         }
     }
 
@@ -3335,11 +3422,15 @@ function getPuntosParaRuta(rutaSeleccionada) {
     const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
     const normSelected = cleanStr(rutaSeleccionada);
 
-    // 2. Coincidencia normalizada
+    // 2. Coincidencia normalizada o de sub-ruta específica (rutasCoinciden)
+    let porSubRuta = [];
     for (const key in PUNTOS_POR_RUTA) {
-        if (cleanStr(key) === normSelected && PUNTOS_POR_RUTA[key].length > 0) {
-            return PUNTOS_POR_RUTA[key];
+        if ((cleanStr(key) === normSelected || rutasCoinciden(key, rutaSeleccionada)) && PUNTOS_POR_RUTA[key].length > 0) {
+            porSubRuta = porSubRuta.concat(PUNTOS_POR_RUTA[key]);
         }
+    }
+    if (porSubRuta.length > 0) {
+        return Array.from(new Set(porSubRuta));
     }
 
     // 3. Coincidencia flexible por número de ruta (ej: "RUTA 1", "RUTA 2", "RUTA 3", etc.)
@@ -3416,23 +3507,13 @@ function getProveedoresParaRuta(rutaSeleccionada) {
         return getTodosLosProveedores();
     }
 
-    const cleanStr = str => (str || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
-    const normSelected = cleanStr(rutaSeleccionada);
-    const matchNum = rutaSeleccionada.match(/RUTA\s*(\d+)/i);
-    const num = matchNum ? matchNum[1] : null;
-
     const provsSet = new Set();
 
-    // 1. Si MATRIZ_PUNTOS_RUTAS está disponible, extraer directamente los proveedores únicos de esa ruta
+    // 1. Si MATRIZ_PUNTOS_RUTAS está disponible, extraer directamente los proveedores únicos de esa ruta (respetando sub-rutas Norte/Sur)
     if (Array.isArray(MATRIZ_PUNTOS_RUTAS) && MATRIZ_PUNTOS_RUTAS.length > 0) {
         MATRIZ_PUNTOS_RUTAS.forEach(it => {
             if (it.estado === 'Inactivo') return;
-            const itRuta = cleanStr(it.ruta);
-            let coincide = (itRuta === normSelected) || normSelected.includes(itRuta) || itRuta.includes(normSelected);
-            if (!coincide && num) {
-                const itNumMatch = (it.ruta || '').match(/RUTA\s*(\d+)/i);
-                if (itNumMatch && itNumMatch[1] === num) coincide = true;
-            }
+            const coincide = rutasCoinciden(it.ruta, rutaSeleccionada);
             if (coincide && it.proveedor && it.proveedor.trim() !== '' && it.proveedor !== 'PROVEEDOR GENERAL') {
                 provsSet.add(it.proveedor.trim());
             }
@@ -3442,11 +3523,7 @@ function getProveedoresParaRuta(rutaSeleccionada) {
     // 2. Fallback con PROVEEDORES_POR_RUTA si no se encontraron en MATRIZ
     if (provsSet.size === 0) {
         for (const key in PROVEEDORES_POR_RUTA) {
-            const normKey = cleanStr(key);
-            const keyNumMatch = key.match(/RUTA\s*(\d+)/i);
-            const keyNum = keyNumMatch ? keyNumMatch[1] : null;
-
-            if (normKey === normSelected || (num && keyNum === num) || normKey.includes(normSelected) || normSelected.includes(normKey)) {
+            if (rutasCoinciden(key, rutaSeleccionada)) {
                 (PROVEEDORES_POR_RUTA[key] || []).forEach(pr => provsSet.add(pr));
             }
         }
@@ -5338,7 +5415,7 @@ function actualizarSelectRutasCierre() {
     rutasUnicas.forEach(r => {
         const opt = document.createElement('option');
         opt.value = r;
-        opt.textContent = r;
+        opt.textContent = obtenerEtiquetaRutaVisible(r, rutasUnicas);
         rutaSelect.appendChild(opt);
     });
     
@@ -5384,12 +5461,93 @@ async function generarCierreDiarioAdmin() {
     btn.innerHTML = 'Auditando...';
 
     try {
-        // Helper para normalizar texto (sin tildes, minúsculas, sin espacios extra)
-        const normTexto = (t) => String(t || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        // Helper para normalizar texto (sin tildes, minúsculas, sin espacios/símbolos extra)
+        const normTexto = (t) => String(t || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const normProv = (t) => normTexto(typeof homologarNombreProveedor === 'function' ? homologarNombreProveedor(t) : t);
+        const normPunt = (t) => normTexto(typeof homologarNombrePunto === 'function' ? homologarNombrePunto(t) : t);
 
         // Extraer componentes numéricos de la fecha seleccionada (YYYY-MM-DD)
         const [targetYear, targetMonth, targetDay] = fechaStr.split('-').map(Number);
         const rutaHomologadaBuscada = typeof homologarRuta === 'function' ? homologarRuta(rutaStr) : rutaStr;
+
+        // Determinar día de la semana correspondiente a la fecha evaluada (12:00 mediodía para evitar desfases UTC)
+        const fechaObj = new Date(targetYear, targetMonth - 1, targetDay, 12, 0, 0);
+        const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const diaSemanaIndex = fechaObj.getDay();
+        const diaSemanaNombre = diasSemana[diaSemanaIndex];
+
+        // Detectar si la ruta evaluada pertenece a una familia con sub-rutas hermanas (ej. Ruta 2 Norte / Sur)
+        const numBuscado = getNumeroRuta(rutaStr);
+        const subBuscada = getSubRuta(rutaStr);
+        const subRutasEnMatriz = new Set();
+        if (numBuscado && Array.isArray(MATRIZ_PUNTOS_RUTAS)) {
+            MATRIZ_PUNTOS_RUTAS.forEach(p => {
+                if (!p || (p.estado || 'Activo').toLowerCase() === 'inactivo') return;
+                if (getNumeroRuta(p.ruta) === numBuscado) {
+                    const sr = getSubRuta(p.ruta);
+                    if (sr) subRutasEnMatriz.add(sr);
+                }
+            });
+        }
+        const tieneSubRutasHermanas = Boolean(numBuscado && subBuscada && subRutasEnMatriz.size > 1);
+
+        // Evalúa si un registro de recolección pertenece a la ruta (o sub-ruta) auditada
+        const registroPerteneceARutaCierre = (rutaRegistro, proveedor, sucursal) => {
+            if (!tieneSubRutasHermanas) {
+                return (rutaRegistro === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(rutaRegistro) === rutaHomologadaBuscada));
+            }
+            const numReg = getNumeroRuta(rutaRegistro) || getNumeroRuta(typeof homologarRuta === 'function' ? homologarRuta(rutaRegistro) : '');
+            if (numReg !== numBuscado) return false;
+
+            const subReg = getSubRuta(rutaRegistro);
+            if (subReg === 'SUR') {
+                return subBuscada === 'SUR';
+            }
+
+            // Si viene con la etiqueta histórica/ambigua (ej. "RUTA 2: Cali (Norte / Sur / Oriente juanchito)"),
+            // atribuir según el catálogo oficial de Puntos_Rutas para no alterar los registros históricos
+            const provR = normProv(proveedor);
+            const puntR = normPunt(sucursal);
+            const puntosCoincidentes = (MATRIZ_PUNTOS_RUTAS || []).filter(p => {
+                if (!p || (p.estado || 'Activo').toLowerCase() === 'inactivo') return false;
+                if (getNumeroRuta(p.ruta) !== numBuscado) return false;
+                const provP = normProv(p.proveedor);
+                const puntP = normPunt(p.punto);
+                const matchProv = (provR && provP && (provR === provP || provR.includes(provP) || provP.includes(provR)));
+                const matchPunt = (puntR && puntP && (puntR === puntP || puntR.includes(puntP) || puntP.includes(puntR)));
+                return matchProv && matchPunt;
+            });
+
+            const subRutasDelPunto = new Set(puntosCoincidentes.map(p => getSubRuta(p.ruta)).filter(Boolean));
+            if (subRutasDelPunto.size === 1) {
+                return subRutasDelPunto.has(subBuscada);
+            }
+
+            // Si el punto existe en ambas sub-rutas (ej. Ciudad del Campo) o en ninguna, desempatar por día programado
+            if (puntosCoincidentes.length > 0) {
+                const subRutasDelDia = new Set(
+                    puntosCoincidentes
+                        .filter(p => puntoAplicaParaDia(p.frecuencia, diaSemanaIndex))
+                        .map(p => getSubRuta(p.ruta))
+                        .filter(Boolean)
+                );
+                if (subRutasDelDia.size === 1) {
+                    return subRutasDelDia.has(subBuscada);
+                }
+            }
+
+            const subRutasProgramadasHoy = new Set(
+                (MATRIZ_PUNTOS_RUTAS || [])
+                    .filter(p => p && (p.estado || 'Activo').toLowerCase() !== 'inactivo' && getNumeroRuta(p.ruta) === numBuscado && puntoAplicaParaDia(p.frecuencia, diaSemanaIndex))
+                    .map(p => getSubRuta(p.ruta))
+                    .filter(Boolean)
+            );
+            if (subRutasProgramadasHoy.size === 1) {
+                return subRutasProgramadasHoy.has(subBuscada);
+            }
+
+            return subReg ? (subReg === subBuscada) : true;
+        };
 
         let recoleccionesDelDia = [];
         let fuenteDatos = '';
@@ -5435,7 +5593,7 @@ async function generarCierreDiarioAdmin() {
                     const jsonRes = await resW.json();
                     if (jsonRes && jsonRes.result === 'success' && Array.isArray(jsonRes.recolecciones)) {
                         jsonRes.recolecciones.forEach(r => {
-                            const matchRuta = (r.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(r.ruta) === rutaHomologadaBuscada));
+                            const matchRuta = registroPerteneceARutaCierre(r.ruta, r.proveedor, r.sucursal || r.punto);
                             if (matchRuta) {
                                 recoleccionesDelDia.push({
                                     proveedor: r.proveedor || '',
@@ -5495,7 +5653,7 @@ async function generarCierreDiarioAdmin() {
                             const ruta = cols[2] || '';
                             
                             const matchFecha = coincideFecha(fechaHora);
-                            const matchRuta = (ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(ruta) === rutaHomologadaBuscada));
+                            const matchRuta = matchFecha && registroPerteneceARutaCierre(ruta, cols[4] || '', cols[5] || '');
                             
                             if (matchFecha && matchRuta) {
                                 recoleccionesDelDia.push({
@@ -5538,7 +5696,7 @@ async function generarCierreDiarioAdmin() {
 
                 sourceRecords.forEach(data => {
                     const matchFecha = coincideFecha(data.fecha || '');
-                    const matchRuta = (data.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(data.ruta) === rutaHomologadaBuscada));
+                    const matchRuta = matchFecha && registroPerteneceARutaCierre(data.ruta, data.proveedor, data.sucursal || data.punto);
 
                     if (matchFecha && matchRuta) {
                         recoleccionesDelDia.push({
@@ -5579,7 +5737,7 @@ async function generarCierreDiarioAdmin() {
                 localBackup.forEach(data => {
                     if (!data) return;
                     const matchFecha = coincideFecha(data.fecha || '');
-                    const matchRuta = (data.ruta === rutaStr || (typeof homologarRuta === 'function' && homologarRuta(data.ruta) === rutaHomologadaBuscada));
+                    const matchRuta = matchFecha && registroPerteneceARutaCierre(data.ruta, data.proveedor, data.sucursal || '');
 
                     if (matchFecha && matchRuta) {
                         recoleccionesDelDia.push({
@@ -5622,12 +5780,6 @@ async function generarCierreDiarioAdmin() {
             badgeFuente.style.color = badgeColor.text;
         }
 
-        // Determinar día de la semana correspondiente a la fecha evaluada (12:00 mediodía para evitar desfases UTC)
-        const fechaObj = new Date(targetYear, targetMonth - 1, targetDay, 12, 0, 0);
-        const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-        const diaSemanaIndex = fechaObj.getDay();
-        const diaSemanaNombre = diasSemana[diaSemanaIndex];
-
         // Actualizar píldora visual del día evaluado
         const diaPill = document.getElementById('cierre-dia-semana-pill');
         if (diaPill) {
@@ -5640,10 +5792,10 @@ async function generarCierreDiarioAdmin() {
         // Helper para comprobar si un punto del catálogo tuvo registros reales en campo hoy
         const puntoTieneVisitaHoy = (puntoInfo) => {
             return recoleccionesDelDia.some(r => {
-                const provR = normTexto(r.proveedor);
-                const provP = normTexto(puntoInfo.proveedor);
-                const puntR = normTexto(r.sucursal);
-                const puntP = normTexto(puntoInfo.punto);
+                const provR = normProv(r.proveedor);
+                const provP = normProv(puntoInfo.proveedor);
+                const puntR = normPunt(r.sucursal);
+                const puntP = normPunt(puntoInfo.punto);
 
                 const matchProv = (provR === provP || provR.includes(provP) || provP.includes(provR));
                 const matchPunt = (puntR === puntP || puntR.includes(puntP) || puntP.includes(puntR));
@@ -5669,18 +5821,18 @@ async function generarCierreDiarioAdmin() {
         // Incluir cualquier visita registrada en campo que no esté en la matriz oficial de puntos
         recoleccionesDelDia.forEach(r => {
             const yaEnLista = puntosAsignados.some(p => {
-                const provR = normTexto(r.proveedor);
-                const provP = normTexto(p.proveedor);
-                const puntR = normTexto(r.sucursal);
-                const puntP = normTexto(p.punto);
+                const provR = normProv(r.proveedor);
+                const provP = normProv(p.proveedor);
+                const puntR = normPunt(r.sucursal);
+                const puntP = normPunt(p.punto);
                 return (provR === provP || provR.includes(provP) || provP.includes(provR)) &&
                        (puntR === puntP || puntR.includes(puntP) || puntP.includes(puntR));
             });
             if (!yaEnLista) {
                 puntosAsignados.push({
                     ruta: r.ruta || rutaStr,
-                    proveedor: r.proveedor,
-                    punto: r.sucursal,
+                    proveedor: typeof homologarNombreProveedor === 'function' ? homologarNombreProveedor(r.proveedor) : r.proveedor,
+                    punto: typeof homologarNombrePunto === 'function' ? homologarNombrePunto(r.sucursal) : r.sucursal,
                     frecuencia: 'Visita Extra',
                     estado: 'Activo',
                     esAdicional: true
@@ -5701,10 +5853,10 @@ async function generarCierreDiarioAdmin() {
             puntosAsignados.forEach(puntoInfo => {
                 // Buscar si este punto tiene registros HOY con coincidencia flexible
                 const registrosVisita = recoleccionesDelDia.filter(r => {
-                    const provR = normTexto(r.proveedor);
-                    const provP = normTexto(puntoInfo.proveedor);
-                    const puntR = normTexto(r.sucursal);
-                    const puntP = normTexto(puntoInfo.punto);
+                    const provR = normProv(r.proveedor);
+                    const provP = normProv(puntoInfo.proveedor);
+                    const puntR = normPunt(r.sucursal);
+                    const puntP = normPunt(puntoInfo.punto);
 
                     const matchProv = (provR === provP || provR.includes(provP) || provP.includes(provR));
                     const matchPunt = (puntR === puntP || puntR.includes(puntP) || puntP.includes(puntR));

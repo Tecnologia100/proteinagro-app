@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.7.5`  
+> **Versión Actual:** `v=1.7.7`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -803,6 +803,20 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - `🏬 OTROS PROVEEDORES DEL CATÁLOGO (N)`: Despliega alfabéticamente todos los demás proveedores del sistema, permitiendo registrar paradas adicionales o imprevistas sin fricción.
 - **Backend Robusto (`Code.gs`):** Endpoint `getCatalogoProveedores` que consolida las pestañas `Puntos_Rutas`, `Tarifas` y el histórico de `Recolecciones`.
 - **Caché y Conciliador:** Integración de `recolecciones_cache.js` en `CONCILIADOR.html` para optimizar consultas de auditoría.
+
+## 🧭 23. Separación Operativa y Auditoría Retrocompatible de Sub-Rutas Hermanas: Ruta 2 Norte vs. Sur (`v1.7.7`)
+> **Fecha de Implementación:** 21 de Octubre de 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`index.html`](./index.html), [`sw.js`](./sw.js), [`GEMINI.md`](./GEMINI.md)  
+> **Objetivo:** Habilitar la coexistencia en vivo de las dos variantes operativas de Ruta 2 (`Norte / Centro` de los Viernes y `Sur / Oriente` de los Martes) en el selector del conductor y en el Cierre Diario sin modificar ningún registro histórico de Google Sheets ni Firestore.
+
+- **Deduplicación por Clave Completa (`seenRutaKeys`):**
+  - Se reemplazó el filtro numérico `seenRutaNums` en `sincronizarCatalogosDesdeGviz` por normalización de nombre completo (`normalizarClaveRuta`), permitiendo cargar las **9 rutas activas** de la pestaña `Rutas` e incluyendo en el selector del conductor tanto Ruta 2 Norte (`·  📅 Viernes`) como Ruta 2 Sur (`·  📅 Martes`).
+- **Filtrado Inteligente de Proveedores y Sucursales (`rutasCoinciden`):**
+  - Al seleccionar Ruta 2 Sur, el grupo `📍 EN TU RUTA PROGRAMADA` despliega los 10 proveedores del Sur; al seleccionar Ruta 2 Norte, los 10 del Norte.
+  - En el selector de sucursales (`getPuntosParaProveedor`), aparecen primero los puntos de la sub-ruta elegida seguidos de los de la sub-ruta hermana sin duplicados.
+- **Atribución Retrocompatible en Cierre Diario (`registroPerteneceARutaCierre`):**
+  - Para registros históricos guardados con la etiqueta ambigua `"RUTA 2: Cali (Norte / Sur / Oriente juanchito)"`, las 4 capas del Cierre Diario (Webhook, GViz CSV, Firestore y LocalStorage) atribuyen automáticamente cada recolección a Norte o Sur cruzando el par `(proveedor, sucursal)` contra `MATRIZ_PUNTOS_RUTAS` y desempatando puntos compartidos (*Ciudad del Campo*) según la frecuencia del día auditado.
+  - Validado con las 24 transacciones del Martes 20/10/2026 de Emer Rodríguez (**1.675,20 Kg**, **12 / 17 puntos cubiertos = 71%**).
 ---
 ---
 

@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.7.5)  
+> **Última Actualización:** Octubre 2026 (Versión 1.7.7)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -252,6 +252,22 @@
   - Implementación de `obtenerCatalogoProveedoresCompleto(ss)` y endpoint `action=getCatalogoProveedores` que consolida en tiempo real los proveedores desde `Puntos_Rutas`, `Tarifas` y el histórico de `Recolecciones`, garantizando que ningún proveedor activo quede excluido.
 - **Soporte Offline y Conciliador:**
   - Soporte integrado en `CONCILIADOR.html` mediante `recolecciones_cache.js` para acelerar las auditorías masivas sin saturar las cuotas de red.
+
+### 19. Separación Operativa y Auditoría Retrocompatible de Sub-Rutas Hermanas: Ruta 2 Norte vs. Sur (`v1.7.7`)
+- **Problema Diagnosticado (Incidente Martes 20/10/2026):**
+  - El conductor **Emer Rodríguez** ejecutó la **Ruta 2 Sur** recolectando **1.675,20 Kg** en **24 transacciones** (12 de 17 puntos visitados, 70,6% de cobertura real).
+  - Sin embargo, en el selector `<select id="ruta">` del conductor solo aparecía una opción de Ruta 2 (`"RUTA 2: Cali (Norte / Sur / Oriente juanchito)"`), porque `sincronizarCatalogosDesdeGviz` deduplicaba por número de ruta (`seenRutaNums.has("2")`) y descartaba silenciosamente la segunda fila (`"RUTA 2: Cali Sur / Oriente/ Juanchito)"`).
+  - Al guardarse las 24 recolecciones bajo la etiqueta del Norte, el Cierre Diario para `"Ruta 2: Cali Sur / Oriente/ Juanchito)"` reportaba falsamente **0 recolecciones y 0% de cobertura (17 puntos en rojo)**.
+- **Solución Quirúrgica 100% Retrocompatible (Sin Alterar Datos en Sheets/Firestore):**
+  1. *Deduplicación por Clave Completa (`seenRutaKeys`):* En `sincronizarCatalogosDesdeGviz()`, se reemplazó `seenRutaNums` por `normalizarClaveRuta(rName)`, permitiendo que coexistan todas las sub-rutas activas con el mismo número (**9 rutas activas** en total, incluyendo Ruta 2 Norte y Ruta 2 Sur).
+  2. *Identificación Visual de Día en Selector (`obtenerEtiquetaRutaVisible`):* `renderDynamicRoutes()` conserva `option.value` idéntico al valor oficial de la hoja, pero añade en `option.textContent` el sufijo de programación (`·  📅 Viernes` para Ruta 2 Norte y `·  📅 Martes` para Ruta 2 Sur).
+  3. *Segregación de Proveedores y Puntos por Sub-Ruta (`rutasCoinciden`, `getSubRuta`, `getNumeroRuta`):*
+     - Al elegir Ruta 2 Sur, el grupo `📍 EN TU RUTA PROGRAMADA` lista únicamente los 10 proveedores del Sur (y al elegir Norte, los 10 del Norte).
+     - `getPuntosParaProveedor` prioriza en primer lugar las sucursales de la sub-ruta elegida y muestra a continuación las de la sub-ruta hermana sin duplicados.
+  4. *Atribución Inteligente en Cierre Diario (`registroPerteneceARutaCierre` en las 4 Capas):*
+     - Cuando una ruta tiene sub-rutas hermanas (Ruta 2 Norte/Sur) y el registro histórico viene con la etiqueta ambigua `"RUTA 2: Cali (Norte / Sur / Oriente juanchito)"`, el motor de Cierre Diario atribuye el registro a `NORTE` o `SUR` según el catálogo `MATRIZ_PUNTOS_RUTAS` del par `(proveedor, sucursal)` y, para puntos compartidos (*Ciudad del Campo*), desempata por la frecuencia del día auditado (`Martes` ➔ Sur, `Viernes` ➔ Norte).
+     - Incluye homologación canónica tolerante para digitaciones manuales (`Megan Capital` ➔ `Migan Capital`, `Lantaña De Morichal` ➔ `La Montaña Morichal`, `Ciudadela Delrio` ➔ `Ciudadela del Río`).
+  5. *Resultado Verificado en Vivo (20/10/2026):* Ruta 2 Sur audita **24 transacciones (1.675,20 Kg)** de Emer Rodríguez con **12 / 17 puntos cubiertos (71%)**, mientras Ruta 2 Norte aisla las **2 transacciones (228,40 Kg)** de Carolina Becerra en `La Montaña Av. 6A`, sin alterar ni una sola celda de Google Sheets.
 
 ---
 
