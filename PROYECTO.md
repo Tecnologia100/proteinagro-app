@@ -792,6 +792,18 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - `Daniela Marquez` (PIN: `3016`)
 - **Blindaje Anti-Sobreescritura:** Se neutralizó la condición en `cargarCatalogosDinamicos()` que al fallar la consulta al Webhook sobreescribía los selectores con valores truncados heredados.
 - **Migración Inmediata en Memoria Local:** Los clientes con versiones cacheadas antiguas migran instantáneamente a nombres propios completos y claves oficiales.
+
+## 🏬 22. Desacoplamiento de Proveedores con Agrupación Optgroup y Catálogo Maestro (`v1.7.6`)
+> **Fecha de Implementación:** Octubre 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`Code.gs`](./Code.gs), [`CONCILIADOR.html`](./CONCILIADOR.html), [`sw.js`](./sw.js), [`GEMINI.md`](./GEMINI.md)  
+> **Objetivo:** Permitir a los conductores registrar recolecciones de cualquier proveedor del catálogo sin las restricciones rígidas de la ruta seleccionada, organizando la interfaz con grupos visuales `<optgroup>` y sincronizando un catálogo maestro unificado.
+
+- **Agrupación Inteligente en el Selector (`#proveedor`):**
+  - `📍 EN TU RUTA PROGRAMADA (N)`: Prioriza con una estrella (`⭐`) los puntos que corresponden al itinerario del día.
+  - `🏬 OTROS PROVEEDORES DEL CATÁLOGO (N)`: Despliega alfabéticamente todos los demás proveedores del sistema, permitiendo registrar paradas adicionales o imprevistas sin fricción.
+- **Backend Robusto (`Code.gs`):** Endpoint `getCatalogoProveedores` que consolida las pestañas `Puntos_Rutas`, `Tarifas` y el histórico de `Recolecciones`.
+- **Caché y Conciliador:** Integración de `recolecciones_cache.js` en `CONCILIADOR.html` para optimizar consultas de auditoría.
+---
 ---
 
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*

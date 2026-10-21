@@ -241,6 +241,18 @@
   4. *Sincronización en Edición Administrativa:* `#edit-conductor` lee la fuente oficial sincronizada.
   5. *Bumping Global a `v1.7.5` y Limpieza:* Parámetros de caché actualizados en `index.html`, `app.js` y `sw.js` para forzar la recarga transparente en todos los dispositivos móviles y navegadores.
 
+### 18. Desacoplamiento de Proveedores con Agrupación Optgroup y Catálogo Maestro (`v1.7.6`)
+- **Problema Operativo Resuelto:**
+  - En la aplicación móvil / TWA, al seleccionar una ruta el menú desplegable de proveedores se restringía exclusivamente a los puntos de esa ruta específica. Si un conductor realizaba un servicio imprevisto o adicional en un punto fuera de su itinerario, el formulario le impedía registrarlo o lo forzaba a seleccionar `"OTRO"`.
+- **Solución de Experiencia de Usuario (Agrupación `<optgroup>`):**
+  - El selector de proveedores `#proveedor` ahora organiza dinámicamente las opciones en dos grupos jerárquicos:
+    1. `📍 EN TU RUTA PROGRAMADA (N)`: Marcados con estrella (`⭐`), aparecen en primer lugar para facilitar el registro de las paradas planificadas del día.
+    2. `🏬 OTROS PROVEEDORES DEL CATÁLOGO (N)`: Lista completa de todos los demás proveedores del sistema, permitiendo registrar cualquier parada adicional con un solo toque y sin cambiar de pantalla.
+- **Backend y Catálogo Maestro Desacoplado (`Code.gs`):**
+  - Implementación de `obtenerCatalogoProveedoresCompleto(ss)` y endpoint `action=getCatalogoProveedores` que consolida en tiempo real los proveedores desde `Puntos_Rutas`, `Tarifas` y el histórico de `Recolecciones`, garantizando que ningún proveedor activo quede excluido.
+- **Soporte Offline y Conciliador:**
+  - Soporte integrado en `CONCILIADOR.html` mediante `recolecciones_cache.js` para acelerar las auditorías masivas sin saturar las cuotas de red.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
