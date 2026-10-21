@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.7.7)  
+> **Última Actualización:** Octubre 2026 (Versión 1.7.8)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -268,6 +268,30 @@
      - Cuando una ruta tiene sub-rutas hermanas (Ruta 2 Norte/Sur) y el registro histórico viene con la etiqueta ambigua `"RUTA 2: Cali (Norte / Sur / Oriente juanchito)"`, el motor de Cierre Diario atribuye el registro a `NORTE` o `SUR` según el catálogo `MATRIZ_PUNTOS_RUTAS` del par `(proveedor, sucursal)` y, para puntos compartidos (*Ciudad del Campo*), desempata por la frecuencia del día auditado (`Martes` ➔ Sur, `Viernes` ➔ Norte).
      - Incluye homologación canónica tolerante para digitaciones manuales (`Megan Capital` ➔ `Migan Capital`, `Lantaña De Morichal` ➔ `La Montaña Morichal`, `Ciudadela Delrio` ➔ `Ciudadela del Río`).
   5. *Resultado Verificado en Vivo (20/10/2026):* Ruta 2 Sur audita **24 transacciones (1.675,20 Kg)** de Emer Rodríguez con **12 / 17 puntos cubiertos (71%)**, mientras Ruta 2 Norte aisla las **2 transacciones (228,40 Kg)** de Carolina Becerra en `La Montaña Av. 6A`, sin alterar ni una sola celda de Google Sheets.
+
+---
+
+### 20. Saneamiento de Emojis y Sufijos en Selectores Móviles PWA / TWA (`v1.7.8`)
+- **Problema Diagnosticado:**
+  - En la versión `v1.7.6`, para guiar visualmente al conductor sobre sus paradas asignadas, se introdujo el agrupamiento `<optgroup label="📍 EN TU RUTA PROGRAMADA">` donde cada `<option>` mostraba una estrella decorativa (`opt.textContent = "⭐ " + prov`).
+  - Al persistir las recolecciones (`btnGuardarRecoleccion`) o las novedades (`formNovedad`), el código obtenía el nombre del proveedor leyendo accidentalmente `proveedorSel.options[proveedorSel.selectedIndex].text` en vez de su valor unívoco `proveedorSel.value`.
+  - Esta lectura causó que el carácter emoji `"⭐ "` se guardara directamente en Firebase Firestore y Google Sheets dentro del campo `proveedor` (ej. `"⭐ Bodega Santa Elena"`), apareciendo con estrella en la tabla de *Recolecciones en Vivo* y en los comprobantes.
+  - De forma idéntica, la selección de ruta (`rutaSel`) leía el `.text` en lugar de `.value`, arriesgando capturar el sufijo informativo de frecuencia `" · 📅 [Día]"` introducido en `v1.7.7`.
+- **Solución Quirúrgica y Preservación Total de la Experiencia Móvil TWA:**
+  1. *Preservación Visual para Conductores:* La experiencia táctil en campo no sufre ninguna merma: el selector de proveedores sigue destacando con `⭐` las paradas de la ruta programada en el `<optgroup>`.
+  2. *Lectura Estricta por `.value` al Guardar:*
+     - En `recoleccion-form` (`btnGuardarRecoleccion`): Se corrigió a `rutaName = rutaSel.value;` y `proveedorName = homologarNombreProveedor(proveedorSel.value);`.
+     - En `initNovedadesModal` (previsualización y guardado de novedades en dos etapas): Se corrigió a `rutaName = rutaSel.value;` y `provName = homologarNombreProveedor(provSel.value);`.
+  3. *Sanitización Preventiva en `homologarNombreProveedor`*:
+     - Se añadió la regla regular `let s = String(texto || '').replace(/^[⭐\u2B50\u2605\u2728*•\s]+/, '').trim();` antes de cualquier búsqueda canónica o formateo Nombre Propio.
+     - Neutraliza de raíz cualquier emoji de estrella (`⭐`, `✨`, `★`), asterisco o viñeta que pueda filtrarse accidentalmente desde cualquier fuente.
+  4. *Limpieza Retroactiva en Tabla en Vivo (`renderRecordsInTable`)*:
+     - Se envolvió la visualización de la celda de proveedor con `data.proveedor ? homologarNombreProveedor(data.proveedor) : 'N/A'`.
+     - Con esto, los registros históricos que ya se habían guardado con estrella en la base de datos se limpian dinámicamente al renderizarse, mostrándose impecablemente como `"Bodega Santa Elena"`.
+  5. *Bumping Global a `v1.7.8`*:
+     - `sw.js`: `CACHE_NAME = 'proteinagro-v1.7.8'` y console log correspondiente.
+     - `index.html`: Parámetros `?v=1.7.8` en CSS/JS y badges interactivos `🔄 v1.7.8`.
+     - `app.js`: Referencias internas de registro de Service Worker y funciones de recarga forzada (`forzarActualizacionApp`) migradas de `1.7.5` a `1.7.8`.
 
 ---
 

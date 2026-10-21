@@ -311,8 +311,8 @@ const CANONICOS_PROVEEDORES = {
 
 function homologarNombreProveedor(texto) {
     if (!texto) return '';
-    const s = String(texto).trim();
-    if (!s) return '';
+    let s = String(texto || '').replace(/^[⭐\u2B50\u2605\u2728*•\s]+/, '').trim();
+    if (!s) return String(texto).trim();
     if (s.toUpperCase() === 'PROVEEDOR GENERAL') return 'PROVEEDOR GENERAL';
     const norm = str => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
     const k = norm(s);
@@ -909,7 +909,7 @@ function homologarRuta(texto) {
 }
 
 // ==============================================================================
-// SUB-RUTAS HERMANAS CON EL MISMO NÚMERO (Ruta 2 Norte / Sur) (v1.7.7)
+// SUB-RUTAS HERMANAS CON EL MISMO NÚMERO (Ruta 2 Norte / Sur) (v1.7.8)
 // Solo lógica cliente: NO altera los valores de ruta persistidos.
 // ==============================================================================
 function normalizarClaveRuta(texto) {
@@ -1969,7 +1969,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
             return;
         }
     } else if (rutaSel.selectedIndex >= 0) {
-        rutaName = rutaSel.options[rutaSel.selectedIndex].text;
+        rutaName = rutaSel.value;
     }
     
     // 3. Validar Proveedor
@@ -1992,8 +1992,9 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
             return;
         }
     } else if (proveedorSel.selectedIndex >= 0) {
-        proveedorName = proveedorSel.options[proveedorSel.selectedIndex].text;
+        proveedorName = proveedorSel.value;
     }
+    proveedorName = homologarNombreProveedor(proveedorName);
 
     // 4. Validar Punto / Lugar de Recolección
     if (!validarPuntoObligatorio(true)) {
@@ -2385,7 +2386,7 @@ function renderRecordsInTable(records, tbody) {
         const ruta = data.ruta ? homologarRuta(data.ruta) : 'N/A';
         const obsText = data.observaciones ? data.observaciones : '-';
 
-        const provDisplay = data.proveedor || 'N/A';
+        const provDisplay = data.proveedor ? homologarNombreProveedor(data.proveedor) : 'N/A';
         const sucDisplay = data.punto || data.sucursal || 'General';
         const cleanTotalKg = isNovedad ? '<span style="color: #dc2626; font-weight: 700;">0 kg (Novedad)</span>' : `<span style="color: #0369a1; font-weight: 700;">${formatResumenTotales(data)}</span>`;
         const recordLocalId = data.id || '';
@@ -3928,7 +3929,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.5&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.8&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -4736,7 +4737,7 @@ function initAdminEditModal() {
 }
 
 // ==============================================================================
-// VERIFICAR SI YA EXISTE PESAJE / CARGA REGISTRADA HOY PARA UN PUNTO (v1.7.5)
+// VERIFICAR SI YA EXISTE PESAJE / CARGA REGISTRADA HOY PARA UN PUNTO (v1.7.8)
 // ==============================================================================
 function verificarPesajePrevioHoy(proveedor, punto) {
     try {
@@ -4748,7 +4749,7 @@ function verificarPesajePrevioHoy(proveedor, punto) {
         // 1. Pesaje en curso en memoria activa del formulario
         if (typeof collectedProducts !== 'undefined' && Array.isArray(collectedProducts) && collectedProducts.length > 0) {
             const curProvSel = document.getElementById('proveedor');
-            const curProv = norm(curProvSel?.options[curProvSel.selectedIndex]?.text || curProvSel?.value || '');
+            const curProv = norm(curProvSel?.value || curProvSel?.options[curProvSel.selectedIndex]?.text || '');
             const curPunto = norm(typeof obtenerPuntoSeleccionado === 'function' ? obtenerPuntoSeleccionado() : '');
             const matchCurProv = (curProv === provNorm || curProv.includes(provNorm) || provNorm.includes(curProv));
             const matchCurPunto = (curPunto === puntNorm || curPunto.includes(puntNorm) || puntNorm.includes(curPunto));
@@ -4923,7 +4924,7 @@ function initNovedadesModal() {
         if (rutaSel.value === 'OTRA') {
             rutaName = document.getElementById('custom-ruta')?.value.trim() || 'Otra Ruta';
         } else if (rutaSel.selectedIndex >= 0) {
-            rutaName = rutaSel.options[rutaSel.selectedIndex].text;
+            rutaName = rutaSel.value;
         }
 
         // 3. Validar Proveedor
@@ -4942,8 +4943,9 @@ function initNovedadesModal() {
         if (provSel.value === 'OTRO') {
             provName = document.getElementById('custom-proveedor')?.value.trim() || 'Otro Proveedor';
         } else if (provSel.selectedIndex >= 0) {
-            provName = provSel.options[provSel.selectedIndex].text;
+            provName = provSel.value;
         }
+        provName = homologarNombreProveedor(provName);
 
         // 4. Validar Punto / Sucursal obligatorio
         if (!validarPuntoObligatorio(true)) {
@@ -5061,8 +5063,9 @@ function initNovedadesModal() {
         if (provSel?.value === 'OTRO') {
             provName = document.getElementById('custom-proveedor')?.value.trim() || 'Otro Proveedor';
         } else if (provSel && provSel.selectedIndex >= 0) {
-            provName = provSel.options[provSel.selectedIndex].text;
+            provName = provSel.value;
         }
+        provName = homologarNombreProveedor(provName);
         const puntoName = obtenerPuntoSeleccionado();
 
         // Regla de negocio: "Cliente Cancela Servicio" sólo antes de arribo / pesaje
@@ -5107,7 +5110,7 @@ function initNovedadesModal() {
             if (rutaSel?.value === 'OTRA') {
                 rutaName = document.getElementById('custom-ruta')?.value.trim() || 'Otra Ruta';
             } else if (rutaSel && rutaSel.selectedIndex >= 0) {
-                rutaName = rutaSel.options[rutaSel.selectedIndex].text;
+                rutaName = rutaSel.value;
             }
 
             const ubicacionGps = await obtenerUbicacionGpsActual();
@@ -5267,12 +5270,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.7.5 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.7.8 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.7.5')
+            navigator.serviceWorker.register('/sw.js?v=1.7.8')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.7.5 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.7.8 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -5280,8 +5283,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.7.5 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.5&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.7.8 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.8&t=' + Date.now();
                                 }
                             };
                         }
@@ -5310,7 +5313,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.5&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.8&t=' + Date.now();
             }
         });
 
@@ -5319,7 +5322,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.5&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.8&t=' + Date.now();
                 }
             }
         });

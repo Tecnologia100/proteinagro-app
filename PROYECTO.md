@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.7.7`  
+> **Versión Actual:** `v=1.7.8`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -817,7 +817,25 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Atribución Retrocompatible en Cierre Diario (`registroPerteneceARutaCierre`):**
   - Para registros históricos guardados con la etiqueta ambigua `"RUTA 2: Cali (Norte / Sur / Oriente juanchito)"`, las 4 capas del Cierre Diario (Webhook, GViz CSV, Firestore y LocalStorage) atribuyen automáticamente cada recolección a Norte o Sur cruzando el par `(proveedor, sucursal)` contra `MATRIZ_PUNTOS_RUTAS` y desempatando puntos compartidos (*Ciudad del Campo*) según la frecuencia del día auditado.
   - Validado con las 24 transacciones del Martes 20/10/2026 de Emer Rodríguez (**1.675,20 Kg**, **12 / 17 puntos cubiertos = 71%**).
+
+## ⭐ 24. Saneamiento de Emojis y Sufijos en Selectores Móviles PWA / TWA (`v1.7.8`)
+> **Fecha de Implementación:** 21 de Octubre de 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`index.html`](./index.html), [`sw.js`](./sw.js), [`GEMINI.md`](./GEMINI.md)  
+> **Objetivo:** Erradicar la fuga del emoji estrella (`⭐`) y sufijo de itinerario (`· 📅`) hacia la base de datos al guardar recolecciones o novedades, preservando al 100% la experiencia visual táctil en la aplicación móvil PWA / TWA.
+
+- **Diagnóstico y Causa Raíz:**
+  - El selector `#proveedor` implementado en `v1.7.6` utilizaba `<optgroup label="📍 EN TU RUTA PROGRAMADA">` donde cada opción mostraba `opt.textContent = "⭐ " + prov` para guiar al transportador.
+  - Al persistir la transacción, el controlador leía `proveedorSel.options[proveedorSel.selectedIndex].text`, inyectando el emoji en Firebase y Google Sheets (`"⭐ Bodega Santa Elena"`).
+  - Igualmente, el selector de rutas `#ruta` leía `.text`, arriesgando persistir el sufijo de itinerario (`" · 📅 Martes"`).
+- **Remediación y Blindaje Operativo:**
+  1. *Lectura Invariable por `.value`*: Tanto en el formulario de recolección principal como en el modal de novedades, se lee exclusivamente `rutaSel.value` y `proveedorSel.value`.
+  2. *Sanitización en `homologarNombreProveedor`*: Expresión regular que remueve preventivamente cualquier prefijo decorativo (`⭐`, `✨`, `★`, `•`, `*`).
+  3. *Presentación Limpia en Tabla en Vivo*: La columna de proveedor en `renderRecordsInTable` homologa dinámicamente los registros para que los documentos históricos con estrella se visualicen limpios.
+  4. *Preservación TWA*: Las opciones del menú móvil siguen luciendo la estrella informativa para los conductores en campo sin alterar la base contable.
+  5. *Bumping Global*: Actualización de Service Worker a `proteinagro-v1.7.8`, HTML y scripts de recarga forzada.
+
 ---
+
 ---
 
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
