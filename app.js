@@ -309,9 +309,18 @@ const CANONICOS_PROVEEDORES = {
     'yimisanclemente': 'Yimi Sanclemente',
 };
 
+function removerEmojisDecorativos(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/[\u2B50\u2605\u2728\u2729\u2730\uD83C\uDF1F\uD83C\uDF20\uFE0E\uFE0F]/g, '')
+        .replace(/^[*•·\-\s]+/, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 function homologarNombreProveedor(texto) {
     if (!texto) return '';
-    let s = String(texto || '').replace(/^[⭐\u2B50\u2605\u2728*•\s]+/, '').trim();
+    let s = removerEmojisDecorativos(texto);
     if (!s) return String(texto).trim();
     if (s.toUpperCase() === 'PROVEEDOR GENERAL') return 'PROVEEDOR GENERAL';
     const norm = str => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
@@ -1972,13 +1981,15 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         rutaName = rutaSel.value;
     }
     
-    // 3. Validar Proveedor
+    // 3. Validar Proveedor (Desacople total: presentación con estrella ⭐ vs persistencia limpia)
     const proveedorSel = document.getElementById('proveedor');
-    let proveedorName = proveedorSel.value;
-    if (!proveedorSel.value) {
-        proveedorSel.classList.add('input-error');
-        proveedorSel.focus();
-        proveedorSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    let proveedorName = '';
+    if (!proveedorSel || !proveedorSel.value) {
+        if (proveedorSel) {
+            proveedorSel.classList.add('input-error');
+            proveedorSel.focus();
+            proveedorSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         alert("⚠️ Por favor seleccione el Proveedor / Razón Social.");
         return;
     }
@@ -1991,10 +2002,11 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
             alert("⚠️ Por favor escriba el nombre del nuevo proveedor.");
             return;
         }
-    } else if (proveedorSel.selectedIndex >= 0) {
-        proveedorName = proveedorSel.value;
+    } else {
+        const selectedOpt = (proveedorSel.selectedIndex >= 0) ? proveedorSel.options[proveedorSel.selectedIndex] : null;
+        proveedorName = selectedOpt ? (selectedOpt.value || selectedOpt.text) : proveedorSel.value;
     }
-    proveedorName = homologarNombreProveedor(proveedorName);
+    proveedorName = removerEmojisDecorativos(homologarNombreProveedor(proveedorName));
 
     // 4. Validar Punto / Lugar de Recolección
     if (!validarPuntoObligatorio(true)) {
@@ -2537,6 +2549,9 @@ async function enviarAGoogleSheets(data) {
 
     if (dataLight.ruta) {
         dataLight.ruta = homologarRuta(dataLight.ruta);
+    }
+    if (dataLight.proveedor) {
+        dataLight.proveedor = removerEmojisDecorativos(homologarNombreProveedor(dataLight.proveedor));
     }
     const payloadParam = encodeURIComponent(JSON.stringify(dataLight));
     const actionType = (dataLight.tipo === 'Novedad' || String(dataLight.id || '').startsWith('NOV-')) ? 'saveNovedad' : (dataLight.action || 'saveRecoleccion');
@@ -3702,10 +3717,11 @@ function populardropdownProveedoresPorRuta(rutaSeleccionada, mostrandoTodos = fa
         // 1. Grupo: Proveedores programados en la ruta actual
         const grpRuta = document.createElement('optgroup');
         grpRuta.label = `📍 EN TU RUTA PROGRAMADA (${proveedoresEnRuta.length})`;
-        proveedoresEnRuta.forEach(prov => {
+        proveedoresEnRuta.forEach(provRaw => {
+            const provLimpio = removerEmojisDecorativos(provRaw);
             const opt = document.createElement('option');
-            opt.value = prov;
-            opt.textContent = `⭐ ${prov}`;
+            opt.value = provLimpio; // Valor puro para la base de datos
+            opt.textContent = `⭐ ${provLimpio}`; // Presentación visual en la TWA
             grpRuta.appendChild(opt);
         });
         proveedorSelect.appendChild(grpRuta);
@@ -3714,10 +3730,11 @@ function populardropdownProveedoresPorRuta(rutaSeleccionada, mostrandoTodos = fa
         if (otrosProveedores.length > 0) {
             const grpOtros = document.createElement('optgroup');
             grpOtros.label = `🏬 OTROS PROVEEDORES DEL CATÁLOGO (${otrosProveedores.length})`;
-            otrosProveedores.forEach(prov => {
+            otrosProveedores.forEach(provRaw => {
+                const provLimpio = removerEmojisDecorativos(provRaw);
                 const opt = document.createElement('option');
-                opt.value = prov;
-                opt.textContent = prov;
+                opt.value = provLimpio;
+                opt.textContent = provLimpio;
                 grpOtros.appendChild(opt);
             });
             proveedorSelect.appendChild(grpOtros);
@@ -5059,13 +5076,14 @@ function initNovedadesModal() {
 
         const esCancelacionCliente = (causal === 'Cliente Cancela Servicio');
         const provSel = document.getElementById('proveedor');
-        let provName = provSel?.value || '';
+        let provName = '';
         if (provSel?.value === 'OTRO') {
             provName = document.getElementById('custom-proveedor')?.value.trim() || 'Otro Proveedor';
         } else if (provSel && provSel.selectedIndex >= 0) {
-            provName = provSel.value;
+            const selectedOpt = provSel.options[provSel.selectedIndex];
+            provName = selectedOpt ? (selectedOpt.value || selectedOpt.text) : provSel.value;
         }
-        provName = homologarNombreProveedor(provName);
+        provName = removerEmojisDecorativos(homologarNombreProveedor(provName));
         const puntoName = obtenerPuntoSeleccionado();
 
         // Regla de negocio: "Cliente Cancela Servicio" sólo antes de arribo / pesaje

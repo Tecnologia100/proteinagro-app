@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.7.9)  
+> **Última Actualización:** Octubre 2026 (Versión 1.8.0)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -308,6 +308,22 @@
   2. *Desvinculación de Archivos Espejo:* Retiro de las copias huérfanas de `CONCILIADOR.html` y `recolecciones_cache.js` de la raíz de `PROTEINAGRO` (resguardadas en backup), dejando a `G:\Mi unidad\Antigravity\CONCILIADOR` como única fuente de verdad del Conciliador.
   3. *Reglas en `.vercelignore`:* Exclusión de `CONCILIADOR*`, `recolecciones_cache.js`, `*.zip`, `*.py`, `*.gs` y carpetas de backup del despliegue de la TWA en Vercel.
   4. *Separación de Puertos Locales (`.vscode/settings.json`):* Puerto `5500` asignado a `PROTEINAGRO` (TWA) y Puerto `5501` asignado a `CONCILIADOR`, aislando al 100% el `localStorage`, `IndexedDB` y Service Workers en el navegador.
+
+---
+
+### 22. Desacoplamiento Visual y Sanitización de Emojis en Persistencia (`v1.8.0`)
+- **Problema Diagnosticado:**
+  - En la aplicación móvil TWA, las paradas asignadas de la ruta programada se visualizaban con una estrella amarilla (`⭐`) en el menú desplegable.
+  - Al registrar o sincronizar la transacción, si el navegador o WebView tomaba el texto del elemento seleccionado, la estrella (`⭐`) viajaba en el payload y se persistía en Google Sheets y Firebase, alterando la base contable.
+- **Solución Arquitectónica en Tres Capas (Triple Escudo):**
+  1. *Capa de Presentación Desacoplada (Frontend TWA - `app.js`):*
+     - En `populardropdownProveedoresPorRuta`: el atributo `opt.value` se asigna exclusivamente con el nombre limpio en texto plano (`opt.value = provLimpio`), mientras que la estrella queda aislada como adorno puramente visual en la interfaz (`opt.textContent = '⭐ ' + provLimpio`).
+  2. *Capa de Sanitización en Captura y Payload (`app.js`):*
+     - Función `removerEmojisDecorativos(str)` que elimina de forma infalible caracteres `⭐`, `⭐`, `️` (selectores de variación), `✨`, viñetas y espacios residuales.
+     - Aplicada en los handlers de formulario (`btnGuardarRecoleccion`, `formNovedad`) y como salvaguarda preventiva en `enviarAGoogleSheets(data)`.
+  3. *Capa de Blindaje en Servidor (`Code.gs`):*
+     - Inyección de `removerEmojisDecorativos` en `guardarRecoleccionSheet` y `homologarProveedor`. Aunque un cliente envíe una estrella decorativa, el servidor de Google Apps Script la purga antes de insertar la fila en la hoja `Recolecciones`.
+     - Sincronizado en `PROTEINAGRO/Code.gs` y `CONCILIADOR/Codigo_Integrado_App_Y_Conciliador.gs`.
 
 ---
 

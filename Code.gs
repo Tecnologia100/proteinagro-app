@@ -443,7 +443,7 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     var fecha = data.fecha ? String(data.fecha) : new Date().toLocaleString();
     var ruta = data.ruta || '';
     var conductor = data.conductor || '';
-    var proveedor = data.proveedor || '';
+    var proveedor = removerEmojisDecorativos(data.proveedor || '');
     var punto = data.punto || data.sucursal || '';
     var observaciones = data.observaciones || '';
     var ubicacionGps = data.ubicacionGps || '0';
@@ -598,7 +598,7 @@ function guardarRecoleccionSheet(ss, rawPayload) {
       // Formato "Nombre Propio" automático (Title Case estilo =NOMPROPIO)
       var rutaFinal = homologarRuta(ruta);
       var conductorFinal = aNombrePropio(conductor);
-      var proveedorFinal = aNombrePropio(proveedor);
+      var proveedorFinal = aNombrePropio(homologarProveedor(proveedor));
       var puntoFinal = aNombrePropio(punto);
       var prodNombreFinal = aNombrePropio(prodNombre);
       var observacionesFinal = capitalizarOracion(observaciones);
@@ -2993,6 +2993,15 @@ function getCatalogoProveedoresHttp(ss) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString(), proveedores: [] }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function removerEmojisDecorativos(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\u2B50\u2605\u2728\u2729\u2730\uFE0E\uFE0F]/g, '')
+    .replace(/^[*•·\-\s]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function homologarProveedor(nombreOriginal) {
