@@ -4,4 +4,11 @@
 *.gsheet
 *.txt
 *.jpeg
+*.zip
+*.py
+*.gs
+*.csv
 app-recolecciones
+CONCILIADOR*
+recolecciones_cache.js
+PROTEINAGRO_Backup_*

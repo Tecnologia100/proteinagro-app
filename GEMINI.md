@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.7.8)  
+> **Última Actualización:** Octubre 2026 (Versión 1.7.9)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -292,6 +292,22 @@
      - `sw.js`: `CACHE_NAME = 'proteinagro-v1.7.8'` y console log correspondiente.
      - `index.html`: Parámetros `?v=1.7.8` en CSS/JS y badges interactivos `🔄 v1.7.8`.
      - `app.js`: Referencias internas de registro de Service Worker y funciones de recarga forzada (`forzarActualizacionApp`) migradas de `1.7.5` a `1.7.8`.
+
+---
+
+### 21. Aislamiento y Desacoplamiento Definitivo entre TWA y Conciliador (`v1.7.9`)
+- **Problema Diagnosticado:**
+  - Existía interferencia cruzada entre el proyecto móvil de conductores (`PROTEINAGRO` / TWA) y el proyecto administrativo `CONCILIADOR`:
+    1. *Colisión de Service Worker y Origen:* Al desplegarse bajo el mismo host en Vercel o puerto local, `sw.js` (con `Scope: '/'`) interceptaba `CONCILIADOR.html`, lo metía en la caché de la TWA y enviaba mensajes `RELOAD_PAGE` a todas las pestañas abiertas cuando la TWA cambiaba de versión.
+    2. *Archivos Espejo Desfasados en Disco:* Existía una copia antigua de `CONCILIADOR.html` (393 KB) y `recolecciones_cache.js` en la raíz de `PROTEINAGRO`, compitiendo con la versión evolucionada de `G:\Mi unidad\Antigravity\CONCILIADOR\CONCILIADOR.html` (464 KB).
+    3. *Acoplamiento en Vercel:* Cada commit de la TWA publicaba en producción la copia desactualizada de `CONCILIADOR.html`.
+- **Solución Quirúrgica de Aislamiento en 4 Capas:**
+  1. *Blindaje en `sw.js` (`proteinagro-v1.7.9`):*
+     - Exclusión explícita en el listener `fetch` para ignorar cualquier ruta o parámetro con `conciliador`, `recolecciones_cache` o `view=conciliador`.
+     - Filtro en el listener `activate` (`!client.url.toLowerCase().includes('conciliador')`) para jamás enviar recargas forzadas (`RELOAD_PAGE`) a pestañas del Conciliador.
+  2. *Desvinculación de Archivos Espejo:* Retiro de las copias huérfanas de `CONCILIADOR.html` y `recolecciones_cache.js` de la raíz de `PROTEINAGRO` (resguardadas en backup), dejando a `G:\Mi unidad\Antigravity\CONCILIADOR` como única fuente de verdad del Conciliador.
+  3. *Reglas en `.vercelignore`:* Exclusión de `CONCILIADOR*`, `recolecciones_cache.js`, `*.zip`, `*.py`, `*.gs` y carpetas de backup del despliegue de la TWA en Vercel.
+  4. *Separación de Puertos Locales (`.vscode/settings.json`):* Puerto `5500` asignado a `PROTEINAGRO` (TWA) y Puerto `5501` asignado a `CONCILIADOR`, aislando al 100% el `localStorage`, `IndexedDB` y Service Workers en el navegador.
 
 ---
 

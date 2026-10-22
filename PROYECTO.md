@@ -838,7 +838,24 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 ---
 
+## 🔒 25. Aislamiento y Desacoplamiento Definitivo entre TWA y Conciliador (`v1.7.9`)
+> **Fecha de Implementación:** 22 de Octubre de 2026  
+> **Archivos Asociados:** [`sw.js`](./sw.js), [`.vercelignore`](./.vercelignore), [`index.html`](./index.html), [`app.js`](./app.js), [`GEMINI.md`](./GEMINI.md)  
+> **Objetivo:** Erradicar de raíz cualquier interferencia cruzada entre la aplicación móvil TWA (`PROTEINAGRO`) y el sistema administrativo `CONCILIADOR`, asegurando que ambos proyectos operen de forma 100% independiente tanto en disco como en navegador y producción.
+
+- **Aislamiento del Service Worker (`sw.js` v1.7.9):**
+  - El interceptor `fetch` ignora explícitamente cualquier ruta o parámetro que contenga `conciliador` o `recolecciones_cache`.
+  - El broadcast `RELOAD_PAGE` en `activate` filtra las ventanas clientes para nunca forzar recargas sobre pestañas del Conciliador.
+- **Limpieza de Archivos Espejo y `.vercelignore`:**
+  - Se retiraron de la raíz de `PROTEINAGRO` los archivos duplicados `CONCILIADOR.html` (393 KB) y `recolecciones_cache.js`, preservando una copia de seguridad íntegra y dejando a `G:\Mi unidad\Antigravity\CONCILIADOR\CONCILIADOR.html` (464 KB) como único archivo maestro del Conciliador.
+  - `.vercelignore` actualizado para publicar en Vercel exclusivamente los activos de la PWA/TWA de conductores.
+- **Aislamiento de Puertos Locales:**
+  - Configuración `.vscode/settings.json` con puerto `5500` para `PROTEINAGRO` y `5501` para `CONCILIADOR`, separando sus orígenes, `localStorage` e `IndexedDB`.
+
+---
+
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
+
 
 
 

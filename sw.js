@@ -3,7 +3,7 @@
 // Cache del App Shell con estrategia Network-First y Fallback a Cache Offline
 // ==============================================================================
 
-const CACHE_NAME = 'proteinagro-v1.7.8';
+const CACHE_NAME = 'proteinagro-v1.7.9';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -20,7 +20,7 @@ const APP_SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-cacheando App Shell de ProteinAgro v1.7.8');
+      console.log('[SW] Pre-cacheando App Shell de ProteinAgro v1.7.9');
       return cache.addAll(APP_SHELL).catch((err) => {
         console.warn('[SW] Advertencia pre-cacheando recursos:', err);
       });
@@ -44,10 +44,12 @@ self.addEventListener('activate', (event) => {
     }).then(() => {
       return self.clients.claim();
     }).then(() => {
-      // Notificar a las ventanas activas para que se actualicen inmediatamente
+      // Notificar únicamente a las ventanas activas de la TWA (excluyendo el Conciliador)
       return self.clients.matchAll({ type: 'window' }).then((clients) => {
         clients.forEach((client) => {
-          client.postMessage({ action: 'RELOAD_PAGE', version: CACHE_NAME });
+          if (!client.url || !client.url.toLowerCase().includes('conciliador')) {
+            client.postMessage({ action: 'RELOAD_PAGE', version: CACHE_NAME });
+          }
         });
       });
     })
@@ -62,6 +64,16 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+
+  // Aislamiento estricto: Ignorar por completo cualquier archivo o vista del proyecto CONCILIADOR
+  if (
+    url.pathname.toLowerCase().includes('conciliador') ||
+    url.pathname.toLowerCase().includes('recolecciones_cache') ||
+    url.searchParams.get('view') === 'conciliador' ||
+    url.searchParams.get('view') === 'dashboard'
+  ) {
+    return;
+  }
 
   // Ignorar peticiones a Google Docs/Sheets, Google Apps Script Webhooks y Firebase (manejan su propia persistencia)
   if (

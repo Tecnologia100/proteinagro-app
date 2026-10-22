@@ -1,0 +1,12 @@
+{
+  "liveServer.settings.port": 5500,
+  "liveServer.settings.root": "/",
+  "liveServer.settings.ignoreFiles": [
+    ".vscode/**",
+    "**/CONCILIADOR*",
+    "**/recolecciones_cache.js",
+    "**/PROTEINAGRO_Backup_*/**",
+    "**/*.zip",
+    "**/*.xlsx"
+  ]
+}
