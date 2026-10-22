@@ -3029,3 +3029,216 @@ function homologarProveedor(nombreOriginal) {
   if (key.indexOf("MERCAMIO") !== -1) return "Mercamio";
   return aNombrePropio(raw);
 }
+
+
+// ==============================================================================
+// FUNCIONES RPC EXCLUSIVAS DEL CONCILIADOR (google.script.run)
+// Garantizan 100% compatibilidad en Google Sheets sin interferir con la TWA
+// ==============================================================================
+
+/**
+ * Consulta independiente del catálogo completo de proveedores (vía google.script.run)
+ */
+function getCatalogoProveedores() {
+  try {
+    var ss = null;
+    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) {}
+    if (!ss) {
+      var dbId = (typeof SPREADSHEET_ID_DB !== 'undefined') ? SPREADSHEET_ID_DB : "1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU";
+      ss = SpreadsheetApp.openById(dbId);
+    }
+    var provSet = obtenerCatalogoProveedoresCompleto(ss);
+    var sheetRec = ss.getSheetByName("Recolecciones");
+    if (sheetRec && sheetRec.getLastRow() > 1) {
+      var rData = sheetRec.getRange(2, 5, sheetRec.getLastRow() - 1, 1).getValues();
+      for (var ri = 0; ri < rData.length; ri++) {
+        var rp = homologarProveedor(rData[ri][0]);
+        if (rp) provSet[rp] = true;
+      }
+    }
+    var lista = Object.keys(provSet).sort(function(a, b) {
+      return a.localeCompare(b, 'es', { sensitivity: 'base' });
+    });
+    return { success: true, proveedores: lista };
+  } catch (err) {
+    return { success: false, error: err.toString(), proveedores: [] };
+  }
+}
+
+/**
+ * Persistencia en la nube (PropertiesService) para la Memoria de Equivalencias de Productos por Proveedor
+ */
+function obtenerMapaProveedoresServer() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    return props.getProperty('PROTEINAGRO_MAPA_PROVEEDORES_V1') || '{}';
+  } catch (e) {
+    return '{}';
+  }
+}
+
+function guardarMapaProveedoresServer(jsonStr) {
+  try {
+    if (!jsonStr) return false;
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('PROTEINAGRO_MAPA_PROVEEDORES_V1', String(jsonStr));
+    return true;
+  } catch (e) {
+    Logger.log('Error en guardarMapaProveedoresServer: ' + e.toString());
+    return false;
+  }
+}
+
+/**
+ * Limpieza de números para liquidaciones
+ */
+function cleanNumberValue(val) {
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (!val) return 0;
+
+  var s = String(val).trim().replace(/[$\s]/g, '');
+  if (!s) return 0;
+
+  if (s.indexOf('.') !== -1 && s.indexOf(',') !== -1) {
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
+  } else if (s.indexOf(',') !== -1) {
+    s = s.replace(',', '.');
+  } else if (s.indexOf('.') !== -1) {
+    var parts = s.split('.');
+    if (parts.length === 2 && parts[1].length === 3) {
+      s = parts[0] + parts[1];
+    }
+  }
+
+  var num = parseFloat(s);
+  return isNaN(num) ? 0 : num;
+}
+
+/**
+ * Extrae o deduce el nombre del proveedor a partir del nombre del archivo Excel
+ */
+function extraerProveedorDeNombreArchivo(fileName) {
+  if (!fileName) return "VARIOS PROVEEDORES";
+  var m = fileName.match(/^Liquidacion_(.+?)_(?:\d{4}-\d{2}-\d{2}|desde_\d{4}-\d{2}-\d{2}|\d{4})/i);
+  if (m) {
+    var raw = m[1].replace(/_/g, ' ').trim().toUpperCase();
+    if (raw.indexOf("PROVEEDORES") !== -1) {
+      return "VARIOS PROVEEDORES";
+    }
+    return homologarProveedor(raw) || raw;
+  }
+  if (fileName.indexOf("INFORME_MATERIA_PRIMA") !== -1) {
+    return "INFORMES MATERIA PRIMA";
+  }
+  return "VARIOS PROVEEDORES";
+}
+
+/**
+ * Obtiene la carpeta de destino organizada en Google Drive:
+ * PROTEINAGRO > PROVEEDORES > DOCUMENTOS COMPARTIDOS > LIQUIDACIONES {AÑO} > {PROVEEDOR}
+ */
+function getCarpetaLiquidacionesDestino(proveedorNombre) {
+  var root = DriveApp.getRootFolder();
+  var pFolders = root.getFoldersByName("PROTEINAGRO");
+  var proveedoresFolder = null;
+
+  while (pFolders.hasNext()) {
+    var pFolder = pFolders.next();
+    var provFolders = pFolder.getFoldersByName("PROVEEDORES");
+    if (!provFolders.hasNext()) {
+      provFolders = pFolder.getFoldersByName("Proveedores");
+    }
+    if (provFolders.hasNext()) {
+      proveedoresFolder = provFolders.next();
+      break;
+    }
+  }
+
+  if (!proveedoresFolder) {
+    var allProvFolders = DriveApp.getFoldersByName("PROVEEDORES");
+    while (allProvFolders.hasNext()) {
+      var f = allProvFolders.next();
+      var parents = f.getParents();
+      if (parents.hasNext() && parents.next().getName().toUpperCase() === "PROTEINAGRO") {
+        proveedoresFolder = f;
+        break;
+      }
+    }
+  }
+
+  if (!proveedoresFolder) {
+    var parentP = root.getFoldersByName("PROTEINAGRO");
+    var baseP = parentP.hasNext() ? parentP.next() : root;
+    proveedoresFolder = baseP.createFolder("PROVEEDORES");
+  }
+
+  var docCompFolders = proveedoresFolder.getFoldersByName("DOCUMENTOS COMPARTIDOS");
+  if (!docCompFolders.hasNext()) {
+    docCompFolders = proveedoresFolder.getFoldersByName("Documentos compartidos");
+  }
+  var docCompFolder = docCompFolders.hasNext() ? docCompFolders.next() : proveedoresFolder.createFolder("DOCUMENTOS COMPARTIDOS");
+
+  var anioFolderName = "LIQUIDACIONES " + (new Date().getFullYear());
+  var anioFolders = docCompFolder.getFoldersByName(anioFolderName);
+  var anioFolder = anioFolders.hasNext() ? anioFolders.next() : docCompFolder.createFolder(anioFolderName);
+
+  var provClean = (proveedorNombre || "VARIOS PROVEEDORES").trim().toUpperCase();
+  provClean = provClean.replace(/[/\\?%*:|"<>]/g, '').trim() || "VARIOS PROVEEDORES";
+
+  var provFoldersDest = anioFolder.getFoldersByName(provClean);
+  var provFolder = provFoldersDest.hasNext() ? provFoldersDest.next() : anioFolder.createFolder(provClean);
+
+  return {
+    targetFolder: provFolder,
+    folderName: anioFolderName + " / " + provClean,
+    folderUrl: provFolder.getUrl(),
+    docCompUrl: docCompFolder.getUrl()
+  };
+}
+
+/**
+ * Guarda el archivo Excel de liquidación o informe en la carpeta compartida de Google Drive
+ */
+function saveExcelToDriveFolder(base64Data, fileName, optProvName) {
+  try {
+    var provName = optProvName;
+    if (!provName) {
+      provName = extraerProveedorDeNombreArchivo(fileName);
+    }
+
+    var dest = getCarpetaLiquidacionesDestino(provName);
+    var targetFolder = dest.targetFolder;
+
+    var decoded = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(
+      decoded,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      fileName
+    );
+
+    var existingFiles = targetFolder.getFilesByName(fileName);
+    while (existingFiles.hasNext()) {
+      try { existingFiles.next().setTrashed(true); } catch (eTrash) {}
+    }
+    var file = targetFolder.createFile(blob);
+
+    return {
+      success: true,
+      fileUrl: file.getUrl(),
+      fileName: file.getName(),
+      folderUrl: targetFolder.getUrl(),
+      folderName: dest.folderName,
+      docCompUrl: dest.docCompUrl
+    };
+  } catch (err) {
+    Logger.log("Error en saveExcelToDriveFolder: " + err.toString());
+    return {
+      success: false,
+      error: err.message || err.toString()
+    };
+  }
+}
