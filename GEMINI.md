@@ -327,6 +327,23 @@
 
 ---
 
+### 23. Captura y Conciliación de Facturas Físicas en Sitio para Caribe (`v1.8.1`)
+- **Problema Resuelto:**
+  - En clientes multisucursal como **Caribe Supermercados**, el libro auxiliar contable sólo registra la razón social y el número de factura física sin detallar la sucursal, mientras que la plataforma operativa registraba la sucursal y los kilos sin el número de factura, obligando a cruzar cada soporte manualmente.
+- **Solución E2E Implementada:**
+  1. *Exclusividad y Activación Inteligente (`esProveedorCaribe`):*
+     - La tarjeta `#factura-caribe-container` se despliega y exige campos obligatorios **exclusivamente** cuando el proveedor seleccionado es **Caribe Supermercados** (Rutas 3 y 4) o **Caribe** (Ruta 1 Cavasa). Para el resto de proveedores permanece 100% oculta.
+  2. *Alerta Informativa de Discrepancia en Tiempo Real:*
+     - Calcula el importe esperado (`Peso × Tarifa Referencia Caribe`) y lo compara contra el `valor_factura` digitado. Si existe una diferencia mayor a `$500 COP`, muestra un banner informativo con el desglose exacto sin bloquear el envío.
+  3. *Soporte Fotográfico Comprimido y Offline-First:*
+     - Compresión automática en Canvas (`max-width: 1200px`, JPEG `0.72` < 180 KB), subida a Firebase Storage (`facturas/${recordId}.jpg`) y respaldo Base64 offline en `localStorage` para sincronización diferida.
+  4. *Esquema Seguro en Google Sheets (`Columnas O, P y Q`):*
+     - Escritura separada en dos bloques: `A:L` (Cols 1-12) y `O:Q` (Cols 15-17: `Numero_Factura`, `Valor_Factura`, `Foto_Factura`), dejando **100% intactas las columnas `M` (`ID_Clave`) y `N` (`Alerta`)**.
+  5. *Integración en Reportes y Conciliador:*
+     - Visualización de badge de factura y enlace a foto en tabla administrativa, comprobante digital, WhatsApp, exportación CSV y matriz Excel de `CONCILIADOR.html` para cruce directo (`BUSCARV` / `XLOOKUP`) contra el libro auxiliar contable.
+
+---
+
 ## 📦 3. Procedimientos de Respaldo y Despliegue
 
 1. **Despliegue Web:** Cualquier cambio en `app.js`, `index.html`, `styles.css` o `sw.js` se sube con `git add .`, `git commit` y `git push origin main`. Vercel compila y publica en menos de 10 segundos.
