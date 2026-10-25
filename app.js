@@ -80,6 +80,35 @@ async function subirEvidenciaNovedadAStorage(dataUrl, recordId) {
     }
 }
 
+async function subirFotoFacturaAStorage(dataUrl, recordId) {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) return dataUrl;
+    if (!navigator.onLine || !storage) return dataUrl;
+
+    try {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const storageRef = storage.ref().child(`facturas/${recordId}.jpg`);
+
+        const uploadTask = storageRef.put(blob, { contentType: 'image/jpeg' });
+        const uploadPromise = new Promise((resolve, reject) => {
+            uploadTask.on('state_changed', null, reject, async () => {
+                const downloadURL = await storageRef.getDownloadURL();
+                resolve(downloadURL);
+            });
+        });
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout subiendo foto de factura a Firebase Storage")), 5000)
+        );
+
+        const urlFinal = await Promise.race([uploadPromise, timeoutPromise]);
+        console.log("🧾 Foto de factura subida a Firebase Storage exitosamente:", urlFinal);
+        return urlFinal;
+    } catch (err) {
+        console.warn("⚠️ No se pudo subir foto de factura a Storage (se conservará Base64 comprimido):", err);
+        return dataUrl;
+    }
+}
+
 let ULTIMA_UBICACION_GPS = "0";
 
 // Captura GPS en segundo plano totalmente asíncrona (0 milisegundos de bloqueo)
@@ -918,7 +947,7 @@ function homologarRuta(texto) {
 }
 
 // ==============================================================================
-// SUB-RUTAS HERMANAS CON EL MISMO NÚMERO (Ruta 2 Norte / Sur) (v1.7.9)
+// SUB-RUTAS HERMANAS CON EL MISMO NÚMERO (Ruta 2 Norte / Sur) (v1.8.1)
 // Solo lógica cliente: NO altera los valores de ruta persistidos.
 // ==============================================================================
 function normalizarClaveRuta(texto) {
@@ -1609,6 +1638,13 @@ async function sincronizarCatalogosDesdeGviz() {
                 for (let i = 1; i < linesT.length; i++) {
                     const cols = linesT[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
                     if (cols[1]) provsTarif.push(cols[1]);
+                    if (typeof esProveedorCaribe === 'function' && (esProveedorCaribe(cols[1] || '') || esProveedorCaribe(cols[2] || ''))) {
+                        const prodClean = (cols[3] || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        const precioNum = parseFloat(String(cols[4] || '').replace(/[^0-9.-]/g, ''));
+                        if (prodClean && !isNaN(precioNum) && precioNum > 0 && typeof TARIFAS_REFERENCIA_CARIBE === 'object') {
+                            TARIFAS_REFERENCIA_CARIBE[prodClean] = precioNum;
+                        }
+                    }
                 }
                 if (provsTarif.length > 0) {
                     actualizarCatalogoMaestroProveedores(provsTarif);
@@ -1862,7 +1898,169 @@ function renderAddedProducts() {
     } else {
         addedProductsDiv.style.display = 'none';
     }
+    evaluarDiscrepanciaFacturaCaribe();
 }
+
+// ==============================================================================
+// MÓDULO: CAPTURA DE FACTURA FÍSICA EN SITIO Y CONCILIACIÓN CARIBE (v1.8.1)
+// ==============================================================================
+let capturedFacturaPhoto = null;
+
+// Tarifas oficiales de referencia para Caribe (usadas para alerta en vivo de discrepancia)
+const TARIFAS_REFERENCIA_CARIBE = {
+    'SEBO': 1200,
+    'HUESO BLANCO': 500,
+    'DESPERDICIO': 350,
+    'HUESO DE CERDO': 350,
+    'CABEZAS': 350,
+    'PATAS': 350
+};
+
+function esProveedorCaribe(proveedor) {
+    const norm = s => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const p = norm(proveedor);
+    return p === 'caribe' || p.includes('caribe');
+}
+
+function calcularValorEstimadoCaribe(productosList) {
+    if (!Array.isArray(productosList) || productosList.length === 0) return 0;
+    let total = 0;
+    productosList.forEach(item => {
+        const prodClean = String(item.producto || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const kilos = Number(item.kilos) || 0;
+        let tarifa = TARIFAS_REFERENCIA_CARIBE[prodClean] || 0;
+        if (!tarifa) {
+            for (const k in TARIFAS_REFERENCIA_CARIBE) {
+                if (prodClean === k) { tarifa = TARIFAS_REFERENCIA_CARIBE[k]; break; }
+            }
+        }
+        if (tarifa > 0 && kilos > 0) {
+            total += Math.round(kilos * tarifa);
+        }
+    });
+    return total;
+}
+
+function evaluarDiscrepanciaFacturaCaribe() {
+    const alertBox = document.getElementById('factura-discrepancia-alert');
+    const valInput = document.getElementById('factura-valor');
+    if (!alertBox || !valInput) return;
+
+    const valorFactura = parseFloat(valInput.value);
+    if (isNaN(valorFactura) || valorFactura <= 0 || collectedProducts.length === 0) {
+        alertBox.style.display = 'none';
+        return;
+    }
+
+    const estimado = calcularValorEstimadoCaribe(collectedProducts);
+    if (estimado <= 0) {
+        alertBox.style.display = 'none';
+        return;
+    }
+
+    const diff = valorFactura - estimado;
+    const absDiff = Math.abs(diff);
+
+    alertBox.style.display = 'block';
+    if (absDiff <= 500) {
+        alertBox.className = 'discrepancia-banner ok';
+        alertBox.innerHTML = `✅ <strong>Liquidación coincidente:</strong> Factura ($${valorFactura.toLocaleString('es-CO')}) coincide con tarifa ProteinAgro ($${estimado.toLocaleString('es-CO')}).`;
+    } else {
+        const signo = diff > 0 ? '+' : '-';
+        alertBox.className = 'discrepancia-banner warn';
+        alertBox.innerHTML = `⚠️ <strong>Diferencia detectada (${signo}$${absDiff.toLocaleString('es-CO')}):</strong> La factura física indica <strong>$${valorFactura.toLocaleString('es-CO')}</strong>, pero según los kilos registrados el estimado es <strong>$${estimado.toLocaleString('es-CO')}</strong>. Verifique el tiquete (se guardará para conciliación).`;
+    }
+}
+
+function limpiarCamposFacturaCaribe() {
+    const numInput = document.getElementById('factura-numero');
+    const valInput = document.getElementById('factura-valor');
+    const fotoInput = document.getElementById('factura-foto-input');
+    const previewBox = document.getElementById('factura-foto-preview-box');
+    const previewImg = document.getElementById('factura-foto-preview');
+    const btnCam = document.getElementById('btn-capturar-factura');
+    const alertBox = document.getElementById('factura-discrepancia-alert');
+
+    if (numInput) numInput.value = '';
+    if (valInput) valInput.value = '';
+    if (fotoInput) fotoInput.value = '';
+    if (previewBox) previewBox.style.display = 'none';
+    if (previewImg) previewImg.src = '';
+    if (btnCam) btnCam.style.display = 'flex';
+    if (alertBox) alertBox.style.display = 'none';
+    capturedFacturaPhoto = null;
+}
+
+function actualizarVisibilidadFacturaCaribe() {
+    const container = document.getElementById('factura-caribe-container');
+    if (!container) return;
+    const provSelect = document.getElementById('proveedor');
+    let provVal = provSelect ? provSelect.value : '';
+    if (provVal === 'OTRO') {
+        provVal = document.getElementById('custom-proveedor')?.value || '';
+    }
+    if (esProveedorCaribe(provVal)) {
+        container.style.display = 'block';
+        evaluarDiscrepanciaFacturaCaribe();
+    } else {
+        container.style.display = 'none';
+        limpiarCamposFacturaCaribe();
+    }
+}
+
+document.getElementById('factura-valor')?.addEventListener('input', evaluarDiscrepanciaFacturaCaribe);
+document.getElementById('btn-capturar-factura')?.addEventListener('click', () => {
+    document.getElementById('factura-foto-input')?.click();
+});
+document.getElementById('btn-eliminar-foto-factura')?.addEventListener('click', () => {
+    capturedFacturaPhoto = null;
+    const fotoInput = document.getElementById('factura-foto-input');
+    const previewBox = document.getElementById('factura-foto-preview-box');
+    const previewImg = document.getElementById('factura-foto-preview');
+    const btnCam = document.getElementById('btn-capturar-factura');
+    if (fotoInput) fotoInput.value = '';
+    if (previewBox) previewBox.style.display = 'none';
+    if (previewImg) previewImg.src = '';
+    if (btnCam) btnCam.style.display = 'flex';
+});
+document.getElementById('factura-foto-input')?.addEventListener('change', (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const maxDim = 1024;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+                if (width > maxDim) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                }
+            } else {
+                if (height > maxDim) {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            capturedFacturaPhoto = canvas.toDataURL('image/jpeg', 0.70);
+            const previewImg = document.getElementById('factura-foto-preview');
+            const previewBox = document.getElementById('factura-foto-preview-box');
+            const btnCam = document.getElementById('btn-capturar-factura');
+            if (previewImg) previewImg.src = capturedFacturaPhoto;
+            if (previewBox) previewBox.style.display = 'block';
+            if (btnCam) btnCam.style.display = 'none';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+});
 
 window.eliminarProductoRegistrado = function(index) {
     if (index >= 0 && index < collectedProducts.length) {
@@ -2067,6 +2265,36 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         }
     }
 
+    // Validación estricta de Factura Física en Sitio para proveedor Caribe
+    const requiereFacturaCaribe = esProveedorCaribe(proveedorName);
+    let numeroFacturaVal = '';
+    let valorFacturaVal = '';
+    if (requiereFacturaCaribe) {
+        numeroFacturaVal = (document.getElementById('factura-numero')?.value || '').trim();
+        const rawValor = (document.getElementById('factura-valor')?.value || '').trim();
+        const parsedValor = parseFloat(rawValor);
+
+        if (!numeroFacturaVal) {
+            alert("⚠️ Para recolecciones de Supermercados Caribe es obligatorio ingresar el N° de Factura / Tiquete.");
+            const el = document.getElementById('factura-numero');
+            if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            return;
+        }
+        if (!rawValor || isNaN(parsedValor) || parsedValor <= 0) {
+            alert("⚠️ Para recolecciones de Supermercados Caribe es obligatorio ingresar el Valor Total de la Factura ($ COP).");
+            const el = document.getElementById('factura-valor');
+            if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            return;
+        }
+        if (!capturedFacturaPhoto) {
+            alert("⚠️ Para recolecciones de Supermercados Caribe es obligatorio tomar la fotografía de la factura física.");
+            const el = document.getElementById('btn-capturar-factura');
+            if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            return;
+        }
+        valorFacturaVal = Math.round(parsedValor);
+    }
+
     const btnSubmit = document.getElementById('btn-submit');
     const spinner = btnSubmit.querySelector('.spinner');
     const textSpan = btnSubmit.querySelector('.btn-text-content');
@@ -2098,6 +2326,9 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         totalKilos: totalKilos,
         totalAtados: totalAtados,
         observaciones: observacionesVal,
+        numeroFactura: numeroFacturaVal || '',
+        valorFactura: valorFacturaVal !== '' ? valorFacturaVal : '',
+        fotoFactura: '',
         ubicacionGps: ubicacionGps,
         firma: firmaDataUrl,
         fecha: (() => {
@@ -2114,11 +2345,20 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     };
 
     try {
-        // 0.1 Intentar subir firma a Firebase Storage (o mantener base64 offline)
+        // 0.1 Intentar subir firma y foto de factura a Firebase Storage (o mantener base64 offline)
         let firmaURL = firmaDataUrl;
         if (navigator.onLine) {
             firmaURL = await subirFirmaAStorage(firmaDataUrl, recordId);
         }
+        let fotoFacturaFinal = '';
+        if (requiereFacturaCaribe && capturedFacturaPhoto) {
+            if (navigator.onLine) {
+                fotoFacturaFinal = await subirFotoFacturaAStorage(capturedFacturaPhoto, recordId);
+            } else {
+                fotoFacturaFinal = capturedFacturaPhoto;
+            }
+        }
+        data.fotoFactura = fotoFacturaFinal || '';
 
         // 1. Guardar en respaldo local (LocalStorage) de inmediato
         let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
@@ -2186,6 +2426,8 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         resetearDropdownSucursal("Primero seleccione un proveedor");
+        limpiarCamposFacturaCaribe();
+        actualizarVisibilidadFacturaCaribe();
 
         // Mostrar Comprobante Digital Modal al conductor e información del recibo
         mostrarComprobanteDigital({ ...data, firma: firmaURL, id: recordId });
@@ -2411,12 +2653,21 @@ function renderRecordsInTable(records, tbody) {
             ? `<br><a href="https://www.google.com/maps?q=${encodeURIComponent(data.ubicacionGps)}" target="_blank" rel="noopener noreferrer" style="font-size: 0.72rem; color: #059669; text-decoration: none; font-weight: 600;">📍 Ver mapa</a>` 
             : '';
 
+        let facturaBadgeHtml = '';
+        if (data.numeroFactura || data.valorFactura) {
+            const valStr = data.valorFactura ? ` ($${Number(data.valorFactura).toLocaleString('es-CO')})` : '';
+            const fotoLink = data.fotoFactura
+                ? ` <a href="#" onclick="verFotoFactura('${docId}', '${recordLocalId}'); return false;" title="Ver Foto Factura" style="color:#0284c7; text-decoration:underline; margin-left:4px; font-weight:700;">📷 Factura</a>`
+                : '';
+            facturaBadgeHtml = `<div style="margin-top:3px;"><span style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:1px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">🧾 Fact: ${escapeHtml(String(data.numeroFactura || 'S/N'))}${valStr}</span>${fotoLink}</div>`;
+        }
+
         tr.innerHTML = `
             <td style="font-weight: 500; white-space: nowrap;">${escapeHtml(fechaTexto)}</td>
             <td style="text-transform: capitalize;">${escapeHtml(aNombrePropio(data.conductor || '-'))}</td>
             <td style="text-transform: capitalize;">${escapeHtml(ruta)}</td>
             <td style="text-transform: capitalize;">${escapeHtml(provDisplay)}</td>
-            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${escapeHtml(sucDisplay)}${gpsLink}</td>
+            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${escapeHtml(sucDisplay)}${gpsLink}${facturaBadgeHtml}</td>
             <td style="font-weight: bold;">${cleanTotalKg}</td>
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569; word-break: break-word;">${escapeHtml(obsText)}</td>
             <td><span class="badge ${badgeClass}" ${badgeStyle}>${escapeHtml(badgeText)}</span></td>
@@ -2438,6 +2689,26 @@ function renderRecordsInTable(records, tbody) {
         tbody.appendChild(tr);
     });
 }
+
+window.verFotoFactura = function(docId, recordLocalId) {
+    const rec = adminRecordsCache.find(r => (docId && r._docId === docId) || (recordLocalId && (r.id === recordLocalId || r._docId === recordLocalId)));
+    const url = rec ? rec.fotoFactura : '';
+    if (!url) {
+        alert("No hay fotografía de factura disponible para este registro.");
+        return;
+    }
+    if (String(url).startsWith('http')) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    } else if (String(url).startsWith('data:image')) {
+        const w = window.open('', '_blank');
+        if (w) {
+            w.document.write(`<html><head><title>Factura ${escapeHtml(String(rec.numeroFactura || ''))}</title></head><body style="margin:0;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${url}" style="max-width:98vw;max-height:98vh;object-fit:contain;"></body></html>`);
+            w.document.close();
+        }
+    } else {
+        alert("Soporte registrado: " + url);
+    }
+};
 
 // Función global para eliminar un registro individual
 async function eliminarRecoleccion(firestoreDocId, localRecordId) {
@@ -2492,7 +2763,7 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
         }
 
         let csvContent = "\uFEFF"; // UTF-8 BOM para abrir correctamente en Excel
-        csvContent += "ID,Fecha,Conductor,Ruta,Proveedor,Sucursal/Punto,Productos,Total Kilos,Observaciones,Estado\n";
+        csvContent += "ID,Fecha,Conductor,Ruta,Proveedor,Sucursal/Punto,Productos,Total Kilos,Observaciones,Estado,Numero_Factura,Valor_Factura,Foto_Factura\n";
 
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -2515,8 +2786,11 @@ document.getElementById('btn-export')?.addEventListener('click', async () => {
             const totalResumen = `"${formatResumenTotales(data)}"`;
             const observaciones = `"${(data.observaciones || '').replace(/"/g, '""')}"`;
             const estado = `"${data.estado || ''}"`;
+            const numFactura = `"${String(data.numeroFactura || '').replace(/"/g, '""')}"`;
+            const valFactura = `"${data.valorFactura !== undefined && data.valorFactura !== null ? data.valorFactura : ''}"`;
+            const fotoFactura = `"${(data.fotoFactura && String(data.fotoFactura).startsWith('http')) ? data.fotoFactura : (data.fotoFactura ? 'Foto Factura Registrada' : '')}"`;
 
-            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${sucursal},${productosStr},${totalResumen},${observaciones},${estado}\n`;
+            csvContent += `${doc.id},${fechaFormatted},${conductor},${ruta},${proveedor},${sucursal},${productosStr},${totalResumen},${observaciones},${estado},${numFactura},${valFactura},${fotoFactura}\n`;
         });
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -2575,7 +2849,12 @@ async function enviarAGoogleSheets(data) {
         console.warn("⚠️ Falló POST a Google Sheets, procediendo con GET:", ePost);
         // 2. Envío secundario redundante vía GET
         try {
-            const getUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=${actionType}&payload=${payloadParam}`;
+            const dataLightGet = { ...dataLight };
+            if (dataLightGet.fotoFactura && dataLightGet.fotoFactura.length > 300 && !dataLightGet.fotoFactura.startsWith('http')) {
+                dataLightGet.fotoFactura = "Foto Factura Registrada";
+            }
+            const payloadParamGet = encodeURIComponent(JSON.stringify(dataLightGet));
+            const getUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=${actionType}&payload=${payloadParamGet}`;
             const getResponse = await fetch(getUrl, { method: 'GET' });
             if (getResponse.ok || getResponse.type === 'opaque') {
                 console.log("✅ Datos enviados a Google Sheets vía GET.");
@@ -3224,6 +3503,7 @@ function initRutasYProveedores() {
             document.getElementById('custom-ruta').required = true;
         }
         renderizarCronogramaRuta(selectedRuta);
+        actualizarVisibilidadFacturaCaribe();
     });
 
     // Event listener al cambiar Punto / Sucursal (AUTOCOMPLETA EL PROVEEDOR)
@@ -3269,12 +3549,17 @@ function initRutasYProveedores() {
                 autofillBadge.style.display = 'inline-block';
             }
         }
+        actualizarVisibilidadFacturaCaribe();
     });
 
     document.getElementById('custom-sucursal')?.addEventListener('input', () => {
         document.getElementById('custom-sucursal')?.classList.remove('input-error');
         const customErrorMsg = document.getElementById('custom-sucursal-error');
         if (customErrorMsg) customErrorMsg.style.display = 'none';
+    });
+
+    document.getElementById('custom-proveedor')?.addEventListener('input', () => {
+        actualizarVisibilidadFacturaCaribe();
     });
 
     // Event listener al cambiar Proveedor manualmente
@@ -3286,6 +3571,7 @@ function initRutasYProveedores() {
             const currentRuta = rutaSelect.value || '';
             populardropdownProveedoresPorRuta(currentRuta, true);
             resetearDropdownSucursal("Seleccione un proveedor de la lista");
+            actualizarVisibilidadFacturaCaribe();
             return;
         }
 
@@ -3305,6 +3591,7 @@ function initRutasYProveedores() {
             document.getElementById('custom-proveedor').required = false;
             populardropdownSucursales(selectedProv);
         }
+        actualizarVisibilidadFacturaCaribe();
     });
 
     // Cargar banner con itinerario recomendado según día de la semana
@@ -3690,6 +3977,7 @@ function renderizarCronogramaRuta(rutaSeleccionada) {
                     sucursalSelect.value = opt.value;
                 }
             }
+            actualizarVisibilidadFacturaCaribe();
         };
 
         timelineList.appendChild(item);
@@ -3840,6 +4128,18 @@ function mostrarComprobanteDigital(data) {
 
     document.getElementById('receipt-total-kilos').textContent = formatResumenTotales(data);
 
+    const facturaRow = document.getElementById('receipt-factura-row');
+    const facturaInfo = document.getElementById('receipt-factura-info');
+    if (facturaRow && facturaInfo) {
+        if (data.numeroFactura || data.valorFactura) {
+            const valFmt = data.valorFactura ? `$${Number(data.valorFactura).toLocaleString('es-CO')}` : 'S/V';
+            facturaInfo.textContent = `N° ${data.numeroFactura || 'S/N'} — Valor: ${valFmt}`;
+            facturaRow.style.display = 'block';
+        } else {
+            facturaRow.style.display = 'none';
+        }
+    }
+
     const obsContainer = document.getElementById('receipt-obs-container');
     if (data.observaciones && data.observaciones.trim() !== '') {
         obsContainer.style.display = 'block';
@@ -3913,6 +4213,7 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
         `📦 *PRODUCTOS RECOLECTADOS:*\n${prodsTxt}\n` +
         `-----------------------------------------\n` +
         `⚖️ *TOTAL RECOLECTADO: ${totalResumenStr}*\n` +
+        (d.numeroFactura ? `🧾 *Factura Proveedor:* N° ${d.numeroFactura}${d.valorFactura ? ' ($' + Number(d.valorFactura).toLocaleString('es-CO') + ')' : ''}\n` : '') +
         (d.observaciones ? `📝 *Observaciones:* ${d.observaciones}\n` : '') +
         `✍️ *Firma Registrada:* OK\n` +
         `-----------------------------------------\n` +
@@ -3946,7 +4247,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.9&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.8.1&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -4754,7 +5055,7 @@ function initAdminEditModal() {
 }
 
 // ==============================================================================
-// VERIFICAR SI YA EXISTE PESAJE / CARGA REGISTRADA HOY PARA UN PUNTO (v1.7.9)
+// VERIFICAR SI YA EXISTE PESAJE / CARGA REGISTRADA HOY PARA UN PUNTO (v1.8.1)
 // ==============================================================================
 function verificarPesajePrevioHoy(proveedor, punto) {
     try {
@@ -5288,12 +5589,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.7.9 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.8.1 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.7.9')
+            navigator.serviceWorker.register('/sw.js?v=1.8.1')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.7.9 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.8.1 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -5301,8 +5602,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.7.9 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.9&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.8.1 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.8.1&t=' + Date.now();
                                 }
                             };
                         }
@@ -5331,7 +5632,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.7.9&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.8.1&t=' + Date.now();
             }
         });
 
@@ -5340,7 +5641,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.7.9&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.8.1&t=' + Date.now();
                 }
             }
         });

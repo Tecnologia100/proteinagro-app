@@ -985,5 +985,98 @@ label {
     background: #f1f5f9 !important;
 }
 
+/* =========================================================
+   CAPTURA DE FACTURA FÍSICA EN SITIO (SUPERMERCADOS CARIBE)
+   ========================================================= */
+.factura-caribe-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1.5px solid #7dd3fc;
+    border-left: 5px solid #0284c7;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+    animation: fadeIn 0.25s ease-out;
+}
+.factura-caribe-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #bae6fd;
+}
+.factura-caribe-icon {
+    font-size: 1.5rem;
+    background: #ffffff;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(2, 132, 199, 0.12);
+}
+.factura-caribe-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0369a1;
+}
+.factura-caribe-subtitle {
+    margin: 2px 0 0 0;
+    font-size: 0.75rem;
+    color: #0284c7;
+    font-weight: 500;
+}
+.factura-caribe-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+@media (max-width: 480px) {
+    .factura-caribe-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.btn-camera-factura {
+    width: 100%;
+    padding: 12px;
+    background: #ffffff;
+    border: 2px dashed #0284c7;
+    color: #0369a1;
+    font-weight: 700;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+.btn-camera-factura:hover, .btn-camera-factura:active {
+    background: #e0f2fe;
+}
+.discrepancia-banner {
+    margin: 6px 0 12px 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    font-weight: 600;
+}
+.discrepancia-banner.warn {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-left: 4px solid #f59e0b;
+    color: #92400e;
+}
+.discrepancia-banner.ok {
+    background: #ecfdf5;
+    border: 1px solid #6ee7b7;
+    border-left: 4px solid #10b981;
+    color: #065f46;
+}
+
 
 

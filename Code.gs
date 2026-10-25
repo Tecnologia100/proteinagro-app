@@ -282,8 +282,8 @@ function obtenerRecoleccionesHttp(ss, fechaFiltro, rutaFiltro) {
     }
 
     var lastRow = sheet.getLastRow();
-    // Leer columnas A hasta I (ID, Fecha_Hora, Ruta, Conductor, Proveedor, Punto, Materia, Kg, Observaciones)
-    var numCols = Math.min(sheet.getLastColumn(), 9);
+    // Leer columnas A hasta Q (ID..Observaciones + Numero_Factura, Valor_Factura, Foto_Factura en O, P, Q)
+    var numCols = Math.min(sheet.getLastColumn(), 17);
     var data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
     var resultado = [];
 
@@ -357,7 +357,10 @@ function obtenerRecoleccionesHttp(ss, fechaFiltro, rutaFiltro) {
         sucursal: String(row[5] || ''),
         materia: String(row[6] || ''),
         totalKilos: numKg,
-        observaciones: String(row[8] || '')
+        observaciones: String(row[8] || ''),
+        numeroFactura: row.length > 14 ? String(row[14] || '').trim() : '',
+        valorFactura: row.length > 15 && row[15] !== '' ? (parseFloat(String(row[15]).replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0) : 0,
+        fotoFactura: row.length > 16 ? String(row[16] || '').trim() : ''
       });
     }
 
@@ -447,6 +450,10 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     var punto = data.punto || data.sucursal || '';
     var observaciones = data.observaciones || '';
     var ubicacionGps = data.ubicacionGps || '0';
+    var numeroFactura = String(data.numeroFactura || data.numero_factura || '').trim();
+    var valorFacturaRaw = (data.valorFactura !== undefined && data.valorFactura !== null && data.valorFactura !== '') ? data.valorFactura : ((data.valor_factura !== undefined && data.valor_factura !== null && data.valor_factura !== '') ? data.valor_factura : '');
+    var valorFactura = valorFacturaRaw !== '' ? parseKilosNumero(valorFacturaRaw) : '';
+    var fotoFactura = String(data.fotoFactura || data.foto_factura || '').trim();
     
     var productos = data.productos || [];
     if (typeof productos === 'string') {
@@ -538,6 +545,7 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     var catalogoHistorico = null; // Carga perezosa si algún producto lo requiere
 
     var filasNuevas = [];
+    var filasFactura = [];
 
     for (var p = 0; p < productos.length; p++) {
       var prodItem = productos[p];
@@ -618,21 +626,38 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         precio,
         valor
       ]);
+      filasFactura.push([
+        sanitizarParaHoja(numeroFactura),
+        (valorFactura !== '' && valorFactura > 0) ? valorFactura : '',
+        sanitizarParaHoja(fotoFactura)
+      ]);
 
       existingRecordsMap[prodKey] = true;
       existingIdsMap[id] = true;
     }
 
-    // 3. Escritura atómica en lote (1 sola llamada setValues para todas las materias primas del viaje)
+    // 3. Escritura atómica en lote (1 sola llamada setValues para A:L y 1 para O:Q sin tocar M:N)
     if (filasNuevas.length > 0) {
-      // Blindaje de capacidad: asegurar que la hoja tenga suficientes renglones antes de escribir
+      // Blindaje de capacidad: asegurar que la hoja tenga suficientes renglones y columnas antes de escribir
       var maxFilasActuales = sheet.getMaxRows();
       var filaFinalRequerida = targetRow + filasNuevas.length;
       if (filaFinalRequerida > maxFilasActuales) {
         var filasFaltantes = filaFinalRequerida - maxFilasActuales;
         sheet.insertRowsAfter(maxFilasActuales, Math.max(filasFaltantes, 200));
       }
+      var maxColsActuales = sheet.getMaxColumns();
+      if (maxColsActuales < 17) {
+        sheet.insertColumnsAfter(maxColsActuales, 17 - maxColsActuales);
+      }
+      // Asegurar encabezados O1:Q1
+      var hdrOQ = sheet.getRange(1, 15, 1, 3).getValues()[0];
+      if (!hdrOQ[0] || String(hdrOQ[0]).trim() === '') {
+        sheet.getRange(1, 15, 1, 3).setValues([["Numero_Factura", "Valor_Factura", "Foto_Factura"]]);
+      }
       sheet.getRange(targetRow + 1, 1, filasNuevas.length, 12).setValues(filasNuevas);
+      if (numeroFactura || (valorFactura !== '' && valorFactura > 0) || fotoFactura) {
+        sheet.getRange(targetRow + 1, 15, filasFactura.length, 3).setValues(filasFactura);
+      }
     }
 
     return ContentService.createTextOutput(JSON.stringify({
@@ -2723,7 +2748,7 @@ function getDashboardDataRaw() {
     }
 
     var headers = values[0];
-    var colMap = { fecha: -1, proveedor: -1, punto: -1, materia: -1, kg: -1, precio: -1, valor: -1, id: -1, gps: -1 };
+    var colMap = { fecha: -1, proveedor: -1, punto: -1, materia: -1, kg: -1, precio: -1, valor: -1, id: -1, gps: -1, numFactura: -1, valorFactura: -1, fotoFactura: -1 };
 
     for (var c = 0; c < headers.length; c++) {
       var h = String(headers[c] || "").trim().toLowerCase();
@@ -2733,6 +2758,9 @@ function getDashboardDataRaw() {
       else if (/materia|producto/i.test(h) && colMap.materia === -1) colMap.materia = c;
       else if (/^kg|kilos|peso/i.test(h) && colMap.kg === -1) colMap.kg = c;
       else if (/precio|tarifa/i.test(h) && colMap.precio === -1) colMap.precio = c;
+      else if (/numero_factura|num_factura|nro_factura/i.test(h) && colMap.numFactura === -1) colMap.numFactura = c;
+      else if (/valor_factura|total_factura/i.test(h) && colMap.valorFactura === -1) colMap.valorFactura = c;
+      else if (/foto_factura|soporte_factura/i.test(h) && colMap.fotoFactura === -1) colMap.fotoFactura = c;
       else if (/valor|total/i.test(h) && colMap.valor === -1) colMap.valor = c;
       else if (/^id/i.test(h) && colMap.id === -1) colMap.id = c;
       else if (/gps|ubicaci/i.test(h) && colMap.gps === -1) colMap.gps = c;
@@ -2745,6 +2773,9 @@ function getDashboardDataRaw() {
     if (colMap.kg === -1) colMap.kg = 7;
     if (colMap.precio === -1) colMap.precio = 10;
     if (colMap.valor === -1) colMap.valor = 11;
+    if (colMap.numFactura === -1 && headers.length >= 15) colMap.numFactura = 14;
+    if (colMap.valorFactura === -1 && headers.length >= 16) colMap.valorFactura = 15;
+    if (colMap.fotoFactura === -1 && headers.length >= 17) colMap.fotoFactura = 16;
 
     var timeZone = ss.getSpreadsheetTimeZone() || "America/Bogota";
     var data = [];
@@ -2785,6 +2816,13 @@ function getDashboardDataRaw() {
 
       if (provClean) proveedoresSet[provClean] = true;
 
+      var numFactStr = (colMap.numFactura !== -1 && row.length > colMap.numFactura && row[colMap.numFactura] !== null && row[colMap.numFactura] !== undefined) ? String(row[colMap.numFactura]).trim() : "";
+      var rawValFact = (colMap.valorFactura !== -1 && row.length > colMap.valorFactura) ? row[colMap.valorFactura] : 0;
+      var valFactNum = 0;
+      if (typeof rawValFact === 'number') valFactNum = rawValFact;
+      else if (rawValFact) valFactNum = parseFloat(String(rawValFact).replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0;
+      var fotoFactStr = (colMap.fotoFactura !== -1 && row.length > colMap.fotoFactura && row[colMap.fotoFactura] !== null && row[colMap.fotoFactura] !== undefined) ? String(row[colMap.fotoFactura]).trim() : "";
+
       data.push({
         FECHA: fechaStr,
         PROVEEDOR: provClean,
@@ -2793,7 +2831,10 @@ function getDashboardDataRaw() {
         KG: kg,
         PRECIO: precio,
         VALOR: valor,
-        ID: colMap.id !== -1 ? String(row[colMap.id] || "").trim() : ""
+        ID: colMap.id !== -1 ? String(row[colMap.id] || "").trim() : "",
+        NUMERO_FACTURA: numFactStr,
+        VALOR_FACTURA: valFactNum,
+        FOTO_FACTURA: fotoFactStr
       });
     }
 

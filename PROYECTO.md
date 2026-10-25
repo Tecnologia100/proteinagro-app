@@ -854,6 +854,22 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 ---
 
+## 🧾 26. Captura y Conciliación de Facturas Físicas en Sitio para Caribe (`v1.8.1`)
+> **Fecha de Implementación:** 25 de Octubre de 2026  
+> **Archivos Asociados:** [`app.js`](./app.js), [`index.html`](./index.html), [`styles.css`](./styles.css), [`sw.js`](./sw.js), [`Code.gs`](./Code.gs), [`GEMINI.md`](./GEMINI.md)  
+> **Objetivo:** Habilitar la captura obligatoria de Número de Factura, Valor Total Facturado y Foto de Factura Física en sitio exclusivamente para **Caribe Supermercados / Caribe (Cavasa)**, con alerta informativa de discrepancia en tiempo real y persistencia en las columnas `O`, `P` y `Q` de Google Sheets para automatizar el cruce masivo (`BUSCARV`) contra el libro auxiliar contable.
+
+- **Interfaz Móvil del Conductor (PWA / TWA):**
+  - Tarjeta condicional `#factura-caribe-container` visible únicamente cuando `esProveedorCaribe(proveedor)` es verdadero.
+  - Cálculo reactivo de discrepancia (`calcularValorEstimadoCaribe` vs `#factura-valor`) con banner informativo no bloqueante cuando la diferencia supera `$500 COP`.
+  - Captura fotográfica desde cámara trasera con compresión automática en Canvas (`1200px`, JPEG `0.72`) y subida a Firebase Storage (`facturas/${recordId}.jpg`) con fallback offline.
+- **Persistencia en Google Sheets (`Code.gs`):**
+  - Escritura segmentada en `Recolecciones`: rango `A:L` (columnas 1 a 12) y rango `O:Q` (columnas 15 a 17: `Numero_Factura`, `Valor_Factura`, `Foto_Factura`), preservando intactas las fórmulas de auditoría en `M` y `N`.
+- **Reportes y Conciliador:**
+  - Columnas `Numero_Factura`, `Valor_Factura` y `Foto_Factura` integradas en la tabla en vivo, recibo digital, WhatsApp, exportación CSV administrativa y reporte Excel del Conciliador.
+
+---
+
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
 
 
