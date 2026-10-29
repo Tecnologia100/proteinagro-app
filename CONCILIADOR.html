@@ -4565,7 +4565,7 @@
                     const etiquetaDoc = item.facturaDoc ? `Factura ${item.facturaDoc}` : 'Lote';
                     const obsPunto = item.puntoDoc ? ` en ${item.puntoDoc}` : (ri.PUNTO ? ` en ${ri.PUNTO}` : '');
                     exactos.push({
-                        dia: item.dia, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
+                        dia: item.dia, mes: item.mes, anio: item.anio, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
                         kg_proveedor: item.kg_proveedor, kg_recoleccion: ri.kg,
                         delta_kg: deltaKg, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
@@ -4615,7 +4615,7 @@
                     const deltaKg = sumaKg - item.kg_proveedor;
                     const fechaRango = `${r1.fecha.slice(0, 5)}+${r2.fecha.slice(0, 5)}`;
                     exactos.push({
-                        dia: item.dia, sortKey: r1.sortKey || item.sortKey, fecha: r1.fecha, producto: item.producto,
+                        dia: item.dia, mes: item.mes, anio: item.anio, sortKey: r1.sortKey || item.sortKey, fecha: r1.fecha, producto: item.producto,
                         kg_proveedor: item.kg_proveedor, kg_recoleccion: sumaKg,
                         delta_kg: deltaKg, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: sumaKg * precio,
@@ -4673,7 +4673,7 @@
                     const deltaKg = ri.kg - item.kg_proveedor;
                     if (esDentroTolerancia(deltaKg, item.kg_proveedor)) {
                         exactos.push({
-                            dia: item.dia, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
+                            dia: item.dia, mes: item.mes, anio: item.anio, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
                             kg_proveedor: item.kg_proveedor, kg_recoleccion: ri.kg,
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
@@ -4685,7 +4685,7 @@
                         });
                     } else {
                         desviaciones.push({
-                            dia: item.dia, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
+                            dia: item.dia, mes: item.mes, anio: item.anio, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
                             kg_proveedor: item.kg_proveedor, kg_recoleccion: ri.kg,
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
@@ -4698,7 +4698,7 @@
                     }
                 } else {
                     faltantes.push({
-                        dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
+                        dia: item.dia, mes: item.mes, anio: item.anio, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                         kg_proveedor: item.kg_proveedor, kg_recoleccion: 0,
                         delta_kg: -item.kg_proveedor, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: 0,
@@ -4728,7 +4728,7 @@
                         const sumaEsperada = itemD.kg_proveedor + despSig.kg_proveedor;
                         if (esDentroTolerancia(kgRecSig - sumaEsperada, sumaEsperada)) {
                             exactos.push({
-                                dia: itemD.dia, sortKey: itemD.sortKey, fecha: itemD.fecha, producto: itemD.producto,
+                                dia: itemD.dia, mes: itemD.mes, anio: itemD.anio, sortKey: itemD.sortKey, fecha: itemD.fecha, producto: itemD.producto,
                                 kg_proveedor: itemD.kg_proveedor, kg_recoleccion: itemD.kg_proveedor,
                                 delta_kg: 0, precio_unit: itemD.precio_unit,
                                 valor_proveedor: itemD.valor_proveedor, valor_recoleccion: itemD.valor_proveedor,
@@ -4737,7 +4737,7 @@
                             });
                             const deltaSig = kgRecSig - sumaEsperada;
                             exactos.push({
-                                dia: despSig.dia, sortKey: despSig.sortKey, fecha: despSig.fecha, producto: despSig.producto,
+                                dia: despSig.dia, mes: despSig.mes, anio: despSig.anio, sortKey: despSig.sortKey, fecha: despSig.fecha, producto: despSig.producto,
                                 kg_proveedor: despSig.kg_proveedor, kg_recoleccion: despSig.kg_proveedor + deltaSig,
                                 delta_kg: deltaSig, precio_unit: despSig.precio_unit,
                                 valor_proveedor: despSig.valor_proveedor, valor_recoleccion: (despSig.kg_proveedor + deltaSig) * despSig.precio_unit,
@@ -4752,7 +4752,7 @@
                         if (esDentroTolerancia(kgRecSig - itemD.kg_proveedor, itemD.kg_proveedor)) {
                             const delta = kgRecSig - itemD.kg_proveedor;
                             exactos.push({
-                                dia: itemD.dia, sortKey: itemD.sortKey, fecha: itemD.fecha, producto: itemD.producto,
+                                dia: itemD.dia, mes: itemD.mes, anio: itemD.anio, sortKey: itemD.sortKey, fecha: itemD.fecha, producto: itemD.producto,
                                 kg_proveedor: itemD.kg_proveedor, kg_recoleccion: kgRecSig,
                                 delta_kg: delta, precio_unit: itemD.precio_unit,
                                 valor_proveedor: itemD.valor_proveedor, valor_recoleccion: kgRecSig * itemD.precio_unit,
@@ -4780,7 +4780,7 @@
 
                     if (esDentroTolerancia(deltaKg, item.kg_proveedor)) {
                         exactos.push({
-                            dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
+                            dia: item.dia, mes: item.mes, anio: item.anio, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                             kg_proveedor: item.kg_proveedor, kg_recoleccion: kgRec,
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
@@ -4789,7 +4789,7 @@
                         });
                     } else {
                         desviaciones.push({
-                            dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
+                            dia: item.dia, mes: item.mes, anio: item.anio, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                             kg_proveedor: item.kg_proveedor, kg_recoleccion: kgRec,
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
@@ -4819,7 +4819,7 @@
                             const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
                             const rawLabel = item.rawProdLabel || item.producto;
                             exactos.push({
-                                dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
+                                dia: item.dia, mes: item.mes, anio: item.anio, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                                 kg_proveedor: item.kg_proveedor, kg_recoleccion: kgRec,
                                 delta_kg: deltaKg, precio_unit: precio,
                                 valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
@@ -4853,7 +4853,7 @@
                             const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
                             const rawLabel = item.rawProdLabel || item.producto;
                             exactos.push({
-                                dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
+                                dia: item.dia, mes: item.mes, anio: item.anio, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                                 kg_proveedor: item.kg_proveedor, kg_recoleccion: kgRec,
                                 delta_kg: deltaKg, precio_unit: precio,
                                 valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
@@ -4895,7 +4895,7 @@
                     const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
                     const rawLabel = item.rawProdLabel || item.producto;
                     desviaciones.push({
-                        dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
+                        dia: item.dia, mes: item.mes, anio: item.anio, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                         kg_proveedor: item.kg_proveedor, kg_recoleccion: cand.kgRec,
                         delta_kg: deltaKg, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: cand.kgRec * precio,
@@ -4917,7 +4917,7 @@
                 const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
 
                 faltantes.push({
-                    dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
+                    dia: item.dia, mes: item.mes, anio: item.anio, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                     kg_proveedor: item.kg_proveedor, kg_recoleccion: 0,
                     delta_kg: -item.kg_proveedor, precio_unit: precio,
                     valor_proveedor: valProv, valor_recoleccion: 0,
@@ -5055,12 +5055,18 @@
             baseItems.forEach(it => {
                 let fechaLimpia = it.fecha;
                 let etiquetaFacturaObs = '';
-                if (/Factura|\(Ítem|\(Item/i.test(fechaLimpia)) {
+                if (/Factura|\(Ítem|\(Item|Lote/i.test(fechaLimpia)) {
                     etiquetaFacturaObs = fechaLimpia;
                     if (it.dia && it.mes && it.anio) {
                         fechaLimpia = `${String(it.dia).padStart(2, '0')}/${String(it.mes).padStart(2, '0')}/${it.anio}`;
-                    } else if (d.periodoStr) {
+                    } else if (d.periodoStr && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d.periodoStr)) {
                         fechaLimpia = d.periodoStr;
+                    } else {
+                        const mNum = it.mes || (d && d.mes) || 9;
+                        const yNum = it.anio || (d && d.anio) || 2026;
+                        const ultDia = new Date(yNum, mNum, 0).getDate();
+                        const dNum = it.dia || ultDia;
+                        fechaLimpia = `${String(dNum).padStart(2, '0')}/${String(mNum).padStart(2, '0')}/${yNum}`;
                     }
                 }
                 const fKey = fechaLimpia;

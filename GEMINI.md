@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.8.5)  
+> **Última Actualización:** Octubre 2026 (Versión 1.8.6)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -422,6 +422,29 @@ i.fecha), consolidándose directamente en la fila de ese día.
      - Compatibilidad entre HUESO BLANCO y HUESO DE CERDO / HUESO PROMOCION cuando el peso coincide exactamente.
   4. *Flexibilización de Punto/Sucursal:*
      - Si el campo ALMACÉN / DIRECCIÓN del PDF contiene una dirección física o postal y no una sede conocida, no se restringe iltroPunto, permitiendo el cotejo contra todas las sedes del proveedor en el período.
+
+---
+
+### 28. Sincronización Automática en Vivo Apps Script ↔ GitHub y Desacoplamiento de Rutas Excluidas (v1.8.6)
+- **Diagnóstico y Causa Raíz:**
+  - Al abrir el Conciliador desde el menú de Google Sheets (*⚡ Conciliador > Abrir aquí en Sheets (Ventana Flotante)*), el sistema ejecutaba una copia estática y desactualizada de `CONCILIADOR.html` almacenada en el editor de Apps Script.
+  - Esto provocaba que en Google Sheets aún se manifestaran los fallos ya corregidos en local:
+    1. Filtro espurio `Auto: PROTEINAGRO SEPT (` con 0 Kg y 0 registros al cargar `PROTEINAGRO SEPT (5).xlsx`.
+    2. Alerta emergente bloqueante `alert('Escribe el nombre del producto tal como aparece en el Excel del proveedor.')` de `script.googleusercontent.com` al hacer clic en "Guardar en Memoria".
+    3. Filas rotuladas con `Factura FV3C 34049 (Ítem X)` en la columna `FECHA` de la matriz y el archivo Excel exportado.
+- **Solución Implementada:**
+  1. *Carga Dinámica en Vivo desde GitHub (`Code.gs`):*
+     - `getConciliadorHtmlOutput()` ahora consulta en tiempo real `https://raw.githubusercontent.com/Tecnologia100/proteinagro-app/main/CONCILIADOR.html` con parámetro anti-caché `?_ts=...`.
+     - Si GitHub responde exitosamente (200 OK), Apps Script renderiza directamente el HTML actualizado en vivo vía `HtmlService.createHtmlOutput(htmlText)`.
+     - Si no hay red o falla GitHub, recurre transparentemente al archivo local interno `CONCILIADOR` como respaldo seguro.
+     - Aplica tanto para la ventana flotante en Sheets (`abrirConciliadorFlotante`, `abrirConciliacionDirectaFlotante`) como para el Web App oficial (`doGet`).
+     - **Beneficio Operativo:** El usuario nunca más tendrá que copiar y pegar 500 KB de HTML en Apps Script; cualquier commit en `main` se refleja inmediatamente en Google Sheets.
+  2. *Normalización Blindada de `FECHA` y Propagación de Fechas en `CONCILIADOR.html`:*
+     - En todos los bloques de emparejamiento (`exactos`, `desviaciones`, `faltantes`), se propagan explícitamente `mes: item.mes, anio: item.anio`.
+     - En `obtenerEstructuraMatrizConciliacion`, si la fecha contiene etiquetas como `Factura` o `Lote`, se formatea forzosamente a una fecha válida `DD/MM/YYYY` (usando día, mes y año del registro o mes de auditoría), trasladando los metadatos de factura y número de ítem a las observaciones del día.
+  3. *Regla de Exclusión Estricta de Rutas:*
+     - Queda estrictamente prohibido modificar, sincronizar o interactuar con `G:\Mi unidad\Antigravity\CONCILIADOR\CONCILIADOR.html`.
+     - La única ruta canónica de desarrollo es `G:\Mi unidad\Antigravity\PROTEINAGRO\CONCILIADOR.html` y su réplica de producción `G:\Mi unidad\PROTEINAGRO\CONCILIADOR.html`.
 
 ---
 

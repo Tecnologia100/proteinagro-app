@@ -11,7 +11,7 @@ function doGet(e) {
     var hasAppAction = (e && e.parameter && (e.parameter.action || e.parameter.payload || e.parameter.fecha || e.parameter.id || e.parameter.t || e.parameter.format === 'json'));
 
     if (isConciliador || !hasAppAction) {
-      return HtmlService.createHtmlOutputFromFile('CONCILIADOR')
+      return getConciliadorHtmlOutput()
         .setTitle('Conciliador de Materias y Proveedores')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
         .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
@@ -2591,13 +2591,28 @@ function configurarUrlWebApp() {
 }
 
 function getConciliadorHtmlOutput() {
+  // 1. Sincronización en vivo desde GitHub (Garantiza que Google Sheets use siempre la última versión oficial desplegada)
+  try {
+    var urlGitHub = "https://raw.githubusercontent.com/Tecnologia100/proteinagro-app/main/CONCILIADOR.html";
+    var res = UrlFetchApp.fetch(urlGitHub + "?_ts=" + new Date().getTime(), { muteHttpExceptions: true });
+    if (res.getResponseCode() === 200) {
+      var htmlText = res.getContentText();
+      if (htmlText && htmlText.indexOf("<!DOCTYPE html>") !== -1) {
+        return HtmlService.createHtmlOutput(htmlText);
+      }
+    }
+  } catch(e) {
+    Logger.log("No se pudo cargar CONCILIADOR desde GitHub en vivo: " + e.toString());
+  }
+
+  // 2. Respaldo de contingencia: archivo local interno en Apps Script
   try {
     return HtmlService.createHtmlOutputFromFile('CONCILIADOR');
   } catch(e1) {
     try {
       return HtmlService.createHtmlOutputFromFile('CONCILIADOR.html');
     } catch(e2) {
-      throw new Error("No se encontró el archivo HTML 'CONCILIADOR'. Asegúrate de que existe en el panel izquierdo de Apps Script.");
+      throw new Error("No se encontró el archivo HTML 'CONCILIADOR'. Asegúrate de tener conexión a GitHub o de que exista el archivo en Apps Script.");
     }
   }
 }

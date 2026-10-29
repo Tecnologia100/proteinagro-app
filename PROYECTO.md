@@ -929,3 +929,9 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 
 
+
+### 28. Sincronización Automática en Vivo Apps Script ↔ GitHub y Desacoplamiento de Rutas Excluidas (v1.8.6)
+- Carga dinámica de `CONCILIADOR.html` en vivo desde GitHub (`https://raw.githubusercontent.com/...`) en `Code.gs`.
+- Desacoplamiento permanente de la ruta `G:\Mi unidad\Antigravity\CONCILIADOR\CONCILIADOR.html`.
+- Normalización definitiva de la columna `FECHA` con propagación de `mes` y `anio`.
+
