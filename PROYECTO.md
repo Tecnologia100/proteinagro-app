@@ -870,6 +870,31 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 ---
 
+### 12.16 Motor Universal de Conciliación por Lotes sin Fecha Calendario (`v1.8.2`)
+
+> **Objetivo:** Soportar boletines y liquidaciones de proveedores estructurados por lotes/períodos sin fecha diaria (ej. **Carnes y Derivados de Occidente S.A. / Sevillana Cavasa**), desambiguando columnas de unidades vs. kilos y conciliando automáticamente contra viajes individuales o acumulados en plataforma.
+
+- **Autodetección y Limpieza Estructural (`CONCILIADOR.html`):**
+  - Escaneo ampliado a 12 filas × 20 columnas en `autodetectarProveedorYPeriodo`, reconociendo `CARNES Y DERIVADOS` y bloqueando `"PROTEINAGRO"` como nombre de proveedor.
+  - Descarte automático de columna `PIELES` (conteo de unidades) en presencia de `PIELES KILOS` y bloqueo de pie de liquidación (`TOTAL FACTURA`).
+- **Motor Forense `PASADA 0` (`0A` Individual, `0B` Par Consecutivo, `0C` Desviación / Mes Previo):**
+  - Cruce exacto y con tolerancia de destare para lotes etiquetados como `AGOSTO PDTE` y `SEPTIEMBRE`, identificando la fecha real de recolección en plataforma y preservando cero regresiones en proveedores diarios.
+
+---
+
+### 12.17 Procesamiento y Conciliación Nativa de Facturas Electrónicas PDF (1.8.3)
+
+> **Objetivo:** Aceptar facturas electrónicas de venta en formato PDF (DIAN / Comerssia), identificando automáticamente el emisor/proveedor (**Sevillana**), punto/sucursal (**Palmira Cañaveral**), número de factura (**FE1P 64048**), fecha de corte y materias primas (**Desperdicio de Pollo**), conciliando con 100% de exactitud contra los viajes físicos registrados en campo.
+
+- **Motor de Lectura PDF Vectorial (PDF.js):**
+  - Admisión de archivos .pdf en dropzone junto a .xlsx y .xls.
+  - Normalización de nombres de productos y limpieza de códigos numéricos de ítem (3000220000030 DESPERDICIO DE POLLO***PRESKILO - KILO ➔ DESPERDICIO).
+- **Conciliación Forense por Línea de Factura:**
+  - Conciliación atómica de despachos individuales agrupados bajo la factura electrónica (80.00 Kg y 92.10 Kg).
+  - Cruce exacto con recolecciones de campo del 10/09 y 03/09 en Palmira: **172.10 Kg conciliados exactos (.652 COP, 0 Kg faltantes, 0 Kg pendientes)**.
+
+---
+
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
 
 

@@ -7,6 +7,15 @@
     <!-- Librerías para exportación avanzada con estilos (ExcelJS y FileSaver) -->
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <!-- Soporte de lectura y procesamiento de documentos PDF en cliente (PDF.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        if (typeof pdfjsLib !== 'undefined') {
+            if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            }
+        }
+    </script>
     <style>
         :root {
             --primary: #2563eb;
@@ -649,11 +658,11 @@
                 <!-- Dropzone inicial -->
                 <div class="dropzone-container" id="dropzoneExcel" onclick="document.getElementById('inputExcelProv').click()">
                     <div class="dropzone-icon">📥</div>
-                    <h3 style="margin: 0 0 6px 0; color: #1e293b;">Arrastra aquí el archivo Excel original del Proveedor</h3>
+                    <h3 style="margin: 0 0 6px 0; color: #1e293b;">Arrastra aquí el archivo Excel (.xlsx) o Factura / Reporte en PDF (.pdf)</h3>
                     <p style="margin: 0; font-size: 0.9em; color: #64748b;">
-                        Soporta <b>el Excel nativo de cualquier proveedor</b> (matrices por bloques, cuadros diarios o listados verticales). El motor <b>Smart Match + Memoria por Proveedor</b> homologa los productos automáticamente.
+                        Soporta <b>Excel nativo (.xlsx, .xls)</b> de cualquier proveedor y <b>Facturas Electrónicas / Libros Auxiliares en PDF (.pdf)</b>. El motor <b>Smart Match</b> identifica el punto, factura, materias y kilos automáticamente.
                     </p>
-                    <input type="file" id="inputExcelProv" accept=".xlsx, .xls" style="display: none;" onclick="this.value=null;" onchange="manejarArchivoSeleccionado(this.files)">
+                    <input type="file" id="inputExcelProv" accept=".xlsx, .xls, .pdf" style="display: none;" onclick="this.value=null;" onchange="manejarArchivoSeleccionado(this.files)">
                 </div>
 
                 <!-- Contenedor de Resultados (Oculto hasta procesar archivo) -->
@@ -830,7 +839,7 @@
             return items.filter((_, idx) => !ghostMap[idx]);
         }
 
-        const MAPA_PRODUCTOS_CLIENTE = {"ACEITE": "ACEITE", "CABEZAS": "CABEZAS", "DESPERDICIO": "DESPERDICIO", "EMPELLA": "EMPELLA", "GORDANA": "GORDANA", "HARINA CARNE": "HARINA CARNE", "HARINA DE HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO BLANCO": "HUESO BLANCO", "HUESO DE CERDO": "HUESO DE CERDO", "HUESO SECO": "HUESO SECO", "HUESO DE POLLO": "HUESO DE POLLO", "MANTECA": "MANTECA", "MARGARINA": "MARGARINA", "MANTEQUILLA": "MANTEQUILLA", "PIEL POLLO": "PIEL POLLO", "SEBO": "SEBO", "SEBO EN RAMA": "SEBO EN RAMA", "OREJAS DE CERDO": "OREJAS DE CERDO", "PULMON DE CERDO": "PULMON DE CERDO", "CALAMBOMBO DE CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO DE RES": "CALAMBOMBO DE RES", "TRAQUEAS": "TRAQUEAS", "HUESO PROMOCION": "HUESO PROMOCION", "LENA": "LEÑA", "PIELES": "PIELES", "ACEITE PALMA": "ACEITE PALMA", "ACEITE SOLLA": "ACEITE SOLLA", "CABEZA": "CABEZAS", "CABEZA DE CERDO": "CABEZAS", "CABEZAS DE CERDO": "CABEZAS", "DESPERDICIOS": "DESPERDICIO", "HARINA/CARNE": "HARINA CARNE", "HARINA DE CARNE": "HARINA CARNE", "HARINA SANGRE": "HARINA DE SANGRE", "HARINA DE SANGRE": "HARINA DE SANGRE", "HARINA HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO VAPORIZADO": "HARINA DE HUESO VAPORIZADA", "HUESO": "HUESO BLANCO", "HUESOS": "HUESO BLANCO", "HUESO CARNUDO": "HUESO BLANCO", "HUESOS BLANCOS": "HUESO BLANCO", "HUESO FEMUR": "HUESO BLANCO", "HUESO FERMUR": "HUESO BLANCO", "HUESO PICADO": "HUESO PICADO", "HUESO CALCINADO": "HUESO CALCINADO", "HUESO CERDO": "HUESO DE CERDO", "HUESOS DE CERDO": "HUESO DE CERDO", "HUESO POLLO": "HUESO DE POLLO", "HUESOS DE POLLO": "HUESO DE POLLO", "HUESOS SECOS": "HUESO SECO", "HUESO EN PROMOCION": "HUESO PROMOCION", "PIEL DE POLLO": "PIEL POLLO", "PIELE DE POLLO": "PIEL POLLO", "PIELES DE POLLO": "PIEL POLLO", "OREJA DE CERDO": "OREJAS DE CERDO", "OREJAS CERDO": "OREJAS DE CERDO", "PULMON CERDO": "PULMON DE CERDO", "CALAMBOMBO CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO RES": "CALAMBOMBO DE RES", "TRAQUEA": "TRAQUEAS", "SEBO RAMA": "SEBO EN RAMA", "SEBO BOVINO": "SEBO BOVINO", "SEBO DERRETIDO": "SEBO DERRETIDO", "SEBO SALADO": "SEBO SALADO", "PIEL": "PIELES"};
+        const MAPA_PRODUCTOS_CLIENTE = {"ACEITE": "ACEITE", "CABEZAS": "CABEZAS", "DESPERDICIO": "DESPERDICIO", "DESPERDICIO DE POLLO": "DESPERDICIO", "DESPERDICIOS DE POLLO": "DESPERDICIO", "DESPERDICIO POLLO": "DESPERDICIO", "EMPELLA": "EMPELLA", "GORDANA": "GORDANA", "HARINA CARNE": "HARINA CARNE", "HARINA DE HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO BLANCO": "HUESO BLANCO", "HUESO DE CERDO": "HUESO DE CERDO", "HUESO SECO": "HUESO SECO", "HUESO DE POLLO": "HUESO DE POLLO", "MANTECA": "MANTECA", "MARGARINA": "MARGARINA", "MANTEQUILLA": "MANTEQUILLA", "PIEL POLLO": "PIEL POLLO", "SEBO": "SEBO", "SEBO EN RAMA": "SEBO EN RAMA", "OREJAS DE CERDO": "OREJAS DE CERDO", "PULMON DE CERDO": "PULMON DE CERDO", "CALAMBOMBO DE CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO DE RES": "CALAMBOMBO DE RES", "TRAQUEAS": "TRAQUEAS", "HUESO PROMOCION": "HUESO PROMOCION", "LENA": "LEÑA", "PIELES": "PIELES", "ACEITE PALMA": "ACEITE PALMA", "ACEITE SOLLA": "ACEITE SOLLA", "CABEZA": "CABEZAS", "CABEZA DE CERDO": "CABEZAS", "CABEZAS DE CERDO": "CABEZAS", "DESPERDICIOS": "DESPERDICIO", "HARINA/CARNE": "HARINA CARNE", "HARINA DE CARNE": "HARINA CARNE", "HARINA SANGRE": "HARINA DE SANGRE", "HARINA DE SANGRE": "HARINA DE SANGRE", "HARINA HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO VAPORIZADO": "HARINA DE HUESO VAPORIZADA", "HUESO": "HUESO BLANCO", "HUESOS": "HUESO BLANCO", "HUESO CARNUDO": "HUESO BLANCO", "HUESOS BLANCOS": "HUESO BLANCO", "HUESO FEMUR": "HUESO BLANCO", "HUESO FERMUR": "HUESO BLANCO", "HUESO PICADO": "HUESO PICADO", "HUESO CALCINADO": "HUESO CALCINADO", "HUESO CERDO": "HUESO DE CERDO", "HUESOS DE CERDO": "HUESO DE CERDO", "HUESO POLLO": "HUESO DE POLLO", "HUESOS DE POLLO": "HUESO DE POLLO", "HUESOS SECOS": "HUESO SECO", "HUESO EN PROMOCION": "HUESO PROMOCION", "PIEL DE POLLO": "PIEL POLLO", "PIELE DE POLLO": "PIEL POLLO", "PIELES DE POLLO": "PIEL POLLO", "OREJA DE CERDO": "OREJAS DE CERDO", "OREJAS CERDO": "OREJAS DE CERDO", "PULMON CERDO": "PULMON DE CERDO", "CALAMBOMBO CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO RES": "CALAMBOMBO DE RES", "TRAQUEA": "TRAQUEAS", "SEBO RAMA": "SEBO EN RAMA", "SEBO BOVINO": "SEBO BOVINO", "SEBO DERRETIDO": "SEBO DERRETIDO", "SEBO SALADO": "SEBO SALADO", "PIEL": "PIELES"};
 
         function homologarMateriaCliente(mat) {
             if (!mat) return "";
@@ -2766,6 +2775,10 @@
             'ACEITE USADO': 'ACEITE',
             'DESPERDICIO': 'DESPERDICIO',
             'DESPERDICIOS': 'DESPERDICIO',
+            'DESPERDICIO DE POLLO': 'DESPERDICIO',
+            'DESPERDICIOS DE POLLO': 'DESPERDICIO',
+            'DESPERDICIO POLLO': 'DESPERDICIO',
+            'DESPERDICIOS POLLO': 'DESPERDICIO',
             'EMPELLA': 'EMPELLA',
             'EMPELLA CERDO': 'EMPELLA',
             'GRASA': 'MANTECA',
@@ -2860,6 +2873,9 @@
             if (!nombre) return '';
             let s = String(nombre).trim().toUpperCase();
             try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
+            s = s.replace(/^[0-9]{4,20}\s+/, '');
+            s = s.replace(/\*\*\*[^*]+\*\*\*/g, '');
+            s = s.replace(/\*\*\*PRESKILO\s*-\s*KILO/gi, '');
             s = s.replace(/\(\s*(?:KG|KILOS?|GR|TON|LBS?)\s*\)/g, '');
             s = s.replace(/\s+(?:KG|KILOS?)$/g, '');
             s = s.replace(/\s+/g, ' ').trim();
@@ -3371,6 +3387,178 @@
             return null;
         }
 
+        async function procesarArchivoPDF(file) {
+            if (typeof pdfjsLib === 'undefined') {
+                throw new Error('La librería PDF.js no está disponible. Verifique su conexión a internet.');
+            }
+            const buffer = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+            const pdf = await loadingTask.promise;
+
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet('Documento_PDF');
+
+            let fullText = '';
+            const allLines = [];
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const textContent = await page.getTextContent();
+
+                const lineMap = new Map();
+                for (const item of textContent.items) {
+                    if (!item.str || !item.str.trim()) continue;
+                    fullText += ' ' + item.str;
+                    const y = Math.round(item.transform[5]);
+                    let foundY = null;
+                    for (const existingY of lineMap.keys()) {
+                        if (Math.abs(existingY - y) <= 4) { foundY = existingY; break; }
+                    }
+                    if (foundY === null) { foundY = y; lineMap.set(foundY, []); }
+                    lineMap.get(foundY).push({ str: item.str.trim(), x: item.transform[4] });
+                }
+
+                const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
+                for (const y of sortedYs) {
+                    const lineItems = lineMap.get(y).sort((a, b) => a.x - b.x);
+                    allLines.push(lineItems);
+                }
+            }
+
+            // 1. Detectar tipo de documento: Factura Electrónica vs Libro Auxiliar vs Planilla Genérica
+            const esFacturaElectronica = /FACTURA\s+ELECTR[OÓ]NICA|CUFE:|DATOS\s+DEL\s+EMISOR|C[OÓ]DIGO\s+DE\s+PRODUCTO/i.test(fullText);
+            const esLibroAuxiliar = /LIBRO\s+AUXILIAR|220501|CREDITOS|D[EÉ]BITOS/i.test(fullText);
+
+            if (esFacturaElectronica) {
+                // A. Factura Electrónica (ej. La Sevillana / DIAN / Comerssia)
+                let numFactura = '';
+                const mFac = fullText.match(/Factura\s+Electr[oó]nica\s+de\s+Venta\s+No\.\s*([A-Z0-9\s-]+?)(?=\s+Resol|DIAN|\s+FECHA|$)/i) ||
+                             fullText.match(/No\.\s*([A-Z0-9]{2,6}\s*\d+)/i);
+                if (mFac) numFactura = mFac[1].replace(/\s+/g, ' ').trim();
+
+                let fechaStr = '';
+                const mFec = fullText.match(/FECHA\s+DE\s+EMISI[OÓ]N\s*:\s*([0-9\/\-]+)/i) ||
+                             fullText.match(/Fecha\s+Emisi[oó]n\s*:\s*([0-9\/\-]+)/i);
+                if (mFec) {
+                    const fRaw = mFec[1].trim();
+                    const mYMD = fRaw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+                    if (mYMD) {
+                        fechaStr = `${mYMD[3].padStart(2, '0')}/${mYMD[2].padStart(2, '0')}/${mYMD[1]}`;
+                    } else {
+                        fechaStr = fRaw;
+                    }
+                }
+
+                let emisor = 'Sevillana';
+                const mEmisor = fullText.match(/NOMBRE\s*:\s*([^\n\r]+?)(?=\s+DIRECCI[OÓ]N|\s+TIPO|\s+TELEFONO|$)/i);
+                if (mEmisor) {
+                    const emRaw = mEmisor[1].trim().toUpperCase();
+                    if (emRaw.includes('SEVILLANA')) emisor = 'Sevillana';
+                    else if (emRaw.includes('SANTA ELENA') || emRaw.includes('SANTA HELENA')) emisor = 'Bodega Santa Elena';
+                    else if (emRaw.includes('CARIBE')) emisor = 'Caribe';
+                    else if (emRaw.includes('FRIGORIVALLE')) emisor = 'Frigorivalle';
+                    else emisor = emRaw;
+                }
+
+                let puntoSucursal = '';
+                const mPunto = fullText.match(/ALMAC[EÉ]N\s*(?:\/\s*DIRECCI[OÓ]N)?\s*(?:\/\s*TEL[EÉ]FONO)?\s*:\s*([^\/\n\r]+)/i);
+                if (mPunto) puntoSucursal = mPunto[1].trim();
+
+                // Tabla de Ítems
+                const rawTokens = [];
+                allLines.forEach(l => l.forEach(it => rawTokens.push(it.str)));
+
+                const items = [];
+                for (let i = 0; i < rawTokens.length; i++) {
+                    if (/^ÍTEM$|^ITEM$/i.test(rawTokens[i])) {
+                        let j = i + 1;
+                        while (j < rawTokens.length && !/^\d+$/.test(rawTokens[j])) j++;
+                        while (j < rawTokens.length && /^\d+$/.test(rawTokens[j])) {
+                            const itemNum = rawTokens[j];
+                            const code = rawTokens[j+1] || '';
+                            const desc = rawTokens[j+2] || '';
+                            const um = rawTokens[j+3] || '';
+                            const cant = parseFloat((rawTokens[j+4] || '0').replace(/,/g, '')) || 0;
+                            const unitVal = parseFloat((rawTokens[j+5] || '0').replace(/,/g, '')) || 0;
+                            const descVal = parseFloat((rawTokens[j+6] || '0').replace(/,/g, '')) || 0;
+                            const impVal = parseFloat((rawTokens[j+7] || '0').replace(/,/g, '')) || 0;
+                            const totVal = parseFloat((rawTokens[j+8] || '0').replace(/,/g, '')) || 0;
+
+                            items.push({ itemNum, code, desc, cant, unitVal, totVal });
+                            j += 9;
+                        }
+                        break;
+                    }
+                }
+
+                ws.addRow(['FECHA', 'PROVEEDOR', 'SUCURSAL', 'PRODUCTO', 'NUMERO_FACTURA', 'KG', 'PRECIO', 'VALOR', 'TIPO_DOCUMENTO']);
+                if (items.length > 0) {
+                    items.forEach(it => {
+                        ws.addRow([fechaStr, emisor, puntoSucursal, it.desc, numFactura, it.cant, it.unitVal, it.totVal, 'FACTURA']);
+                    });
+                } else {
+                    const mTotKg = fullText.match(/Cantidad\s+Total\s*:\s*([0-9.,]+)/i);
+                    const totKg = mTotKg ? parseFloat(mTotKg[1].replace(/,/g, '')) : 0;
+                    const mTotVal = fullText.match(/Total\s+COP\s*([0-9.,]+)/i) || fullText.match(/Total\s+sin\s+impuesto\s*([0-9.,]+)/i);
+                    const totVal = mTotVal ? parseFloat(mTotVal[1].replace(/\./g, '').replace(',', '.')) : 0;
+                    ws.addRow([fechaStr, emisor, puntoSucursal, 'DESPERDICIO', numFactura, totKg, 0, totVal]);
+                }
+
+            } else if (esLibroAuxiliar) {
+                // B. Libro Auxiliar Contable
+                ws.addRow(['FECHA', 'PROVEEDOR', 'SUCURSAL', 'PRODUCTO', 'NUMERO_FACTURA', 'KG', 'PRECIO', 'VALOR', 'TIPO_DOCUMENTO']);
+                for (const line of allLines) {
+                    const fullStr = line.map(x => x.str).join(' ');
+                    if (/^TOTAL|SALDO INICIAL|P[AÁ]GINA|FECHA Y HORA|NIT\b|LIBRO AUXILIAR|220501/i.test(fullStr)) continue;
+
+                    const mDate = fullStr.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+                    if (!mDate) continue;
+                    const fechaStr = mDate[1];
+
+                    const amounts = fullStr.match(/(\d{1,3}(?:\.\d{3})*,\d{2}|\d+\.\d{2})/g);
+                    if (!amounts || amounts.length === 0) continue;
+
+                    let valStr = amounts.length >= 3 ? amounts[1] : amounts[0];
+                    if (amounts.length >= 2 && /^0(?:[.,]00)?$/.test(amounts[0])) {
+                        valStr = amounts[1];
+                    }
+                    const valNum = parseFloat(valStr.replace(/\./g, '').replace(',', '.')) || 0;
+                    if (valNum <= 0) continue;
+
+                    let numFactura = '';
+                    const mFact = fullStr.match(/\b([A-Z0-9]{2,5}[A-Z0-9]{4,10})\b/) || fullStr.match(/\bFC\s*(\d+)\b/i);
+                    if (mFact) numFactura = mFact[0];
+
+                    let prodName = 'DESPERDICIO';
+                    if (/SEBO EN RAMA|GORDAN/i.test(fullStr)) prodName = 'SEBO EN RAMA';
+                    else if (/HUESO BLANCO|HUESO RES/i.test(fullStr)) prodName = 'HUESO BLANCO';
+                    else if (/HUESO PROMO/i.test(fullStr)) prodName = 'HUESO PROMOCION';
+                    else if (/PIEL/i.test(fullStr)) prodName = 'PIELES';
+
+                    ws.addRow([fechaStr, 'Sevillana', '', prodName, numFactura, 0, 0, valNum, 'LIBRO_AUXILIAR']);
+                }
+            } else {
+                // C. Planilla / Matriz estándar en PDF
+                for (const line of allLines) {
+                    ws.addRow(line.map(x => x.str));
+                }
+            }
+
+            currentConcWorkbook = wb;
+
+            const selHoja = document.getElementById('concSelectHoja');
+            if (selHoja) {
+                selHoja.innerHTML = `<option value="AUTO">✨ Auto-seleccionar pestaña</option>`;
+                wb.eachSheet((wsItem) => {
+                    const opt = document.createElement('option');
+                    opt.value = wsItem.name;
+                    opt.textContent = wsItem.name;
+                    selHoja.appendChild(opt);
+                });
+            }
+
+            ejecutarConciliacionUniversal();
+        }
+
         async function manejarArchivoSeleccionado(files) {
             if (!files || !files.length) return;
             const file = files[0];
@@ -3378,34 +3566,72 @@
             updateStatus(`⚡ Cargando archivo "${currentConcFileName}"...`, 'normal');
 
             try {
-                const buffer = await file.arrayBuffer();
-                const wb = new ExcelJS.Workbook();
-                await wb.xlsx.load(buffer);
-                currentConcWorkbook = wb;
+                if (file.name.toLowerCase().endsWith('.pdf')) {
+                    await procesarArchivoPDF(file);
+                } else {
+                    const buffer = await file.arrayBuffer();
+                    const wb = new ExcelJS.Workbook();
+                    await wb.xlsx.load(buffer);
+                    currentConcWorkbook = wb;
 
-                // Poblar selector de pestañas del Excel
-                const selHoja = document.getElementById('concSelectHoja');
-                if (selHoja) {
-                    selHoja.innerHTML = `<option value="AUTO">✨ Auto-seleccionar pestaña</option>`;
-                    wb.eachSheet((ws) => {
-                        const opt = document.createElement('option');
-                        opt.value = ws.name;
-                        opt.textContent = ws.name;
-                        selHoja.appendChild(opt);
-                    });
+                    const selHoja = document.getElementById('concSelectHoja');
+                    if (selHoja) {
+                        selHoja.innerHTML = `<option value="AUTO">✨ Auto-seleccionar pestaña</option>`;
+                        wb.eachSheet((ws) => {
+                            const opt = document.createElement('option');
+                            opt.value = ws.name;
+                            opt.textContent = ws.name;
+                            selHoja.appendChild(opt);
+                        });
+                    }
+
+                    ejecutarConciliacionUniversal();
                 }
-
-                ejecutarConciliacionUniversal();
             } catch (err) {
-                console.error('Error al cargar archivo Excel:', err);
-                alert('Error al leer el archivo Excel: ' + err.message);
-                updateStatus('❌ Error al leer archivo Excel.', 'error');
+                console.error('Error al cargar archivo:', err);
+                alert('Error al leer el archivo: ' + err.message);
+                updateStatus('❌ Error al leer archivo.', 'error');
             }
         }
 
         function autodetectarProveedorYPeriodo(ws, fileName) {
             let textos = [fileName, ws ? ws.name : ''];
+            let docProv = '';
+            let docPunto = '';
+            let docFac = '';
+            let docEsFactura = false;
+
             if (ws) {
+                let colProv = -1, colPunto = -1, colFac = -1, colTipo = -1;
+                const headerRow = ws.getRow(1);
+                for (let c = 1; c <= Math.min(20, ws.columnCount || 20); c++) {
+                    const h = String(getExcelCellVal(headerRow.getCell(c)) || '').trim().toUpperCase();
+                    if (/^PROVEEDOR$/i.test(h)) colProv = c;
+                    else if (/^SUCURSAL$|^PUNTO$|^ALMACEN$|^ALMACÉN$/i.test(h)) colPunto = c;
+                    else if (/NUMERO_FACTURA|NRO_FACTURA|FACTURA\b/i.test(h)) colFac = c;
+                    else if (/TIPO_DOCUMENTO|TIPO_DOC/i.test(h)) colTipo = c;
+                }
+
+                if (colProv !== -1 && ws.rowCount >= 2) {
+                    for (let r = 2; r <= Math.min(10, ws.rowCount); r++) {
+                        const row = ws.getRow(r);
+                        const pVal = String(getExcelCellVal(row.getCell(colProv)) || '').trim();
+                        if (pVal && !docProv) docProv = pVal;
+                        if (colPunto !== -1) {
+                            const puVal = String(getExcelCellVal(row.getCell(colPunto)) || '').trim();
+                            if (puVal && !docPunto) docPunto = puVal;
+                        }
+                        if (colFac !== -1) {
+                            const fVal = String(getExcelCellVal(row.getCell(colFac)) || '').trim();
+                            if (fVal && !docFac) docFac = fVal;
+                        }
+                        if (colTipo !== -1) {
+                            const tVal = String(getExcelCellVal(row.getCell(colTipo)) || '').trim();
+                            if (/FACTURA/i.test(tVal)) docEsFactura = true;
+                        }
+                    }
+                }
+
                 for (let r = 1; r <= Math.min(12, ws.rowCount); r++) {
                     const row = ws.getRow(r);
                     for (let c = 1; c <= Math.min(20, ws.columnCount || 20); c++) {
@@ -3463,7 +3689,17 @@
             let filtroPunto = '';
             const normJoined = joined.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-            if (normJoined.includes('SANTA HELENA') || normJoined.includes('SANTA ELENA')) {
+            if (docProv) {
+                provNombre = docProv;
+                filtroStr = docProv.toUpperCase();
+                if (docPunto) {
+                    const dpNorm = docPunto.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    if (dpNorm.includes('PALMIRA')) filtroPunto = 'PALMIRA';
+                    else if (dpNorm.includes('CAVASA')) filtroPunto = 'CAVASA';
+                    else if (dpNorm.includes('GUACARI')) filtroPunto = 'GUACARI';
+                    else filtroPunto = dpNorm;
+                }
+            } else if (normJoined.includes('SANTA HELENA') || normJoined.includes('SANTA ELENA')) {
                 if (normJoined.includes('SEVILLANA')) {
                     provNombre = 'Sevillana Santa Elena';
                     filtroStr = 'SEVILLANA SANTA ELENA';
@@ -3494,7 +3730,7 @@
                     filtroStr = mejorMatch;
                 } else {
                     // Intentar por palabras significativas del nombre de archivo o cabecera
-                    const limpio = fileName.replace(/\.xlsx?$/i, '').replace(/202\d/g, '').replace(/PLANTILLA|CONCILIACION|PROVEEDORES|MATERIAL|DESPACHADO|DESDE|CUENTA|INFORME|SEPTIEMBRE|SEPTI|AGOSTO|JULIO|JUNIO|MAYO|ABRIL|MARZO|FEBRERO|ENERO|PROTEINAGRO|PROTEINA|AGRO/gi, '').replace(/^[_-\s()0-9]+|[_-\s()0-9]+$/g, '').trim();
+                    const limpio = fileName.replace(/\.(xlsx?|pdf)$/i, '').replace(/202\d/g, '').replace(/PLANTILLA|CONCILIACION|PROVEEDORES|MATERIAL|DESPACHADO|DESDE|CUENTA|INFORME|SEPTIEMBRE|SEPTI|AGOSTO|JULIO|JUNIO|MAYO|ABRIL|MARZO|FEBRERO|ENERO|PROTEINAGRO|PROTEINA|AGRO/gi, '').replace(/^[_-\s()0-9]+|[_-\s()0-9]+$/g, '').trim();
                     if (limpio.length >= 3) {
                         provNombre = limpio.toUpperCase();
                         filtroStr = limpio.toUpperCase();
@@ -3507,7 +3743,10 @@
                 anio: anioDet || 2026,
                 provNombre: provNombre || 'Proveedor',
                 filtroStr: filtroStr,
-                filtroPunto: filtroPunto
+                filtroPunto: filtroPunto,
+                docPunto: docPunto || '',
+                docFac: docFac || '',
+                docEsFactura: docEsFactura || (ws && ws.name === 'Documento_PDF')
             };
         }
 
@@ -3583,6 +3822,9 @@
                 if (!filtroPuntoActivo) return true;
                 const pv = String(r.PROVEEDOR || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                 const pu = String(r.PUNTO || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                if (filtroPuntoActivo.includes('PALMIRA')) {
+                    return pu.includes('PALMIRA') || pu.includes('RICARDO GIL') || pu.includes('VILLAGORGONA');
+                }
                 return pv.includes('DERIVADOS') || pu.includes(filtroPuntoActivo);
             };
 
@@ -3694,19 +3936,21 @@
                 }
 
                 if (foundFechaCol !== -1) {
-                    let cProd = -1, cKg = -1, cPrecio = -1, cValor = -1;
+                    let cProd = -1, cKg = -1, cPrecio = -1, cValor = -1, cPunto = -1, cFac = -1;
                     for (let c = 1; c <= maxCol; c++) {
                         const h = cellTexts[c];
-                        if (/PRODUCTO|MATERIA|MATERIAL|DESCRIPCION|ITEM/.test(h) && cProd === -1) cProd = c;
+                        if (/PUNTO|SUCURSAL|ALMACEN|ALMACÉN/.test(h) && cPunto === -1) cPunto = c;
+                        else if (/FACTURA|DOC|REMISION|REMISIÓN/.test(h) && cFac === -1) cFac = c;
+                        else if (/PRODUCTO|MATERIA|MATERIAL|DESCRIPCION|ITEM|NOTA|CONCEPTO|DETALLE/.test(h) && cProd === -1) cProd = c;
                         else if (/^KG$|^KILOS$|^PESO$|^CANTIDAD$|KG\s*PROV/.test(h) && cKg === -1) cKg = c;
                         else if (/PRECIO|TARIFA|UNIT/.test(h) && cPrecio === -1) cPrecio = c;
-                        else if (/VALOR|TOTAL/.test(h) && cValor === -1) cValor = c;
+                        else if (/VALOR|TOTAL|CREDITOS|CREDITO/.test(h) && cValor === -1) cValor = c;
                     }
 
-                    if (cProd !== -1 && cKg !== -1) {
+                    if (cProd !== -1 && (cKg !== -1 || cValor !== -1)) {
                         flushBlockCrudo(null);
                         mode = 'VERTICAL';
-                        vertCols = { fecha: foundFechaCol, prod: cProd, kg: cKg, precio: cPrecio, valor: cValor };
+                        vertCols = { fecha: foundFechaCol, prod: cProd, kg: cKg, precio: cPrecio, valor: cValor, punto: cPunto, factura: cFac };
                         return;
                     }
 
@@ -3821,7 +4065,7 @@
                     });
                 } else if (mode === 'VERTICAL') {
                     const firstLabels = cellTexts.slice(1, 4).filter(Boolean).join(' ');
-                    if (/^TOTAL|TOTALES|SUBTOTAL|PROMEDIO/.test(firstLabels)) return;
+                    if (/^TOTAL|TOTALES|SUBTOTAL|PROMEDIO|SALDO INICIAL/.test(firstLabels)) return;
 
                     const rawFechaCell = getExcelCellVal(row.getCell(vertCols.fecha));
                     const dInfo = parsearFechaCeldaUniversal(rawFechaCell, mesObjetivo || autoInfo.mes, anioObjetivo);
@@ -3830,23 +4074,42 @@
                     if (mesObjetivo && dInfo.hasExplicitMonth && dInfo.mes !== mesObjetivo) return;
 
                     const prodRaw = limpiarNombreProductoCrudo(getExcelCellVal(row.getCell(vertCols.prod)));
-                    const kg = getExcelCellNum(row.getCell(vertCols.kg));
-                    if (!prodRaw || kg <= 0) return;
-
+                    let kg = vertCols.kg !== -1 ? getExcelCellNum(row.getCell(vertCols.kg)) : 0;
                     let precio = vertCols.precio !== -1 ? getExcelCellNum(row.getCell(vertCols.precio)) : 0;
                     if (precio > 0 && precio < 20) precio = Math.round(precio * 1000);
-                    const valor = vertCols.valor !== -1 ? getExcelCellNum(row.getCell(vertCols.valor)) : 0;
+                    let valor = vertCols.valor !== -1 ? getExcelCellNum(row.getCell(vertCols.valor)) : 0;
+                    const puntoRow = vertCols.punto !== -1 ? String(getExcelCellVal(row.getCell(vertCols.punto)) || '').trim() : '';
+                    const facRow = vertCols.factura !== -1 ? String(getExcelCellVal(row.getCell(vertCols.factura)) || '').trim() : '';
+
+                    if (!prodRaw || (kg <= 0 && valor <= 0)) return;
+
+                    // Si trae valor pero no Kilos (ej. Libro Auxiliar contable o Factura por valor)
+                    if (kg <= 0 && valor > 0) {
+                        const pRef = precio > 0 ? precio : (preciosPlataforma[prodRaw] || 120);
+                        if (pRef > 0) {
+                            kg = Math.round((valor / pRef) * 100) / 100;
+                            if (precio <= 0) precio = pRef;
+                        }
+                    }
+
+                    const esFacturaDoc = autoInfo.docEsFactura || (vertCols.factura !== -1 && Boolean(facRow)) || (targetSheet && targetSheet.name === 'Documento_PDF');
+                    const numItemFactura = currentBlock.length + 1;
+                    const esLoteFactura = esFacturaDoc;
 
                     currentBlock.push({
                         dia: dInfo.dia,
                         mes: dInfo.mes,
                         anio: dInfo.anio,
-                        fecha: dInfo.fechaStr,
+                        fecha: esLoteFactura ? `Factura ${facRow || autoInfo.docFac || ''} (Ítem ${numItemFactura})` : dInfo.fechaStr,
                         sortKey: dInfo.sortKey,
                         rawProd: prodRaw,
                         kg: kg,
                         precio: precio,
-                        valor: valor
+                        valor: valor,
+                        puntoDoc: puntoRow || autoInfo.docPunto || '',
+                        facturaDoc: facRow || autoInfo.docFac || '',
+                        esLoteSinDia: esLoteFactura,
+                        rawEtiqueta: (facRow || autoInfo.docFac) ? `Factura ${facRow || autoInfo.docFac} · Ítem ${numItemFactura}` : (esLoteFactura ? `Factura ${dInfo.fechaStr}` : '')
                     });
                 }
             });
@@ -4187,14 +4450,18 @@
                     const rawLabel = item.rawProdLabel || item.producto;
                     const deltaKg = ri.kg - item.kg_proveedor;
                     const otroNombre = ri.prod !== item.producto ? ` (registrado en plataforma como "${ri.prod}")` : '';
+                    const etiquetaDoc = item.facturaDoc ? `Factura ${item.facturaDoc}` : 'Lote';
+                    const obsPunto = item.puntoDoc ? ` en ${item.puntoDoc}` : (ri.PUNTO ? ` en ${ri.PUNTO}` : '');
                     exactos.push({
                         dia: item.dia, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
                         kg_proveedor: item.kg_proveedor, kg_recoleccion: ri.kg,
                         delta_kg: deltaKg, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
                         delta_valor: deltaKg * precio,
-                        estado: '🟢 Conciliado (Lote ↔ ' + ri.fecha.slice(0, 5) + ')',
-                        obs: `${item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} ${ri.kg.toLocaleString()} Kg${otroNombre}${ri.id ? ' [' + ri.id + ']' : ''}.`
+                        puntoDoc: item.puntoDoc,
+                        facturaDoc: item.facturaDoc,
+                        estado: `🟢 Conciliado (${etiquetaDoc} ↔ ${ri.fecha.slice(0, 5)})`,
+                        obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha}${obsPunto} (${ri.kg.toLocaleString()} Kg)${otroNombre}${ri.id ? ' [' + ri.id + ']' : ''}.`
                     });
                     despKeysConsumidas.add(key);
                 }
@@ -4570,6 +4837,8 @@
                 todos: [...exactos, ...desviaciones, ...faltantes, ...sobrantes].sort((a, b) => a.sortKey - b.sortKey || a.producto.localeCompare(b.producto)),
                 proveedorTotales: { kg: totKgProv, valor: totValProv },
                 proveedorNombre: nombreProveedorDisplay,
+                puntoNombre: autoInfo.docPunto || '',
+                facturaNumero: autoInfo.docFac || '',
                 hojaNombre: targetSheet.name,
                 mesAnio: mesLabel,
                 auditoriaNotas: [
@@ -4590,7 +4859,8 @@
             const d = conciliacionData;
             const badgeProvEl = document.getElementById('badgeProveedorInfo');
             if (badgeProvEl) {
-                badgeProvEl.innerText = `🏢 ${d.proveedorNombre} — ${d.mesAnio} (Hoja: ${d.hojaNombre})`;
+                const puntoBadge = d.puntoNombre ? ` (${d.puntoNombre}${d.facturaNumero ? ' · Factura ' + d.facturaNumero : ''})` : (d.facturaNumero ? ` (Factura ${d.facturaNumero})` : '');
+                badgeProvEl.innerText = `🏢 ${d.proveedorNombre}${puntoBadge} — ${d.mesAnio} (Hoja: ${d.hojaNombre})`;
             }
             document.getElementById('badgeProveedorTotal').innerText = `| Total Excel Proveedor: ${d.proveedorTotales.kg.toLocaleString(undefined, {maximumFractionDigits: 1})} Kg ($${Math.round(d.proveedorTotales.valor).toLocaleString()} COP)`;
 
@@ -4670,7 +4940,7 @@
                     mapPorFecha[fKey] = {
                         fecha: it.fecha,
                         sortKey: it.sortKey || 0,
-                        sucursal: d.proveedorNombre || 'PROVEEDOR',
+                        sucursal: it.puntoDoc || d.proveedorNombre || 'PROVEEDOR',
                         celdasPorProducto: {},
                         observacionesDia: [],
                         smartFixesDia: []

@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.8.1)  
+> **Última Actualización:** Octubre 2026 (Versión 1.8.3)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -341,6 +341,40 @@
      - Escritura separada en dos bloques: `A:L` (Cols 1-12) y `O:Q` (Cols 15-17: `Numero_Factura`, `Valor_Factura`, `Foto_Factura`), dejando **100% intactas las columnas `M` (`ID_Clave`) y `N` (`Alerta`)**.
   5. *Integración en Reportes y Conciliador:*
      - Visualización de badge de factura y enlace a foto en tabla administrativa, comprobante digital, WhatsApp, exportación CSV y matriz Excel de `CONCILIADOR.html` para cruce directo (`BUSCARV` / `XLOOKUP`) contra el libro auxiliar contable.
+
+---
+
+---
+
+### 24. Motor Universal de Conciliación por Lotes sin Fecha Calendario (`v1.8.2`)
+- **Problema Resuelto:**
+  - Boletines de liquidación por períodos/lotes (ej. `CARNES Y DERIVADOS DE OCCIDENTE S.A.` / `PROTEINAGRO_SEPT_2026.xlsx`) traen el nombre del proveedor desplazado en columnas superiores (`C2`), etiquetas de período en lugar de fechas (`AGOSTO PDTE`, `SEPTIEMBRE` y celdas en blanco), columnas simultáneas de unidades (`PIELES`) y peso (`PIELES KILOS`), y bloques de pie de factura (`CANTIDAD / PRECIO / FACTURAR / TOTAL FACTURA`).
+- **Solución Implementada en `CONCILIADOR.html` (`v1.8.2 · Lotes`):**
+  1. *Autodetección Expandida (12 filas × 20 columnas):* Identifica `CARNES Y DERIVADOS` -> `Sevillana Carnes y Derivados de Occ.` (Cavasa) y excluye `"PROTEINAGRO"` como falso nombre de proveedor en el fallback por nombre de archivo.
+  2. *Desambiguación Unidades vs. Kilos y Pie de Factura:* Descarta automáticamente la columna `PIELES` (unidades) cuando coexiste con `PIELES KILOS`, ignora `RECIBO`, y bloquea filas de resumen (`CANTIDAD`, `FACTURAR`, `TOTAL FACTURA`) para evitar lecturas espurias.
+  3. *Motor Forense `PASADA 0` en 3 Fases (`0A`, `0B`, `0C`):*
+     - **0A (Individual Exacto):** Cruza ítems de lotes sin día contra recolecciones individuales del período por peso y compatibilidad de materia (`SEBO` / `GORDANA` / `SEBO EN RAMA`, `HUESO RES` / `HUESO BLANCO`).
+     - **0B (Suma de 2 Viajes Consecutivos):** Detecta lotes acumulados en dos recolecciones consecutivas (ej. `01/09 + 02/09`).
+     - **0C (Desviación de Báscula / Canastillas y Mes Previo):** Empareja desviaciones cercanas (`≤ 10%` ó `≤ 15 Kg`) incluyendo lotes pendientes del mes anterior (`AGOSTO PDTE`) sin contaminar los sobrantes del mes auditado.
+
+### 25. Procesamiento y Conciliación Nativa de Facturas Electrónicas PDF (`v1.8.3`)
+- **Problema Resuelto:**
+  - Los proveedores emiten Facturas Electrónicas de Venta (DIAN / Comerssia / PDF) que agrupan los despachos de la quincena o mes (ej. `AGROPECUARIA LA SEVILLANA SAS`, Factura `FE1P 64048`).
+  - La fecha en el encabezado es la fecha de emisión del documento (`15/09/2026`), mientras que las líneas de producto corresponden a entregas físicas previas (ej. 80.00 Kg el 10/09 y 92.10 Kg el 03/09).
+  - La materia prima viene rotulada con códigos y sufijos técnicos (ej. `3000220000030 DESPERDICIO DE POLLO***PRESKILO - KILO`).
+- **Solución Implementada en `CONCILIADOR.html` (`v1.8.3 · PDF & Facturación`):**
+  1. *Lector Nativo PDF.js:* Dropzone acepta archivos `.pdf` además de `.xlsx` y `.xls`, procesando tablas y texto vectorizado en cliente sin depender de servidores externos.
+  2. *Extracción Automatizada de Metadatos:*
+     - Emisor / Proveedor: `AGROPECUARIA LA SEVILLANA SAS` -> `Sevillana`.
+     - Punto / Sucursal: `PALMIRA CAÑAVERAL` (asociado automáticamente a la sede de Palmira y conductor Ricardo Gil).
+     - Factura: `FE1P 64048`.
+     - Fecha de Emisión: `15/09/2026`.
+     - Materia Prima: `DESPERDICIO` (homologado desde `DESPERDICIO DE POLLO***PRESKILO - KILO` con limpieza numérica de códigos).
+  3. *Conciliación Forense por Línea de Factura:*
+     - Los ítems de la factura electrónica se concilian de forma atómica en el período contra las recolecciones físicas en plataforma por peso y materia.
+     - Ítem 1 (80.00 Kg, $9.600) ↔ Recolección del 10/09/2026 en Sevillana Palmira / Villagorgona (80 Kg).
+     - Ítem 2 (92.10 Kg, $11.052) ↔ Recolección del 03/09/2026 en Ricardo Gil (92.1 Kg).
+     - Resultado: **172.10 Kg (100% Conciliado Exacto, $20.652 COP, 0 Desviaciones, 0 Pendientes)**.
 
 ---
 
