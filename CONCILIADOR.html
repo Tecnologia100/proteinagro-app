@@ -3532,7 +3532,7 @@
                     const lineItems = lineMap.get(y).sort((a, b) => a.x - b.x);
                     pageLines.push(lineItems);
                     allLines.push(lineItems);
-                    fullText += lineItems.map(it => it.str).join(' ') + '\\n';
+                    fullText += lineItems.map(it => it.str).join(' ') + '\n';
                 }
 
                 if (pageNum === 1) {
@@ -3548,8 +3548,8 @@
             }
 
             // 2. Detectar tipo de documento
-            const esFacturaElectronica = /FACTURA\\s+ELECTR[OÓ]NICA|CUFE:|DATOS\\s+DEL\\s+EMISOR|C[OÓ]DIGO\\s+DE\\s+PRODUCTO/i.test(fullText);
-            const esLibroAuxiliar = /LIBRO\\s+AUXILIAR|220501|CREDITOS|D[EÉ]BITOS/i.test(fullText);
+            const esFacturaElectronica = /FACTURA\s+ELECTR[OÓ]NICA|CUFE:|DATOS\s+DEL\s+EMISOR|C[OÓ]DIGO\s+DE\s+PRODUCTO/i.test(fullText);
+            const esLibroAuxiliar = /LIBRO\s+AUXILIAR|220501|CREDITOS|D[EÉ]BITOS/i.test(fullText);
 
             if (esFacturaElectronica) {
                 // A. Factura Electrónica Multi-Página
@@ -3559,20 +3559,20 @@
 
                 // Número de Factura
                 let numFactura = '';
-                const mFac = metaSearchText.match(/Factura\\s+Electr[oó]nica\\s+de\\s+Venta\\s+No\\.\\s*([A-Z0-9\\s-]+?)(?=\\s+Resol|DIAN|\\s+FECHA|\\s+Fecha|\\n|$)/i) ||
-                             metaSearchText.match(/Factura\\s+Electr[oó]nica\\s+No\\.\\s*([A-Z0-9\\s-]+?)(?=\\s+Resol|DIAN|\\s+FECHA|\\s+Fecha|\\n|$)/i) ||
-                             metaSearchText.match(/No\\.\\s*([A-Z0-9]{2,6}\\s*\\d+)/i) ||
-                             fullText.match(/Factura\\s+Electr[oó]nica\\s+de\\s+Venta\\s+No\\.\\s*([A-Z0-9\\s-]+?)(?=\\s+Resol|DIAN|\\s+FECHA|\\s+Fecha|\\n|$)/i);
-                if (mFac) numFactura = mFac[1].replace(/\\s+/g, ' ').trim();
+                const mFac = metaSearchText.match(/Factura\s+Electr[oó]nica\s+de\s+Venta\s+No\.\s*([A-Z0-9\s-]+?)(?=\s+Resol|DIAN|\s+FECHA|\s+Fecha|\n|$)/i) ||
+                             metaSearchText.match(/Factura\s+Electr[oó]nica\s+No\.\s*([A-Z0-9\s-]+?)(?=\s+Resol|DIAN|\s+FECHA|\s+Fecha|\n|$)/i) ||
+                             metaSearchText.match(/No\.\s*([A-Z0-9]{2,6}\s*\d+)/i) ||
+                             fullText.match(/Factura\s+Electr[oó]nica\s+de\s+Venta\s+No\.\s*([A-Z0-9\s-]+?)(?=\s+Resol|DIAN|\s+FECHA|\s+Fecha|\n|$)/i);
+                if (mFac) numFactura = mFac[1].replace(/\s+/g, ' ').trim();
 
                 // Fecha de Emisión
                 let fechaStr = '';
-                const mFec = metaSearchText.match(/FECHA\\s+(?:DE\\s+)?(?:EMISI[OÓ]N|EXPEDICI[OÓ]N|FACTURA)\\s*:\\s*([0-9\\/\\-]+)/i) ||
-                             metaSearchText.match(/Fecha\\s+(?:de\\s+)?(?:Emisi[oó]n|Expedici[oó]n)\\s*:\\s*([0-9\\/\\-]+)/i) ||
-                             fullText.match(/FECHA\\s+(?:DE\\s+)?(?:EMISI[OÓ]N|EXPEDICI[OÓ]N)\\s*:\\s*([0-9\\/\\-]+)/i);
+                const mFec = metaSearchText.match(/FECHA\s+(?:DE\s+)?(?:EMISI[OÓ]N|EXPEDICI[OÓ]N|FACTURA)\s*:\s*([0-9\/\-]+)/i) ||
+                             metaSearchText.match(/Fecha\s+(?:de\s+)?(?:Emisi[oó]n|Expedici[oó]n)\s*:\s*([0-9\/\-]+)/i) ||
+                             fullText.match(/FECHA\s+(?:DE\s+)?(?:EMISI[OÓ]N|EXPEDICI[OÓ]N)\s*:\s*([0-9\/\-]+)/i);
                 if (mFec) {
                     const fRaw = mFec[1].trim();
-                    const mYMD = fRaw.match(/^(\\d{4})[\\/\\-](\\d{1,2})[\\/\\-](\\d{1,2})$/);
+                    const mYMD = fRaw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
                     if (mYMD) {
                         fechaStr = `${mYMD[3].padStart(2, '0')}/${mYMD[2].padStart(2, '0')}/${mYMD[1]}`;
                     } else {
@@ -3582,9 +3582,9 @@
 
                 // Emisor / Proveedor (Protegiendo contra coincidencia con ProteinAgro como adquirente)
                 let emisor = 'Sevillana';
-                const emisorScope = metaSearchText.split(/DATOS\\s+DEL\\s+ADQUIRENTE|DATOS\\s+DEL\\s+CLIENTE|CLIENTE\\s*:/i)[0] || metaSearchText;
-                const mEmisor = emisorScope.match(/(?:DATOS\\s+DEL\\s+EMISOR|DATOS\\s+DEL\\s+FACTURADOR)[\\s\\S]*?NOMBRE\\s*:\\s*([^\\n\\r]+?)(?=\\s+DIRECCI[OÓ]N|\\s+TIPO|\\s+TELEFONO|\\s+NIT|$)/i) ||
-                                emisorScope.match(/NOMBRE\\s*:\\s*([^\\n\\r]+?)(?=\\s+DIRECCI[OÓ]N|\\s+TIPO|\\s+TELEFONO|\\s+NIT|$)/i);
+                const emisorScope = metaSearchText.split(/DATOS\s+DEL\s+ADQUIRENTE|DATOS\s+DEL\s+CLIENTE|CLIENTE\s*:/i)[0] || metaSearchText;
+                const mEmisor = emisorScope.match(/(?:DATOS\s+DEL\s+EMISOR|DATOS\s+DEL\s+FACTURADOR)[\s\S]*?NOMBRE\s*:\s*([^\n\r]+?)(?=\s+DIRECCI[OÓ]N|\s+TIPO|\s+TELEFONO|\s+NIT|$)/i) ||
+                                emisorScope.match(/NOMBRE\s*:\s*([^\n\r]+?)(?=\s+DIRECCI[OÓ]N|\s+TIPO|\s+TELEFONO|\s+NIT|$)/i);
                 if (mEmisor) {
                     const emRaw = mEmisor[1].trim().toUpperCase();
                     if (!emRaw.includes('PROTEINAGRO')) {
@@ -3604,12 +3604,12 @@
 
                 // Sucursal / Punto de Entrega
                 let puntoSucursal = '';
-                const mPunto = metaSearchText.match(/ALMAC[EÉ]N(?:\\s*\\/\\s*DIRECCI[OÓ]N)?(?:\\s*\\/\\s*TEL[EÉ]FONO)?\\s*:\\s*([^\\/\\n\\r]+)/i) ||
-                               metaSearchText.match(/SUCURSAL\\s*:\\s*([^\\/\\n\\r]+)/i) ||
-                               fullText.match(/ALMAC[EÉ]N(?:\\s*\\/\\s*DIRECCI[OÓ]N)?(?:\\s*\\/\\s*TEL[EÉ]FONO)?\\s*:\\s*([^\\/\\n\\r]+)/i);
+                const mPunto = metaSearchText.match(/ALMAC[EÉ]N(?:\s*\/\s*DIRECCI[OÓ]N)?(?:\s*\/\s*TEL[EÉ]FONO)?\s*:\s*([^\/\n\r]+)/i) ||
+                               metaSearchText.match(/SUCURSAL\s*:\s*([^\/\n\r]+)/i) ||
+                               fullText.match(/ALMAC[EÉ]N(?:\s*\/\s*DIRECCI[OÓ]N)?(?:\s*\/\s*TEL[EÉ]FONO)?\s*:\s*([^\/\n\r]+)/i);
                 if (mPunto) {
                     puntoSucursal = mPunto[1].trim();
-                    puntoSucursal = puntoSucursal.replace(/\\s+(DIRECCI[OÓ]N|CIUDAD|TEL[EÉ]FONO|NIT).*$/i, '').trim();
+                    puntoSucursal = puntoSucursal.replace(/\s+(DIRECCI[OÓ]N|CIUDAD|TEL[EÉ]FONO|NIT).*$/i, '').trim();
                 }
 
                 // --- EXTRACCIÓN DE ÍTEMS EN TODAS LAS PÁGINAS ---
@@ -3626,20 +3626,20 @@
                         const fullLineStr = rawLineTokens.join(' ').trim();
 
                         // 1. Detectar cabecera de tabla de ítems en esta página
-                        if (/^ÍTEM$|^ITEM$/i.test(rawLineTokens[0]) || /\\b(?:ÍTEM|ITEM)\\s+C[OÓ]DIGO\\s+DESCRIPCI[OÓ]N\\b/i.test(fullLineStr)) {
+                        if (/^ÍTEM$|^ITEM$/i.test(rawLineTokens[0]) || /\b(?:ÍTEM|ITEM)\s+C[OÓ]DIGO\s+DESCRIPCI[OÓ]N\b/i.test(fullLineStr)) {
                             enTablaDePagina = true;
                             continue;
                         }
 
                         // 2. Detectar fin de tabla en la página (subtotales, notas, resoluciones)
-                        if (enTablaDePagina && /^(?:SUBTOTAL|TOTAL|VALOR TOTAL|SON:|RESOLUCI[OÓ]N|CUFE|OBSERVACIONES|P[AÁ]GINA|Continua)\\b/i.test(fullLineStr)) {
+                        if (enTablaDePagina && /^(?:SUBTOTAL|TOTAL|VALOR TOTAL|SON:|RESOLUCI[OÓ]N|CUFE|OBSERVACIONES|P[AÁ]GINA|Continua)\b/i.test(fullLineStr)) {
                             enTablaDePagina = false;
                             continue;
                         }
 
                         // 3. Evaluar si la línea corresponde a un ítem
                         const primerToken = rawLineTokens[0] || '';
-                        const esNumeroItem = /^\\d{1,4}$/.test(primerToken) && 
+                        const esNumeroItem = /^\d{1,4}$/.test(primerToken) && 
                                              (enTablaDePagina || Number(primerToken) === expectedItemNum || (expectedItemNum > 1 && Number(primerToken) === expectedItemNum));
 
                         if (esNumeroItem) {
@@ -3664,7 +3664,7 @@
 
                                 while (idxCorte >= 2) {
                                     const valStr = rawLineTokens[idxCorte].replace(/,/g, '');
-                                    if (/^-?\\d+(?:\\.\\d+)?$/.test(valStr)) {
+                                    if (/^-?\d+(?:\.\d+)?$/.test(valStr)) {
                                         numerosAlFinal.unshift(parseFloat(valStr));
                                         idxCorte--;
                                     } else {
@@ -3717,8 +3717,8 @@
                     for (let i = 0; i < rawTokens.length; i++) {
                         if (/^ÍTEM$|^ITEM$/i.test(rawTokens[i])) {
                             let j = i + 1;
-                            while (j < rawTokens.length && !/^\\d+$/.test(rawTokens[j])) j++;
-                            while (j < rawTokens.length && /^\\d+$/.test(rawTokens[j])) {
+                            while (j < rawTokens.length && !/^\d+$/.test(rawTokens[j])) j++;
+                            while (j < rawTokens.length && /^\d+$/.test(rawTokens[j])) {
                                 const itemNum = rawTokens[j];
                                 const code = rawTokens[j+1] || '';
                                 const desc = rawTokens[j+2] || '';
@@ -3741,10 +3741,10 @@
                         ws.addRow([fechaStr, emisor, puntoSucursal, it.desc, numFactura, it.cant, it.unitVal, it.totVal, 'FACTURA']);
                     });
                 } else {
-                    const mTotKg = fullText.match(/Cantidad\\s+Total\\s*:\\s*([0-9.,]+)/i);
+                    const mTotKg = fullText.match(/Cantidad\s+Total\s*:\s*([0-9.,]+)/i);
                     const totKg = mTotKg ? parseFloat(mTotKg[1].replace(/,/g, '')) : 0;
-                    const mTotVal = fullText.match(/Total\\s+COP\\s*([0-9.,]+)/i) || fullText.match(/Total\\s+sin\\s+impuesto\\s*([0-9.,]+)/i);
-                    const totVal = mTotVal ? parseFloat(mTotVal[1].replace(/\\./g, '').replace(',', '.')) : 0;
+                    const mTotVal = fullText.match(/Total\s+COP\s*([0-9.,]+)/i) || fullText.match(/Total\s+sin\s+impuesto\s*([0-9.,]+)/i);
+                    const totVal = mTotVal ? parseFloat(mTotVal[1].replace(/\./g, '').replace(',', '.')) : 0;
                     ws.addRow([fechaStr, emisor, puntoSucursal, 'DESPERDICIO', numFactura, totKg, 0, totVal]);
                 }
 
@@ -3753,24 +3753,24 @@
                 ws.addRow(['FECHA', 'PROVEEDOR', 'SUCURSAL', 'PRODUCTO', 'NUMERO_FACTURA', 'KG', 'PRECIO', 'VALOR', 'TIPO_DOCUMENTO']);
                 for (const line of allLines) {
                     const fullStr = line.map(x => x.str).join(' ').trim();
-                    if (/^TOTAL|SALDO INICIAL|P[AÁ]GINA|FECHA Y HORA|NIT\\b|LIBRO AUXILIAR|220501/i.test(fullStr)) continue;
+                    if (/^TOTAL|SALDO INICIAL|P[AÁ]GINA|FECHA Y HORA|NIT\b|LIBRO AUXILIAR|220501/i.test(fullStr)) continue;
 
-                    const mDate = fullStr.match(/(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/);
+                    const mDate = fullStr.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
                     if (!mDate) continue;
                     const fechaStr = mDate[1];
 
-                    const amounts = fullStr.match(/(\\d{1,3}(?:\\.\\d{3})*,\\d{2}|\\d+\\.\\d{2})/g);
+                    const amounts = fullStr.match(/(\d{1,3}(?:\.\d{3})*,\d{2}|\d+\.\d{2})/g);
                     if (!amounts || amounts.length === 0) continue;
 
                     let valStr = amounts.length >= 3 ? amounts[1] : amounts[0];
                     if (amounts.length >= 2 && /^0(?:[.,]00)?$/.test(amounts[0])) {
                         valStr = amounts[1];
                     }
-                    const valNum = parseFloat(valStr.replace(/\\./g, '').replace(',', '.')) || 0;
+                    const valNum = parseFloat(valStr.replace(/\./g, '').replace(',', '.')) || 0;
                     if (valNum <= 0) continue;
 
                     let numFactura = '';
-                    const mFact = fullStr.match(/\\b([A-Z0-9]{2,5}[A-Z0-9]{4,10})\\b/) || fullStr.match(/\\bFC\\s*(\\d+)\\b/i);
+                    const mFact = fullStr.match(/\b([A-Z0-9]{2,5}[A-Z0-9]{4,10})\b/) || fullStr.match(/\bFC\s*(\d+)\b/i);
                     if (mFact) numFactura = mFact[0];
 
                     let prodName = 'DESPERDICIO';
