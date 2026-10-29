@@ -627,6 +627,9 @@
                             </div>
                         </div>
                         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" onclick="guardarTodasLasEquivalenciasEnMemoria()" style="background: #10b981; color: #fff; border: 1px solid #059669; padding: 6px 14px; border-radius: 6px; font-size: 0.82em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);" title="Guarda en la memoria permanente del proveedor todas las equivalencias mostradas en la tabla">
+                                💾 Guardar Todo en Memoria
+                            </button>
                             <button type="button" onclick="aplicarSmartMatchSugeridos()" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 5px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 600; cursor: pointer;" title="Guarda en la memoria de este proveedor todas las equivalencias detectadas por coincidencia de peso">
                                 ✨ Fijar sugeridos por Peso
                             </button>
@@ -645,12 +648,12 @@
                     </div>
                     <!-- Barra para agregar equivalencia manual en cualquier momento -->
                     <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e2e8f0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.82em;">
-                        <span style="font-weight: 600; color: #475569;">➕ Agregar equivalencia a este proveedor:</span>
-                        <input type="text" id="inputNuevoRawProd" placeholder="Nombre en Excel (ej: CARNAZA, SEB0)" style="padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 5px; min-width: 210px; font-size: 0.95em;">
+                        <span style="font-weight: 600; color: #475569;">➕ Agregar equivalencia manual:</span>
+                        <input type="text" id="inputNuevoRawProd" placeholder="Nombre en archivo (ej: CARNAZA, SEB0)" style="padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 5px; min-width: 210px; font-size: 0.95em; transition: border 0.2s, background-color 0.2s;">
                         <span style="color: #64748b;">➔</span>
                         <select id="selectNuevoTargetProd" style="padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 5px; min-width: 190px; font-size: 0.95em;"></select>
-                        <button type="button" onclick="agregarReglaMapeoManual()" style="background: #10b981; color: #fff; border: none; padding: 5px 12px; border-radius: 5px; font-weight: 600; cursor: pointer;">
-                            💾 Guardar en Memoria
+                        <button type="button" id="btnGuardarReglaManual" onclick="agregarReglaMapeoManual()" style="background: #2563eb; color: #fff; border: none; padding: 6px 14px; border-radius: 5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;" title="Guarda esta regla manual para el proveedor">
+                            ➕ Guardar Regla Manual
                         </button>
                     </div>
                 </div>
@@ -2965,18 +2968,95 @@
             updateStatus(`🗑️ Memoria de equivalencias reiniciada para ${currentProveedorDisplayName}.`, 'normal');
         }
 
+        function cargarEnBarraManual(rawEnc, prodEnc) {
+            const raw = decodeURIComponent(rawEnc);
+            const prod = decodeURIComponent(prodEnc);
+            const inp = document.getElementById('inputNuevoRawProd');
+            const sel = document.getElementById('selectNuevoTargetProd');
+            if (inp) {
+                inp.value = raw;
+                inp.focus();
+                inp.style.border = '2px solid #3b82f6';
+                setTimeout(() => { inp.style.border = '1px solid #cbd5e1'; }, 1500);
+            }
+            if (sel && prod) {
+                sel.value = prod;
+            }
+            updateStatus(`📝 Materia "${raw}" cargada en la barra manual para ajustar su equivalente.`, 'normal');
+        }
+
+        function guardarTodasLasEquivalenciasEnMemoria() {
+            const pKey = currentProveedorMemoriaKey || 'GENERAL';
+            if (!mapaMemoriaProveedores[pKey]) mapaMemoriaProveedores[pKey] = {};
+            
+            let countGuardados = 0;
+            const cont = document.getElementById('contenedorTablaMapeoProductos');
+            if (cont) {
+                const selects = cont.querySelectorAll('select[data-raw-prod]');
+                selects.forEach(sel => {
+                    const rawP = decodeURIComponent(sel.getAttribute('data-raw-prod') || '');
+                    const rawClean = limpiarNombreProductoCrudo(rawP);
+                    const val = sel.value;
+                    if (rawClean && val && val !== '__AUTO__') {
+                        mapaMemoriaProveedores[pKey][rawClean] = val;
+                        countGuardados++;
+                    }
+                });
+            }
+
+            if (countGuardados === 0 && Array.isArray(ultimoAnalisisMapeo) && ultimoAnalisisMapeo.length > 0) {
+                ultimoAnalisisMapeo.forEach(it => {
+                    const rawClean = limpiarNombreProductoCrudo(it.rawProd);
+                    const val = it.sugeridoPorPeso || it.prodFinal;
+                    if (rawClean && val && val !== '__AUTO__') {
+                        mapaMemoriaProveedores[pKey][rawClean] = val;
+                        countGuardados++;
+                    }
+                });
+            }
+
+            persistirMemoriaProveedores();
+            if (currentConcWorkbook) {
+                ejecutarConciliacionUniversal();
+            } else {
+                renderizarPanelMapeoProductos([], []);
+            }
+            updateStatus(`💾 Se guardaron con éxito ${countGuardados} equivalencias en la memoria permanente de ${currentProveedorDisplayName}.`, 'success');
+        }
+
         function agregarReglaMapeoManual() {
             const inp = document.getElementById('inputNuevoRawProd');
             const sel = document.getElementById('selectNuevoTargetProd');
             if (!inp || !sel) return;
             const rawVal = limpiarNombreProductoCrudo(inp.value);
             const targetVal = sel.value;
+
+            // Si el campo manual está vacío:
             if (!rawVal) {
-                alert('Escribe el nombre del producto tal como aparece en el Excel del proveedor.');
+                // Si hay elementos en la tabla, interpretar que el usuario quiso guardar las equivalencias mostradas
+                const cont = document.getElementById('contenedorTablaMapeoProductos');
+                const selects = cont ? cont.querySelectorAll('select[data-raw-prod]') : [];
+                if (selects.length > 0 || (Array.isArray(ultimoAnalisisMapeo) && ultimoAnalisisMapeo.length > 0)) {
+                    guardarTodasLasEquivalenciasEnMemoria();
+                    return;
+                }
+
+                // Si no hay productos en la tabla ni texto escrito, advertir de manera visual no intrusiva (sin modal bloqueante alert)
+                inp.style.border = '2px solid #ef4444';
+                inp.style.backgroundColor = '#fef2f2';
+                inp.focus();
+                updateStatus('⚠️ Escribe el nombre del producto o carga un archivo para guardar equivalencias en memoria.', 'error');
+                setTimeout(() => {
+                    inp.style.border = '1px solid #cbd5e1';
+                    inp.style.backgroundColor = '#ffffff';
+                }, 3000);
                 return;
             }
+
             guardarEquivalenciaProductoProveedor(rawVal, targetVal);
             inp.value = '';
+            inp.style.border = '1px solid #cbd5e1';
+            inp.style.backgroundColor = '#ffffff';
         }
 
         function togglePanelMapeoProductos(forzarEstado) {
@@ -3098,10 +3178,11 @@
                     <tr style="border-bottom: 1px solid #f1f5f9;">
                         <td style="padding: 6px 10px; font-weight: 700; color: #0f172a;">
                             "${it.rawProd}" ${infoVolumen}
+                            <button type="button" onclick="cargarEnBarraManual('${rEnc}', '${encodeURIComponent(it.prodFinal)}')" style="background:transparent; border:none; cursor:pointer; font-size:0.9em; margin-left:4px; opacity:0.6; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" title="Cargar en la barra manual inferior para editar">✏️</button>
                         </td>
                         <td style="padding: 6px 10px;">${badgeOrigen}</td>
                         <td style="padding: 6px 10px;">
-                            <select onchange="guardarEquivalenciaProductoProveedor(decodeURIComponent('${rEnc}'), this.value)" style="width: 100%; padding: 5px 8px; border: 1px solid ${it.origen === 'DESCONOCIDO' ? '#f59e0b' : '#cbd5e1'}; border-radius: 6px; font-weight: 600; font-size: 0.86em; background: ${it.origen === 'MEMORIA' ? '#f0fdf4' : '#fff'};">
+                            <select data-raw-prod="${rEnc}" onchange="guardarEquivalenciaProductoProveedor(decodeURIComponent('${rEnc}'), this.value)" style="width: 100%; padding: 5px 8px; border: 1px solid ${it.origen === 'DESCONOCIDO' ? '#f59e0b' : '#cbd5e1'}; border-radius: 6px; font-weight: 600; font-size: 0.86em; background: ${it.origen === 'MEMORIA' ? '#f0fdf4' : '#fff'};">
                                 ${poblarOpcionesSelectProducto(matProvSet, it.prodFinal)}
                             </select>
                         </td>
@@ -3730,7 +3811,7 @@
                     filtroStr = mejorMatch;
                 } else {
                     // Intentar por palabras significativas del nombre de archivo o cabecera
-                    const limpio = fileName.replace(/\.(xlsx?|pdf)$/i, '').replace(/202\d/g, '').replace(/PLANTILLA|CONCILIACION|PROVEEDORES|MATERIAL|DESPACHADO|DESDE|CUENTA|INFORME|SEPTIEMBRE|SEPTI|AGOSTO|JULIO|JUNIO|MAYO|ABRIL|MARZO|FEBRERO|ENERO|PROTEINAGRO|PROTEINA|AGRO/gi, '').replace(/^[_-\s()0-9]+|[_-\s()0-9]+$/g, '').trim();
+                    const limpio = fileName.replace(/\.(xlsx?|pdf)$/i, '').replace(/202\d/g, '').replace(/\(\d+\)/g, '').replace(/\b(?:PLANTILLA|CONCILIACION|PROVEEDORES?|MATERIAL|DESPACHADO|DESDE|CUENTA|INFORME|SEPTIEMBRE|SEPT|OCTUBRE|OCT|NOVIEMBRE|NOV|DICIEMBRE|DIC|ENERO|ENE|FEBRERO|FEB|MARZO|MAR|ABRIL|ABR|MAYO|MAY|JUNIO|JUN|JULIO|JUL|AGOSTO|AGO|PROTEINAGRO|PROTEINA|AGRO)\b/gi, '').replace(/^[_-\s()0-9]+|[_-\s()0-9]+$/g, '').trim();
                     if (limpio.length >= 3) {
                         provNombre = limpio.toUpperCase();
                         filtroStr = limpio.toUpperCase();

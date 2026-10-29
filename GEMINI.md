@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.8.3)  
+> **Última Actualización:** Octubre 2026 (Versión 1.8.4)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -375,6 +375,28 @@
      - Ítem 1 (80.00 Kg, $9.600) ↔ Recolección del 10/09/2026 en Sevillana Palmira / Villagorgona (80 Kg).
      - Ítem 2 (92.10 Kg, $11.052) ↔ Recolección del 03/09/2026 en Ricardo Gil (92.1 Kg).
      - Resultado: **172.10 Kg (100% Conciliado Exacto, $20.652 COP, 0 Desviaciones, 0 Pendientes)**.
+
+---
+
+### 26. Optimización de Memoria de Equivalencias y Eliminación de Alertas Bloqueantes en Conciliador (1.8.4)
+- **Problema Diagnosticado:**
+  - Al abrir el panel *📁 Equivalencias Proveedor*, la interfaz mostraba un botón inferior rotulado 💾 Guardar en Memoria correspondiente al formulario de adición manual de una regla individual.
+  - Los usuarios pulsaban este botón asumiendo que guardaría todas las equivalencias detectadas o visualizadas en la tabla del panel.
+  - Al no haber escrito nada en la caja #inputNuevoRawProd, el sistema arrojaba un cuadro modal nativo del navegador lert('Escribe el nombre del producto tal como aparece en el Excel del proveedor.').
+  - En el contexto de Google Sheets (*Google Apps Script iframe / script.googleusercontent.com*), este lert() bloqueaba la interfaz, mostraba un prefijo hostil del dominio sandboxed y generaba confusión operativa.
+  - Además, los nombres de archivo como PROTEINAGRO_SEPT_2026_(5).xlsx no filtraban correctamente las palabras del mes abreviado (SEPT), dejando filtros sintéticos como SEPT ( que bloqueaban las recolecciones en Sheets.
+- **Solución Implementada en CONCILIADOR.html (1.8.4):**
+  1. *Desambiguación Visual e Inclusión de Botón Masivo:*
+     - Se añadió un botón principal y prominente en la cabecera del panel: 💾 Guardar Todo en Memoria (guardarTodasLasEquivalenciasEnMemoria()).
+     - El botón del formulario inferior se renombró a ➕ Guardar Regla Manual para distinguir claramente la adición de una regla puntual frente al guardado global.
+  2. *Guardado Inteligente sin Bloqueos ni Alertas:*
+     - Si el usuario pulsa el botón manual sin haber escrito un producto, el sistema evalúa si la tabla de equivalencias ya contiene registros analizados o detectados (ultimoAnalisisMapeo). De ser así, ejecuta de forma transparente guardarTodasLasEquivalenciasEnMemoria(), satisfaciendo la intención del usuario sin errores.
+     - Si la tabla está vacía y el campo de texto está en blanco, se reemplazó el lert() bloqueante por una notificación suave en barra de estado (updateStatus('⚠️ Escribe el nombre del producto...', 'error')) y un resaltado visual temporal con borde rojo en la caja de texto.
+  3. *Atributo data-raw-prod y Botón Rápido de Edición (✏️):*
+     - Cada selector en la tabla incluye data-raw-prod para lectura instantánea y atómica al guardar.
+     - Se agregó un icono ✏️ junto al nombre de cada materia en la tabla para cargarlo en la barra manual inferior con un solo clic.
+  4. *Refinamiento de Expresión Regular para Detección Automática de Archivos:*
+     - Se ajustó el filtro de limpieza de nombres de archivo en utodetectarProveedorYPeriodo con límites de palabra \b y soporte completo para abreviaturas mensuales (\bSEPT\b, \bOCT\b, etc.) y sufijos de descarga (\d+), previniendo filtros espurios.
 
 ---
 

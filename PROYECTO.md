@@ -895,6 +895,20 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 ---
 
+### 12.18 Memoria de Equivalencias Blindada y Eliminación de Alertas Bloqueantes (v1.8.4)
+
+> **Objetivo:** Facilitar la interacción del usuario en el panel *Equivalencias Proveedor*, permitiendo guardar todas las materias en memoria con un solo clic, eliminando cuadros de alerta intrusivos (lert()) dentro de Google Apps Script, y evitando falsos filtros por nombres de archivo.
+
+- **Doble Nivel de Guardado Visual:**
+  - Botón principal de cabecera 💾 Guardar Todo en Memoria que persiste en un solo paso todos los mapeos de la tabla en localStorage y en la nube (PropertiesService).
+  - Botón del formulario manual renombrado a ➕ Guardar Regla Manual.
+- **Comportamiento Inteligente Anti-Alertas:**
+  - Si el usuario pulsa el botón sin escribir un producto en el campo de texto, el sistema verifica si la tabla ya tiene equivalencias detectadas y las guarda todas automáticamente.
+  - Erradicación de lert() bloqueantes: en su lugar, se utilizan notificaciones suaves en la barra de estado y feedback visual no intrusivo en el formulario.
+  - Botón rápido ✏️ para precargar cualquier materia en la barra manual con un solo toque.
+
+---
+
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
 
 
