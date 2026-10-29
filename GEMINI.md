@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.8.4)  
+> **Última Actualización:** Octubre 2026 (Versión 1.8.5)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -397,6 +397,31 @@
      - Se agregó un icono ✏️ junto al nombre de cada materia en la tabla para cargarlo en la barra manual inferior con un solo clic.
   4. *Refinamiento de Expresión Regular para Detección Automática de Archivos:*
      - Se ajustó el filtro de limpieza de nombres de archivo en utodetectarProveedorYPeriodo con límites de palabra \b y soporte completo para abreviaturas mensuales (\bSEPT\b, \bOCT\b, etc.) y sufijos de descarga (\d+), previniendo filtros espurios.
+
+---
+
+### 27. Normalización Estricta de Fechas en Facturas y Cruce Universal por Kilos Exactos (1.8.5)
+- **Problema Diagnosticado:**
+  - Al conciliar facturas electrónicas de proveedores (ej. AGROPECUARIA LA SEVILLANA SAS, Factura FV3C 34049), los ítems no conciliados o pendientes aparecían en la columna FECHA rotulados como Factura FV3C 34049 (Ítem 1), Factura FV3C 34049 (Ítem 2), etc., desarticulando la estructura contable de la matriz.
+  - Además, la materia prima DESPERDICIO DE RES de la factura no se homologaba al producto oficial DESPERDICIO, dividiendo la matriz en dos columnas separadas e impidiendo el cruce con las recolecciones físicas de campo.
+  - Como consecuencia, entregas físicas exactas registradas en plataforma (ej. 14/09: 204.8 Kg y 18/09: 329.9 Kg de Desperdicio; 14/09: 89 Kg y 38.4 Kg; 18/09: 169.3 Kg y 38.7 Kg de Hueso) no hacían match en el motor Smart Match / PASADA 0.
+- **Solución Implementada en CONCILIADOR.html (1.8.5):**
+  1. *Normalización Estricta de la Columna FECHA:*
+     - La columna FECHA almacena siempre fechas válidas en formato DD/MM/YYYY (dInfo.fechaStr, ej. 30/09/2026). Se eliminó la sobreescritura con el texto de la factura.
+     - Los metadatos de auditoría (
+umItemFactura, acturaDoc, 
+awEtiqueta) se conservan en propiedades internas y se muestran en la columna de observaciones o diagnóstico del día.
+     - Al conciliar exitosamente en PASADA 0 (Fase 0A/0C), el ítem adopta la fecha real de la recolección física (
+i.fecha), consolidándose directamente en la fila de ese día.
+  2. *Homologación Universal de Subproductos Cárnicos:*
+     - Inclusión en MAPA_PRODUCTOS_CLIENTE y ALIAS_PRODUCTOS_UNIVERSAL de: DESPERDICIO DE RES, DESPERDICIOS DE RES, DESPERDICIO RES, DESPERDICIOS RES -> DESPERDICIO.
+     - Inclusión de HUESO DE RES, HUESO RES -> HUESO BLANCO; SEBO DE RES, SEBO RES -> SEBO EN RAMA; HUESO PORCINO -> HUESO DE CERDO.
+     - Regla regex de respaldo en homologarMateriaCliente y homologarProductoUniversal.
+  3. *Ampliación de Compatibilidad en PASADA 0 (PROD_COMPAT_LOTE):*
+     - Compatibilidad bidireccional entre DESPERDICIO y DESPERDICIO DE RES.
+     - Compatibilidad entre HUESO BLANCO y HUESO DE CERDO / HUESO PROMOCION cuando el peso coincide exactamente.
+  4. *Flexibilización de Punto/Sucursal:*
+     - Si el campo ALMACÉN / DIRECCIÓN del PDF contiene una dirección física o postal y no una sede conocida, no se restringe iltroPunto, permitiendo el cotejo contra todas las sedes del proveedor en el período.
 
 ---
 

@@ -842,7 +842,7 @@
             return items.filter((_, idx) => !ghostMap[idx]);
         }
 
-        const MAPA_PRODUCTOS_CLIENTE = {"ACEITE": "ACEITE", "CABEZAS": "CABEZAS", "DESPERDICIO": "DESPERDICIO", "DESPERDICIO DE POLLO": "DESPERDICIO", "DESPERDICIOS DE POLLO": "DESPERDICIO", "DESPERDICIO POLLO": "DESPERDICIO", "EMPELLA": "EMPELLA", "GORDANA": "GORDANA", "HARINA CARNE": "HARINA CARNE", "HARINA DE HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO BLANCO": "HUESO BLANCO", "HUESO DE CERDO": "HUESO DE CERDO", "HUESO SECO": "HUESO SECO", "HUESO DE POLLO": "HUESO DE POLLO", "MANTECA": "MANTECA", "MARGARINA": "MARGARINA", "MANTEQUILLA": "MANTEQUILLA", "PIEL POLLO": "PIEL POLLO", "SEBO": "SEBO", "SEBO EN RAMA": "SEBO EN RAMA", "OREJAS DE CERDO": "OREJAS DE CERDO", "PULMON DE CERDO": "PULMON DE CERDO", "CALAMBOMBO DE CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO DE RES": "CALAMBOMBO DE RES", "TRAQUEAS": "TRAQUEAS", "HUESO PROMOCION": "HUESO PROMOCION", "LENA": "LEÑA", "PIELES": "PIELES", "ACEITE PALMA": "ACEITE PALMA", "ACEITE SOLLA": "ACEITE SOLLA", "CABEZA": "CABEZAS", "CABEZA DE CERDO": "CABEZAS", "CABEZAS DE CERDO": "CABEZAS", "DESPERDICIOS": "DESPERDICIO", "HARINA/CARNE": "HARINA CARNE", "HARINA DE CARNE": "HARINA CARNE", "HARINA SANGRE": "HARINA DE SANGRE", "HARINA DE SANGRE": "HARINA DE SANGRE", "HARINA HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO VAPORIZADO": "HARINA DE HUESO VAPORIZADA", "HUESO": "HUESO BLANCO", "HUESOS": "HUESO BLANCO", "HUESO CARNUDO": "HUESO BLANCO", "HUESOS BLANCOS": "HUESO BLANCO", "HUESO FEMUR": "HUESO BLANCO", "HUESO FERMUR": "HUESO BLANCO", "HUESO PICADO": "HUESO PICADO", "HUESO CALCINADO": "HUESO CALCINADO", "HUESO CERDO": "HUESO DE CERDO", "HUESOS DE CERDO": "HUESO DE CERDO", "HUESO POLLO": "HUESO DE POLLO", "HUESOS DE POLLO": "HUESO DE POLLO", "HUESOS SECOS": "HUESO SECO", "HUESO EN PROMOCION": "HUESO PROMOCION", "PIEL DE POLLO": "PIEL POLLO", "PIELE DE POLLO": "PIEL POLLO", "PIELES DE POLLO": "PIEL POLLO", "OREJA DE CERDO": "OREJAS DE CERDO", "OREJAS CERDO": "OREJAS DE CERDO", "PULMON CERDO": "PULMON DE CERDO", "CALAMBOMBO CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO RES": "CALAMBOMBO DE RES", "TRAQUEA": "TRAQUEAS", "SEBO RAMA": "SEBO EN RAMA", "SEBO BOVINO": "SEBO BOVINO", "SEBO DERRETIDO": "SEBO DERRETIDO", "SEBO SALADO": "SEBO SALADO", "PIEL": "PIELES"};
+        const MAPA_PRODUCTOS_CLIENTE = {"ACEITE": "ACEITE", "CABEZAS": "CABEZAS", "DESPERDICIO": "DESPERDICIO", "DESPERDICIO DE POLLO": "DESPERDICIO", "DESPERDICIOS DE POLLO": "DESPERDICIO", "DESPERDICIO POLLO": "DESPERDICIO", "DESPERDICIO DE RES": "DESPERDICIO", "DESPERDICIOS DE RES": "DESPERDICIO", "DESPERDICIO RES": "DESPERDICIO", "DESPERDICIOS RES": "DESPERDICIO", "EMPELLA": "EMPELLA", "GORDANA": "GORDANA", "HARINA CARNE": "HARINA CARNE", "HARINA DE HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO BLANCO": "HUESO BLANCO", "HUESO DE CERDO": "HUESO DE CERDO", "HUESO SECO": "HUESO SECO", "HUESO DE POLLO": "HUESO DE POLLO", "MANTECA": "MANTECA", "MARGARINA": "MARGARINA", "MANTEQUILLA": "MANTEQUILLA", "PIEL POLLO": "PIEL POLLO", "SEBO": "SEBO", "SEBO EN RAMA": "SEBO EN RAMA", "SEBO DE RES": "SEBO EN RAMA", "SEBO RES": "SEBO EN RAMA", "SEBOS DE RES": "SEBO EN RAMA", "SEBOS": "SEBO EN RAMA", "OREJAS DE CERDO": "OREJAS DE CERDO", "PULMON DE CERDO": "PULMON DE CERDO", "CALAMBOMBO DE CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO DE RES": "CALAMBOMBO DE RES", "TRAQUEAS": "TRAQUEAS", "HUESO PROMOCION": "HUESO PROMOCION", "LENA": "LEÑA", "PIELES": "PIELES", "ACEITE PALMA": "ACEITE PALMA", "ACEITE SOLLA": "ACEITE SOLLA", "CABEZA": "CABEZAS", "CABEZA DE CERDO": "CABEZAS", "CABEZAS DE CERDO": "CABEZAS", "DESPERDICIOS": "DESPERDICIO", "HARINA/CARNE": "HARINA CARNE", "HARINA DE CARNE": "HARINA CARNE", "HARINA SANGRE": "HARINA DE SANGRE", "HARINA DE SANGRE": "HARINA DE SANGRE", "HARINA HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO VAPORIZADO": "HARINA DE HUESO VAPORIZADA", "HUESO": "HUESO BLANCO", "HUESOS": "HUESO BLANCO", "HUESO DE RES": "HUESO BLANCO", "HUESOS DE RES": "HUESO BLANCO", "HUESO RES": "HUESO BLANCO", "HUESOS RES": "HUESO BLANCO", "HUESO CARNUDO": "HUESO BLANCO", "HUESOS BLANCOS": "HUESO BLANCO", "HUESO FEMUR": "HUESO BLANCO", "HUESO FERMUR": "HUESO BLANCO", "HUESO PICADO": "HUESO PICADO", "HUESO CALCINADO": "HUESO CALCINADO", "HUESO CERDO": "HUESO DE CERDO", "HUESOS DE CERDO": "HUESO DE CERDO", "HUESO PORCINO": "HUESO DE CERDO", "HUESO POLLO": "HUESO DE POLLO", "HUESOS DE POLLO": "HUESO DE POLLO", "HUESOS SECOS": "HUESO SECO", "HUESO EN PROMOCION": "HUESO PROMOCION", "PIEL DE POLLO": "PIEL POLLO", "PIELE DE POLLO": "PIEL POLLO", "PIELES DE POLLO": "PIEL POLLO", "OREJA DE CERDO": "OREJAS DE CERDO", "OREJAS CERDO": "OREJAS DE CERDO", "PULMON CERDO": "PULMON DE CERDO", "CALAMBOMBO CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO RES": "CALAMBOMBO DE RES", "TRAQUEA": "TRAQUEAS", "SEBO RAMA": "SEBO EN RAMA", "SEBO BOVINO": "SEBO BOVINO", "SEBO DERRETIDO": "SEBO DERRETIDO", "SEBO SALADO": "SEBO SALADO", "PIEL": "PIELES"};
 
         function homologarMateriaCliente(mat) {
             if (!mat) return "";
@@ -853,7 +853,12 @@
                 k = k.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             } catch(e) {}
             k = k.replace(/\s+/g, " ").trim();
-            return MAPA_PRODUCTOS_CLIENTE[k] || raw.toUpperCase();
+            if (MAPA_PRODUCTOS_CLIENTE[k]) return MAPA_PRODUCTOS_CLIENTE[k];
+            if (/^DESPERDICIOS?\s+(?:DE\s+)?RES\b/i.test(k) || (/^DESPERDICIOS?\b/i.test(k) && !/POLLO/i.test(k))) return "DESPERDICIO";
+            if (/^SEBOS?\s+(?:DE\s+)?RES\b/i.test(k)) return "SEBO EN RAMA";
+            if (/^HUESOS?\s+(?:DE\s+)?RES\b/i.test(k)) return "HUESO BLANCO";
+            if (/^HUESOS?\s+(?:DE\s+)?CERDO\b|^HUESO\s+PORCINO\b/i.test(k)) return "HUESO DE CERDO";
+            return raw.toUpperCase();
         }
 
 
@@ -2763,6 +2768,8 @@
             'HUESO BLANCO': 'HUESO BLANCO',
             'HUESO RES': 'HUESO BLANCO',
             'HUESO DE RES': 'HUESO BLANCO',
+            'HUESOS DE RES': 'HUESO BLANCO',
+            'HUESOS RES': 'HUESO BLANCO',
             'HUESO CARNUDO': 'HUESO BLANCO',
             'HUESO FEMUR': 'HUESO BLANCO',
             'HUESO FERMUR': 'HUESO BLANCO',
@@ -2771,6 +2778,9 @@
             'SEBO RAMA': 'SEBO EN RAMA',
             'SEBO EN RAMA': 'SEBO EN RAMA',
             'SEBO RES': 'SEBO EN RAMA',
+            'SEBO DE RES': 'SEBO EN RAMA',
+            'SEBOS DE RES': 'SEBO EN RAMA',
+            'SEBOS': 'SEBO EN RAMA',
             'SEBO LIMPIO': 'SEBO EN RAMA',
             'HUESO SECO': 'HUESO SECO',
             'HUESOS SECOS': 'HUESO SECO',
@@ -2778,6 +2788,10 @@
             'ACEITE USADO': 'ACEITE',
             'DESPERDICIO': 'DESPERDICIO',
             'DESPERDICIOS': 'DESPERDICIO',
+            'DESPERDICIO DE RES': 'DESPERDICIO',
+            'DESPERDICIOS DE RES': 'DESPERDICIO',
+            'DESPERDICIO RES': 'DESPERDICIO',
+            'DESPERDICIOS RES': 'DESPERDICIO',
             'DESPERDICIO DE POLLO': 'DESPERDICIO',
             'DESPERDICIOS DE POLLO': 'DESPERDICIO',
             'DESPERDICIO POLLO': 'DESPERDICIO',
@@ -2901,6 +2915,10 @@
                 return mapaMemoriaProveedores[pKey][s];
             }
             if (ALIAS_PRODUCTOS_UNIVERSAL[s]) return ALIAS_PRODUCTOS_UNIVERSAL[s];
+            if (/^DESPERDICIOS?\s+(?:DE\s+)?RES\b/i.test(s) || (/^DESPERDICIOS?\b/i.test(s) && !/POLLO/i.test(s))) return 'DESPERDICIO';
+            if (/^SEBOS?\s+(?:DE\s+)?RES\b/i.test(s)) return 'SEBO EN RAMA';
+            if (/^HUESOS?\s+(?:DE\s+)?RES\b/i.test(s)) return 'HUESO BLANCO';
+            if (/^HUESOS?\s+(?:DE\s+)?CERDO\b|^HUESO\s+PORCINO\b/i.test(s)) return 'HUESO DE CERDO';
             if (typeof homologarMateriaCliente === 'function') {
                 const h = homologarMateriaCliente(s);
                 if (ALIAS_PRODUCTOS_UNIVERSAL[h]) return ALIAS_PRODUCTOS_UNIVERSAL[h];
@@ -3778,7 +3796,11 @@
                     if (dpNorm.includes('PALMIRA')) filtroPunto = 'PALMIRA';
                     else if (dpNorm.includes('CAVASA')) filtroPunto = 'CAVASA';
                     else if (dpNorm.includes('GUACARI')) filtroPunto = 'GUACARI';
-                    else filtroPunto = dpNorm;
+                    else if (dpNorm.includes('SANTA ELENA') || dpNorm.includes('SANTA HELENA')) filtroPunto = 'SANTA ELENA';
+                    else if (dpNorm.includes('LOURDES')) filtroPunto = 'LOURDES';
+                    else if (dpNorm.includes('PASOANCHO')) filtroPunto = 'PASOANCHO';
+                    else if (dpNorm.includes('ISRAEL')) filtroPunto = 'ISRAEL';
+                    else filtroPunto = ''; // No bloquear con direcciones callejeras / físicas (ej. Cra, Cll, Cl, Av, #)
                 }
             } else if (normJoined.includes('SANTA HELENA') || normJoined.includes('SANTA ELENA')) {
                 if (normJoined.includes('SEVILLANA')) {
@@ -4181,7 +4203,7 @@
                         dia: dInfo.dia,
                         mes: dInfo.mes,
                         anio: dInfo.anio,
-                        fecha: esLoteFactura ? `Factura ${facRow || autoInfo.docFac || ''} (Ítem ${numItemFactura})` : dInfo.fechaStr,
+                        fecha: dInfo.fechaStr,
                         sortKey: dInfo.sortKey,
                         rawProd: prodRaw,
                         kg: kg,
@@ -4189,6 +4211,7 @@
                         valor: valor,
                         puntoDoc: puntoRow || autoInfo.docPunto || '',
                         facturaDoc: facRow || autoInfo.docFac || '',
+                        numItemFactura: numItemFactura,
                         esLoteSinDia: esLoteFactura,
                         rawEtiqueta: (facRow || autoInfo.docFac) ? `Factura ${facRow || autoInfo.docFac} · Ítem ${numItemFactura}` : (esLoteFactura ? `Factura ${dInfo.fechaStr}` : '')
                     });
@@ -4406,7 +4429,7 @@
                 const precioUnit = it.precio > 0 ? it.precio : (preciosExcelGlobal[prodOficial] || preciosPlataforma[prodOficial] || 0);
                 const valorItem = it.valor > 0 ? it.valor : (it.kg * precioUnit);
 
-                const key = it.esLoteSinDia ? `${it.fecha}||${prodOficial}||${it.rawProd}` : `${it.fecha}||${prodOficial}`;
+                const key = it.esLoteSinDia ? `${it.fecha}||${prodOficial}||${it.rawProd}||${it.numItemFactura || 0}` : `${it.fecha}||${prodOficial}`;
                 if (!despMap[key]) {
                     despMap[key] = {
                         _key: key,
@@ -4420,6 +4443,10 @@
                         kg_proveedor: 0,
                         precio_unit: precioUnit,
                         valor_proveedor: 0,
+                        puntoDoc: it.puntoDoc || '',
+                        facturaDoc: it.facturaDoc || '',
+                        numItemFactura: it.numItemFactura || 0,
+                        rawEtiqueta: it.rawEtiqueta || '',
                         esLoteSinDia: !!it.esLoteSinDia
                     };
                 }
@@ -4500,9 +4527,13 @@
             const recAuxUsadas = new Set();
             const PROD_COMPAT_LOTE = {
                 'GORDANA': ['GORDANA', 'SEBO EN RAMA'],
-                'SEBO EN RAMA': ['SEBO EN RAMA', 'GORDANA'],
+                'SEBO EN RAMA': ['SEBO EN RAMA', 'GORDANA', 'SEBO RES'],
                 'HUESO PROMOCION': ['HUESO PROMOCION', 'HUESO BLANCO'],
-                'HUESO BLANCO': ['HUESO BLANCO', 'HUESO PROMOCION']
+                'HUESO BLANCO': ['HUESO BLANCO', 'HUESO PROMOCION', 'HUESO RES', 'HUESO DE CERDO'],
+                'DESPERDICIO': ['DESPERDICIO', 'DESPERDICIO DE RES', 'DESPERDICIO DE POLLO'],
+                'DESPERDICIO DE RES': ['DESPERDICIO', 'DESPERDICIO DE RES'],
+                'HUESO DE CERDO': ['HUESO DE CERDO', 'HUESO CERDO', 'HUESO BLANCO'],
+                'HUESO CERDO': ['HUESO DE CERDO', 'HUESO CERDO', 'HUESO BLANCO']
             };
             const lotesSinDia = despachosProv.filter(it => it.esLoteSinDia);
 
@@ -4647,8 +4678,10 @@
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
                             delta_valor: deltaKg * precio,
+                            puntoDoc: item.puntoDoc,
+                            facturaDoc: item.facturaDoc,
                             estado: '🟢 Conciliado (Lote ↔ ' + ri.fecha.slice(0, 5) + ')',
-                            obs: `${item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} ${ri.kg.toLocaleString()} Kg.`
+                            obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} ${ri.kg.toLocaleString()} Kg.`
                         });
                     } else {
                         desviaciones.push({
@@ -4657,8 +4690,10 @@
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
                             delta_valor: deltaKg * precio,
+                            puntoDoc: item.puntoDoc,
+                            facturaDoc: item.facturaDoc,
                             estado: '🟡 Desviación (Lote ↔ ' + ri.fecha.slice(0, 5) + ')',
-                            obs: `${item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} (${ri.kg.toLocaleString()} Kg, Δ ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(2)} Kg).`
+                            obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} (${ri.kg.toLocaleString()} Kg, Δ ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(2)} Kg).`
                         });
                     }
                 } else {
@@ -4668,7 +4703,9 @@
                         delta_kg: -item.kg_proveedor, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: 0,
                         delta_valor: -valProv, estado: '🟠 Pendiente en Sistema',
-                        obs: `${item.fecha}: "${rawLabel}" facturado sin fecha exacta; no se encontró recolección con ese peso.`
+                        puntoDoc: item.puntoDoc,
+                        facturaDoc: item.facturaDoc,
+                        obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" facturado sin fecha exacta; no se encontró recolección con ese peso.`
                     });
                 }
                 despKeysConsumidas.add(key);
@@ -5016,10 +5053,20 @@
             // Agrupar filas por FECHA (cada fila es una fecha, y las materias van en columnas)
             const mapPorFecha = {};
             baseItems.forEach(it => {
-                const fKey = it.fecha;
+                let fechaLimpia = it.fecha;
+                let etiquetaFacturaObs = '';
+                if (/Factura|\(Ítem|\(Item/i.test(fechaLimpia)) {
+                    etiquetaFacturaObs = fechaLimpia;
+                    if (it.dia && it.mes && it.anio) {
+                        fechaLimpia = `${String(it.dia).padStart(2, '0')}/${String(it.mes).padStart(2, '0')}/${it.anio}`;
+                    } else if (d.periodoStr) {
+                        fechaLimpia = d.periodoStr;
+                    }
+                }
+                const fKey = fechaLimpia;
                 if (!mapPorFecha[fKey]) {
                     mapPorFecha[fKey] = {
-                        fecha: it.fecha,
+                        fecha: fechaLimpia,
                         sortKey: it.sortKey || 0,
                         sucursal: it.puntoDoc || d.proveedorNombre || 'PROVEEDOR',
                         celdasPorProducto: {},
@@ -5028,6 +5075,9 @@
                     };
                 }
                 const rowObj = mapPorFecha[fKey];
+                if (etiquetaFacturaObs && !rowObj.observacionesDia.some(o => o.includes(etiquetaFacturaObs))) {
+                    rowObj.observacionesDia.push(etiquetaFacturaObs);
+                }
                 if (!rowObj.celdasPorProducto[it.producto]) {
                     rowObj.celdasPorProducto[it.producto] = {
                         kg_proveedor: 0,

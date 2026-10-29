@@ -909,6 +909,20 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 ---
 
+### 12.19 Normalización Estricta de Fechas en Facturas y Cruce Universal por Kilos Exactos (v1.8.5)
+
+> **Objetivo:** Erradicar etiquetas no temporales en la columna FECHA al conciliar facturas electrónicas, garantizar fechas limpias DD/MM/YYYY, homologar automáticamente materias como DESPERDICIO DE RES a DESPERDICIO, y permitir el cruce exacto de ítems con las entregas físicas registradas en plataforma.
+
+- **Normalización de Fechas y Metadatos de Factura:**
+  - La columna FECHA conserva siempre fechas válidas (DD/MM/YYYY), trasladando el identificador de factura a los metadatos de auditoría y diagnóstico del día.
+  - Al conciliar exitosamente en PASADA 0, los ítems de la factura adoptan la fecha de la recolección física en plataforma (ej. 14/09, 18/09), consolidándose directamente en la fila de ese día.
+- **Homologación Universal de Subproductos y Compatibilidad:**
+  - Homologación automática de DESPERDICIO DE RES, DESPERDICIOS DE RES, DESPERDICIO RES, HUESO DE RES, SEBO DE RES a los nombres de materia oficiales de ProteinAgro.
+  - Compatibilidad ampliada en PROD_COMPAT_LOTE para cotejar HUESO BLANCO con HUESO DE CERDO ante coincidencia exacta de peso en báscula.
+  - Flexibilización de punto/sucursal para direcciones postales en facturas electrónicas.
+
+---
+
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
 
 
