@@ -762,8 +762,9 @@
             const realDayKeys = new Set();
 
             // 1. Indexar IDs reales para detectar duplicados desplazados -18000s (UTC-5 -> 000)
-            for (let i = 0; i < items.length; i++) {
-                const it = items[i];
+            const sourcePool = (typeof rawData !== 'undefined' && Array.isArray(rawData) && rawData.length > items.length) ? rawData : items;
+            for (let i = 0; i < sourcePool.length; i++) {
+                const it = sourcePool[i];
                 const rid = String(it.ID || '').trim();
                 const m = rid.match(/^REC-(\d{10})(\d{3})$/);
                 if (m) {
@@ -3459,6 +3460,7 @@
             // 3. Detectar Proveedor
             let provNombre = '';
             let filtroStr = '';
+            let filtroPunto = '';
             const normJoined = joined.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
             if (normJoined.includes('SANTA HELENA') || normJoined.includes('SANTA ELENA')) {
@@ -3474,7 +3476,8 @@
                 filtroStr = 'FRIGORIVALLE, !CANAVERAL, !SEVILLANA';
             } else if (normJoined.includes('CARNES Y DERIVADOS') || normJoined.includes('CARNES & DERIVADOS') || normJoined.includes('DERIVADOS DE OCC')) {
                 provNombre = 'Sevillana Carnes y Derivados de Occ.';
-                filtroStr = 'CARNES Y DERIVADOS, DERIVADOS DE OCC, SEVILLANA CARNES, BELALCAZAR CARNES, CARIBE CARNES, SEVILLANA';
+                filtroStr = 'SEVILLANA';
+                filtroPunto = 'CAVASA';
             } else {
                 // Buscar coincidencia contra allProveedores
                 let mejorMatch = '';
@@ -3503,7 +3506,8 @@
                 mes: mesDet || 9,
                 anio: anioDet || 2026,
                 provNombre: provNombre || 'Proveedor',
-                filtroStr: filtroStr
+                filtroStr: filtroStr,
+                filtroPunto: filtroPunto
             };
         }
 
@@ -3573,6 +3577,14 @@
             const inpFiltroEl = document.getElementById('concInputFiltroProv');
             let filtroProvActivo = inpFiltroEl ? inpFiltroEl.value.trim() : '';
             let nombreProveedorDisplay = autoInfo.provNombre;
+            // Restricción opcional por punto de recolección (ej. Sevillana sólo en Cavasa para "Carnes y Derivados")
+            let filtroPuntoActivo = '';
+            const pasaFiltroPunto = (r) => {
+                if (!filtroPuntoActivo) return true;
+                const pv = String(r.PROVEEDOR || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const pu = String(r.PUNTO || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                return pv.includes('DERIVADOS') || pu.includes(filtroPuntoActivo);
+            };
 
             if (selProvVal === 'BODEGA_SANTA_ELENA') {
                 nombreProveedorDisplay = 'Bodega Santa Elena';
@@ -3587,6 +3599,7 @@
                     if (!filtroProvActivo) filtroProvActivo = arrSel.join(', ');
                 } else if (autoInfo.filtroStr && !filtroProvActivo) {
                     filtroProvActivo = autoInfo.filtroStr;
+                    filtroPuntoActivo = autoInfo.filtroPunto || '';
                     if (inpFiltroEl) inpFiltroEl.placeholder = `Auto: ${autoInfo.filtroStr}`;
                 }
             }
@@ -3615,7 +3628,7 @@
             const preciosPlataforma = {};
             const materiasProveedorEnPlataforma = new Set();
             rawData.forEach(r => {
-                if (!coincideProveedorConFiltro(r.PROVEEDOR, filtroProvActivo)) return;
+                if (!coincideProveedorConFiltro(r.PROVEEDOR, filtroProvActivo) || !pasaFiltroPunto(r)) return;
                 const prodH = homologarProductoUniversal(r.MATERIA, '__BASE__');
                 if (prodH) materiasProveedorEnPlataforma.add(prodH);
                 let p = Number(r.PRECIO) || 0;
@@ -3652,7 +3665,7 @@
                             it.precio = preciosExcelPorRawProd[it.rawProd];
                         }
                     }
-                    fechasEnExcel.add(it.fecha);
+                    if (!it.esLoteSinDia) fechasEnExcel.add(it.fecha);
                     rawDispatchesCrudos.push(it);
                 });
                 currentBlock = [];
@@ -3660,6 +3673,9 @@
 
             let currentMesDetectado = mesObjetivo || autoInfo.mes || 9;
             let currentBatchNum = 0;
+            let resumenBoletinAlcanzado = false;
+            const lotesPorMes = {};
+            let etiquetaPeriodoActual = '';
 
             targetSheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
                 const maxCol = Math.min(30, row.cellCount || 15);
@@ -3719,6 +3735,7 @@
                         mode = 'MATRIX';
                         colFechaIdx = foundFechaCol;
                         productCols = finalProdCols;
+                        resumenBoletinAlcanzado = false;
                         return;
                     }
                 }
@@ -3742,6 +3759,7 @@
                     }
 
                     if (/^TOTAL|TOTALES|SUBTOTAL|PROMEDIO|CANTIDAD|FACTURAR|DOMINGO|FESTIVO/.test(firstLabels)) {
+                        if (/^TOTAL|CANTIDAD|FACTURAR/.test(firstLabels)) resumenBoletinAlcanzado = true;
                         return;
                     }
 
@@ -3754,17 +3772,22 @@
 
                     // Si no tiene fecha parseable pero la fila contiene cantidades numéricas positivas de producto (despacho por lotes / liquidación)
                     const hasProductValues = productCols.some(pc => getExcelCellNum(row.getCell(pc.colIdx)) > 0);
-                    if (!dInfo && hasProductValues) {
+                    const fechaVaciaOPeriodo = (rawFechaCell === '' || rawFechaCell === null || rawFechaCell === undefined) || !!mesEnCelda;
+                    const filaEsTotal = /\bTOTAL\b|FACTURA/.test(cellTexts.filter(Boolean).join(' '));
+                    if (!dInfo && hasProductValues && fechaVaciaOPeriodo && !filaEsTotal && !resumenBoletinAlcanzado) {
                         currentBatchNum++;
-                        const dNum = Math.min(31, currentBatchNum);
                         const mNum = currentMesDetectado;
+                        lotesPorMes[mNum] = (lotesPorMes[mNum] || 0) + 1;
+                        const dNum = Math.min(31, lotesPorMes[mNum]);
                         const yNum = anioObjetivo;
+                        const etiquetaPeriodo = (rawFechaCell && typeof rawFechaCell === 'string' && rawFechaCell.trim()) ? rawFechaCell.trim().toUpperCase() : '';
+                        if (etiquetaPeriodo) etiquetaPeriodoActual = etiquetaPeriodo;
                         dInfo = {
                             dia: dNum,
                             mes: mNum,
                             anio: yNum,
-                            fechaStr: `${String(dNum).padStart(2, '0')}/${String(mNum).padStart(2, '0')}/${yNum}`,
-                            sortKey: yNum * 10000 + mNum * 100 + dNum,
+                            fechaStr: `Lote ${lotesPorMes[mNum]} · ${etiquetaPeriodoActual || (MESES_NOMBRES_CONC[mNum] || mNum)}`,
+                            sortKey: yNum * 10000 + mNum * 100 + 90 + dNum,
                             hasExplicitMonth: true,
                             esLoteSinDia: true,
                             rawEtiqueta: (rawFechaCell && typeof rawFechaCell === 'string' && rawFechaCell.trim()) ? rawFechaCell.trim() : `Lote ${currentBatchNum}`
@@ -3833,9 +3856,11 @@
             // 5. Filtrar y depurar recolecciones de la plataforma para el mismo Proveedor y Período
             const esSantaElenaBodega = filtroProvActivo.toUpperCase().includes('SANTA ELENA') && filtroProvActivo.toUpperCase().includes('!SEVILLANA');
             const recCandidatas = [];
+            const mesesEnExcel = new Set(rawDispatchesCrudos.map(d => d.mes).filter(Boolean));
+            const recAuxMesesExcel = [];
 
             rawData.forEach(r => {
-                if (!coincideProveedorConFiltro(r.PROVEEDOR, filtroProvActivo)) return;
+                if (!coincideProveedorConFiltro(r.PROVEEDOR, filtroProvActivo) || !pasaFiltroPunto(r)) return;
                 const dInfo = parsearFechaCeldaUniversal(r.FECHA, mesObjetivo || autoInfo.mes, anioObjetivo);
                 if (!dInfo) return;
 
@@ -3850,6 +3875,19 @@
                         _dInfo: dInfo,
                         _prodHom: pHom
                     });
+                } else if (mesesEnExcel.has(dInfo.mes) && dInfo.anio === anioObjetivo) {
+                    const pHom = homologarProductoUniversal(r.MATERIA, '__BASE__');
+                    if (pHom && (Number(r.KG) || 0) > 0) {
+                        recAuxMesesExcel.push({
+                            key: `${dInfo.fechaStr}||${pHom}`,
+                            kg: Number(r.KG) || 0,
+                            fecha: dInfo.fechaStr,
+                            prod: pHom,
+                            mes: dInfo.mes,
+                            sortKey: dInfo.sortKey,
+                            id: r.ID || ''
+                        });
+                    }
                 }
             });
 
@@ -3887,8 +3925,10 @@
                 const st = estadisticasRawProd[it.rawProd];
                 st.diasExcel += 1;
                 st.kgExcel += it.kg;
-                st.porFecha[it.fecha] = (st.porFecha[it.fecha] || 0) + it.kg;
-                st.dInfoPorFecha[it.fecha] = { dia: it.dia, mes: it.mes, anio: it.anio };
+                if (!it.esLoteSinDia) {
+                    st.porFecha[it.fecha] = (st.porFecha[it.fecha] || 0) + it.kg;
+                    st.dInfoPorFecha[it.fecha] = { dia: it.dia, mes: it.mes, anio: it.anio };
+                }
             });
 
             const mapaResueltoRawAOficial = {};
@@ -4022,9 +4062,10 @@
                 const precioUnit = it.precio > 0 ? it.precio : (preciosExcelGlobal[prodOficial] || preciosPlataforma[prodOficial] || 0);
                 const valorItem = it.valor > 0 ? it.valor : (it.kg * precioUnit);
 
-                const key = `${it.fecha}||${prodOficial}`;
+                const key = it.esLoteSinDia ? `${it.fecha}||${prodOficial}||${it.rawProd}` : `${it.fecha}||${prodOficial}`;
                 if (!despMap[key]) {
                     despMap[key] = {
+                        _key: key,
                         dia: it.dia,
                         mes: it.mes,
                         anio: it.anio,
@@ -4034,7 +4075,8 @@
                         rawProdsSet: new Set(),
                         kg_proveedor: 0,
                         precio_unit: precioUnit,
-                        valor_proveedor: 0
+                        valor_proveedor: 0,
+                        esLoteSinDia: !!it.esLoteSinDia
                     };
                 }
                 despMap[key].rawProdsSet.add(it.rawProd);
@@ -4056,6 +4098,7 @@
             const recAgrupado = {};
             const recPreciosDia = {};
             const recMeta = {};
+            const recIndividuales = [];
             let cantEscalaCorregida = 0;
 
             recSinFantasmas.forEach(r => {
@@ -4085,6 +4128,7 @@
 
                 const key = `${dInfo.fechaStr}||${prodHom}`;
                 recAgrupado[key] = (recAgrupado[key] || 0) + kg;
+                recIndividuales.push({ key, kg, fecha: dInfo.fechaStr, prod: prodHom, mes: dInfo.mes, sortKey: dInfo.sortKey, id: r.ID || '' });
                 let pDia = Number(r.PRECIO) || 0;
                 if (pDia > 0 && pDia < 20) pDia = Math.round(pDia * 1000);
                 if (pDia > 0) recPreciosDia[key] = pDia;
@@ -4105,6 +4149,182 @@
                 if (refKg > 0 && (absD / refKg) <= tolPctMax) return true;
                 return false;
             };
+
+            // PASADA 0: Boletines/liquidaciones por lotes sin día (ej. "AGOSTO PDTE", "SEPTIEMBRE" + filas sin fecha).
+            // Fase 0A: Coincidencia exacta individual; Fase 0B: Suma de 2 recolecciones consecutivas; Fase 0C: Desviación cercana.
+            const recIndUsadas = new Set();
+            const recAuxUsadas = new Set();
+            const PROD_COMPAT_LOTE = {
+                'GORDANA': ['GORDANA', 'SEBO EN RAMA'],
+                'SEBO EN RAMA': ['SEBO EN RAMA', 'GORDANA'],
+                'HUESO PROMOCION': ['HUESO PROMOCION', 'HUESO BLANCO'],
+                'HUESO BLANCO': ['HUESO BLANCO', 'HUESO PROMOCION']
+            };
+            const lotesSinDia = despachosProv.filter(it => it.esLoteSinDia);
+
+            // 0A: Coincidencia exacta individual en recIndividuales
+            lotesSinDia.forEach(item => {
+                const key = item._key || `${item.fecha}||${item.producto}`;
+                if (despKeysConsumidas.has(key)) return;
+                const compat = PROD_COMPAT_LOTE[item.producto] || [item.producto];
+                let mejor = null, mejorScore = Infinity;
+                recIndividuales.forEach((ri, idx) => {
+                    if (recIndUsadas.has(idx) || recKeysConsumidas.has(ri.key)) return;
+                    if (!compat.includes(ri.prod)) return;
+                    const delta = Math.abs(ri.kg - item.kg_proveedor);
+                    if (!esDentroTolerancia(delta, item.kg_proveedor)) return;
+                    const penMes = (item.mes && ri.mes !== item.mes) ? 1.0 : 0;
+                    const score = delta + (ri.prod === item.producto ? 0 : 0.5) + penMes;
+                    if (score < mejorScore) { mejorScore = score; mejor = { ri, idx }; }
+                });
+                if (mejor) {
+                    const ri = mejor.ri;
+                    recIndUsadas.add(mejor.idx);
+                    recAgrupado[ri.key] = (recAgrupado[ri.key] || 0) - ri.kg;
+                    if (recAgrupado[ri.key] <= 0.01) recKeysConsumidas.add(ri.key);
+                    const precio = item.precio_unit || preciosPlataforma[item.producto] || 0;
+                    const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
+                    const rawLabel = item.rawProdLabel || item.producto;
+                    const deltaKg = ri.kg - item.kg_proveedor;
+                    const otroNombre = ri.prod !== item.producto ? ` (registrado en plataforma como "${ri.prod}")` : '';
+                    exactos.push({
+                        dia: item.dia, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
+                        kg_proveedor: item.kg_proveedor, kg_recoleccion: ri.kg,
+                        delta_kg: deltaKg, precio_unit: precio,
+                        valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
+                        delta_valor: deltaKg * precio,
+                        estado: '🟢 Conciliado (Lote ↔ ' + ri.fecha.slice(0, 5) + ')',
+                        obs: `${item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} ${ri.kg.toLocaleString()} Kg${otroNombre}${ri.id ? ' [' + ri.id + ']' : ''}.`
+                    });
+                    despKeysConsumidas.add(key);
+                }
+            });
+
+            // 0B: Coincidencia exacta por suma de 2 recolecciones consecutivas (ej. Lote acumulado en 2 viajes seguidos)
+            lotesSinDia.forEach(item => {
+                const key = item._key || `${item.fecha}||${item.producto}`;
+                if (despKeysConsumidas.has(key)) return;
+                const compat = PROD_COMPAT_LOTE[item.producto] || [item.producto];
+                let mejorPar = null, mejorScore = Infinity;
+                for (let i = 0; i < recIndividuales.length; i++) {
+                    const r1 = recIndividuales[i];
+                    if (recIndUsadas.has(i) || recKeysConsumidas.has(r1.key) || !compat.includes(r1.prod)) continue;
+                    for (let j = i + 1; j < recIndividuales.length; j++) {
+                        const r2 = recIndividuales[j];
+                        if (recIndUsadas.has(j) || recKeysConsumidas.has(r2.key) || r2.prod !== r1.prod) continue;
+                        if (Math.abs((r2.sortKey || 0) - (r1.sortKey || 0)) > 3) continue;
+                        const sumaKg = r1.kg + r2.kg;
+                        const delta = Math.abs(sumaKg - item.kg_proveedor);
+                        if (!esDentroTolerancia(delta, item.kg_proveedor)) continue;
+                        if (delta < mejorScore) {
+                            mejorScore = delta;
+                            mejorPar = { i, j, r1, r2, sumaKg };
+                        }
+                    }
+                }
+                if (mejorPar) {
+                    const { i, j, r1, r2, sumaKg } = mejorPar;
+                    recIndUsadas.add(i);
+                    recIndUsadas.add(j);
+                    recAgrupado[r1.key] = (recAgrupado[r1.key] || 0) - r1.kg;
+                    if (recAgrupado[r1.key] <= 0.01) recKeysConsumidas.add(r1.key);
+                    recAgrupado[r2.key] = (recAgrupado[r2.key] || 0) - r2.kg;
+                    if (recAgrupado[r2.key] <= 0.01) recKeysConsumidas.add(r2.key);
+                    const precio = item.precio_unit || preciosPlataforma[item.producto] || 0;
+                    const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
+                    const rawLabel = item.rawProdLabel || item.producto;
+                    const deltaKg = sumaKg - item.kg_proveedor;
+                    const fechaRango = `${r1.fecha.slice(0, 5)}+${r2.fecha.slice(0, 5)}`;
+                    exactos.push({
+                        dia: item.dia, sortKey: r1.sortKey || item.sortKey, fecha: r1.fecha, producto: item.producto,
+                        kg_proveedor: item.kg_proveedor, kg_recoleccion: sumaKg,
+                        delta_kg: deltaKg, precio_unit: precio,
+                        valor_proveedor: valProv, valor_recoleccion: sumaKg * precio,
+                        delta_valor: deltaKg * precio,
+                        estado: `🟢 Conciliado (Lote ↔ ${fechaRango})`,
+                        obs: `${item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ suma de recolecciones ${r1.fecha.slice(0, 5)} (${r1.kg} Kg) + ${r2.fecha.slice(0, 5)} (${r2.kg} Kg) = ${sumaKg.toFixed(2)} Kg.`
+                    });
+                    despKeysConsumidas.add(key);
+                }
+            });
+
+            // 0C: Coincidencia con desviación de báscula/canastillas (≤ 10% ó ≤ 15 Kg) en recIndividuales o recAuxMesesExcel
+            lotesSinDia.forEach(item => {
+                const key = item._key || `${item.fecha}||${item.producto}`;
+                if (despKeysConsumidas.has(key)) return;
+                const compat = PROD_COMPAT_LOTE[item.producto] || [item.producto];
+                const precio = item.precio_unit || preciosPlataforma[item.producto] || 0;
+                const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
+                const rawLabel = item.rawProdLabel || item.producto;
+
+                let mejorDev = null, mejorScore = Infinity;
+                recIndividuales.forEach((ri, idx) => {
+                    if (recIndUsadas.has(idx) || recKeysConsumidas.has(ri.key)) return;
+                    if (!compat.includes(ri.prod)) return;
+                    const delta = Math.abs(ri.kg - item.kg_proveedor);
+                    const pct = item.kg_proveedor > 0 ? (delta / item.kg_proveedor) : 1;
+                    if (delta <= 15 || pct <= 0.10) {
+                        const score = pct + (ri.prod === item.producto ? 0 : 0.05);
+                        if (score < mejorScore) { mejorScore = score; mejorDev = { ri, idx, esAux: false }; }
+                    }
+                });
+                if (!mejorDev && recAuxMesesExcel.length > 0) {
+                    recAuxMesesExcel.forEach((ri, idx) => {
+                        if (recAuxUsadas.has(idx)) return;
+                        if (item.mes && ri.mes !== item.mes) return;
+                        if (!compat.includes(ri.prod)) return;
+                        const delta = Math.abs(ri.kg - item.kg_proveedor);
+                        const pct = item.kg_proveedor > 0 ? (delta / item.kg_proveedor) : 1;
+                        if (delta <= 15 || pct <= 0.10) {
+                            const score = pct + (ri.prod === item.producto ? 0 : 0.05);
+                            if (score < mejorScore) { mejorScore = score; mejorDev = { ri, idx, esAux: true }; }
+                        }
+                    });
+                }
+
+                if (mejorDev) {
+                    const ri = mejorDev.ri;
+                    if (mejorDev.esAux) {
+                        recAuxUsadas.add(mejorDev.idx);
+                    } else {
+                        recIndUsadas.add(mejorDev.idx);
+                        recAgrupado[ri.key] = (recAgrupado[ri.key] || 0) - ri.kg;
+                        if (recAgrupado[ri.key] <= 0.01) recKeysConsumidas.add(ri.key);
+                    }
+                    const deltaKg = ri.kg - item.kg_proveedor;
+                    if (esDentroTolerancia(deltaKg, item.kg_proveedor)) {
+                        exactos.push({
+                            dia: item.dia, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
+                            kg_proveedor: item.kg_proveedor, kg_recoleccion: ri.kg,
+                            delta_kg: deltaKg, precio_unit: precio,
+                            valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
+                            delta_valor: deltaKg * precio,
+                            estado: '🟢 Conciliado (Lote ↔ ' + ri.fecha.slice(0, 5) + ')',
+                            obs: `${item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} ${ri.kg.toLocaleString()} Kg.`
+                        });
+                    } else {
+                        desviaciones.push({
+                            dia: item.dia, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
+                            kg_proveedor: item.kg_proveedor, kg_recoleccion: ri.kg,
+                            delta_kg: deltaKg, precio_unit: precio,
+                            valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
+                            delta_valor: deltaKg * precio,
+                            estado: '🟡 Desviación (Lote ↔ ' + ri.fecha.slice(0, 5) + ')',
+                            obs: `${item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} (${ri.kg.toLocaleString()} Kg, Δ ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(2)} Kg).`
+                        });
+                    }
+                } else {
+                    faltantes.push({
+                        dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
+                        kg_proveedor: item.kg_proveedor, kg_recoleccion: 0,
+                        delta_kg: -item.kg_proveedor, precio_unit: precio,
+                        valor_proveedor: valProv, valor_recoleccion: 0,
+                        delta_valor: -valProv, estado: '🟠 Pendiente en Sistema',
+                        obs: `${item.fecha}: "${rawLabel}" facturado sin fecha exacta; no se encontró recolección con ese peso.`
+                    });
+                }
+                despKeysConsumidas.add(key);
+            });
 
             // PASADA 1: Detección universal de Acumulación en Día Siguiente (D + D+1 recogidos juntos en D+1)
             for (let i = 0; i < despachosProv.length; i++) {
@@ -4304,66 +4524,9 @@
                 }
             });
 
-            // PASADA 3D: Smart Match por Peso dentro del Mismo Mes / Período (para despachos agrupados/por lotes o fechas con desfase)
-            despachosProv.forEach(item => {
-                const key = `${item.fecha}||${item.producto}`;
-                if (despKeysConsumidas.has(key)) return;
-
-                let mejorCandidato = null;
-                let mejorDiff = 999999;
-
-                for (const rKey in recAgrupado) {
-                    if (recKeysConsumidas.has(rKey)) continue;
-                    const [rFecha, rProd] = rKey.split('||');
-                    const rMeta = recMeta[rKey];
-                    if (rMeta && item.mes && rMeta.mes !== item.mes) continue;
-
-                    const prodCompat = (rProd === item.producto) ||
-                        (item.producto === 'GORDANA' && ['SEBO EN RAMA', 'GORDANA'].includes(rProd)) ||
-                        (item.producto === 'SEBO EN RAMA' && ['SEBO EN RAMA', 'GORDANA'].includes(rProd)) ||
-                        (item.producto === 'HUESO PROMOCION' && ['HUESO BLANCO', 'HUESO PROMOCION'].includes(rProd)) ||
-                        (item.producto === 'HUESO BLANCO' && ['HUESO BLANCO', 'HUESO PROMOCION'].includes(rProd));
-
-                    if (prodCompat) {
-                        const kgRec = recAgrupado[rKey];
-                        const delta = Math.abs(kgRec - item.kg_proveedor);
-                        if (esDentroTolerancia(delta, item.kg_proveedor) && delta < mejorDiff) {
-                            mejorDiff = delta;
-                            mejorCandidato = { rKey, rFecha, rProd, kgRec, delta };
-                        }
-                    }
-                }
-
-                if (mejorCandidato) {
-                    const cand = mejorCandidato;
-                    const deltaKg = cand.kgRec - item.kg_proveedor;
-                    const precio = item.precio_unit || recPreciosDia[cand.rKey] || preciosPlataforma[item.producto] || 0;
-                    const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
-                    const rawLabel = item.rawProdLabel || item.producto;
-                    const estadoStr = Math.abs(deltaKg) <= tolKgMax ? '🟢 Conciliado Exacto (Smart Match Mes)' : '🟡 Desviación (Smart Match Mes)';
-                    const obsStr = item.fecha === cand.rFecha
-                        ? `Despacho conciliado en fecha ${cand.rFecha}.`
-                        : `🧠 Despacho de liquidación mensual emparejado con recolección del ${cand.rFecha} en plataforma por coincidencia de peso (${cand.kgRec.toLocaleString()} Kg ↔ ${item.kg_proveedor.toLocaleString()} Kg).`;
-
-                    exactos.push({
-                        dia: item.dia, sortKey: item.sortKey, fecha: cand.rFecha, producto: item.producto,
-                        kg_proveedor: item.kg_proveedor, kg_recoleccion: cand.kgRec,
-                        delta_kg: deltaKg, precio_unit: precio,
-                        valor_proveedor: valProv, valor_recoleccion: cand.kgRec * precio,
-                        delta_valor: deltaKg * precio,
-                        estado: estadoStr,
-                        obs: obsStr,
-                        _smartMatchRaw: rawLabel,
-                        _smartMatchTarget: cand.rProd
-                    });
-                    despKeysConsumidas.add(key);
-                    recKeysConsumidas.add(cand.rKey);
-                }
-            });
-
             // PASADA 4: Faltantes en Plataforma (Despachos del proveedor no encontrados)
             despachosProv.forEach(item => {
-                const key = `${item.fecha}||${item.producto}`;
+                const key = item._key || `${item.fecha}||${item.producto}`;
                 if (despKeysConsumidas.has(key)) return;
                 const precio = item.precio_unit || preciosPlataforma[item.producto] || 0;
                 const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
