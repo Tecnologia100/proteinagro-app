@@ -549,7 +549,7 @@
     <div class="modal-overlay" id="modalConciliacion">
         <div class="modal-card">
             <div class="modal-header">
-                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.8.2 · Lotes</span></h2>
+                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.8.7 · Multi-Página PDF & Live Sync</span></h2>
                 <button class="modal-close-btn" onclick="cerrarModalConciliacion()" title="Cerrar ventana">✕</button>
             </div>
             <div class="modal-body">
@@ -3497,46 +3497,79 @@
             const wb = new ExcelJS.Workbook();
             const ws = wb.addWorksheet('Documento_PDF');
 
+            // 1. Extracción estructurada por páginas (espacial Y descendente, X ascendente)
             let fullText = '';
+            let primeraPaginaText = '';
             const allLines = [];
+            const pagesData = []; // [{ pageNum, lines: [lineItems...], text: '', rawTokens: [] }]
+
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 const page = await pdf.getPage(pageNum);
                 const textContent = await page.getTextContent();
 
                 const lineMap = new Map();
+                let pageText = '';
+                const pageTokens = [];
+
                 for (const item of textContent.items) {
                     if (!item.str || !item.str.trim()) continue;
-                    fullText += ' ' + item.str;
+                    const strClean = item.str.trim();
+                    pageText += ' ' + strClean;
+                    pageTokens.push(strClean);
+
                     const y = Math.round(item.transform[5]);
                     let foundY = null;
                     for (const existingY of lineMap.keys()) {
                         if (Math.abs(existingY - y) <= 4) { foundY = existingY; break; }
                     }
                     if (foundY === null) { foundY = y; lineMap.set(foundY, []); }
-                    lineMap.get(foundY).push({ str: item.str.trim(), x: item.transform[4] });
+                    lineMap.get(foundY).push({ str: strClean, x: item.transform[4] });
                 }
 
                 const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
+                const pageLines = [];
                 for (const y of sortedYs) {
                     const lineItems = lineMap.get(y).sort((a, b) => a.x - b.x);
+                    pageLines.push(lineItems);
                     allLines.push(lineItems);
+                    fullText += lineItems.map(it => it.str).join(' ') + '\n';
                 }
+
+                if (pageNum === 1) {
+                    primeraPaginaText = pageText;
+                }
+
+                pagesData.push({
+                    pageNum,
+                    lines: pageLines,
+                    text: pageText,
+                    rawTokens: pageTokens
+                });
             }
 
-            // 1. Detectar tipo de documento: Factura Electrónica vs Libro Auxiliar vs Planilla Genérica
+            // 2. Detectar tipo de documento
             const esFacturaElectronica = /FACTURA\s+ELECTR[OÓ]NICA|CUFE:|DATOS\s+DEL\s+EMISOR|C[OÓ]DIGO\s+DE\s+PRODUCTO/i.test(fullText);
             const esLibroAuxiliar = /LIBRO\s+AUXILIAR|220501|CREDITOS|D[EÉ]BITOS/i.test(fullText);
 
             if (esFacturaElectronica) {
-                // A. Factura Electrónica (ej. La Sevillana / DIAN / Comerssia)
+                // A. Factura Electrónica Multi-Página
+                
+                // --- METADATOS DEL DOCUMENTO (Priorizando Página 1) ---
+                const metaSearchText = primeraPaginaText || fullText;
+
+                // Número de Factura
                 let numFactura = '';
-                const mFac = fullText.match(/Factura\s+Electr[oó]nica\s+de\s+Venta\s+No\.\s*([A-Z0-9\s-]+?)(?=\s+Resol|DIAN|\s+FECHA|$)/i) ||
-                             fullText.match(/No\.\s*([A-Z0-9]{2,6}\s*\d+)/i);
+                const mFac = metaSearchText.match(/Factura\s+Electr[oó]nica\s+de\s+Venta\s+No\.\s*([A-Z0-9\s-]+?)(?=\s+Resol|DIAN|\s+FECHA|\s+Fecha|\n|$)/i) ||
+                             metaSearchText.match(/Factura\s+Electr[oó]nica\s+No\.\s*([A-Z0-9\s-]+?)(?=\s+Resol|DIAN|\s+FECHA|\s+Fecha|\n|$)/i) ||
+                             metaSearchText.match(/No\.\s*([A-Z0-9]{2,6}\s*\d+)/i) ||
+                             fullText.match(/Factura\s+Electr[oó]nica\s+de\s+Venta\s+No\.\s*([A-Z0-9\s-]+?)(?=\s+Resol|DIAN|\s+FECHA|\s+Fecha|\n|$)/i);
                 if (mFac) numFactura = mFac[1].replace(/\s+/g, ' ').trim();
 
+                // Fecha de Emisión
                 let fechaStr = '';
-                const mFec = fullText.match(/FECHA\s+DE\s+EMISI[OÓ]N\s*:\s*([0-9\/\-]+)/i) ||
-                             fullText.match(/Fecha\s+Emisi[oó]n\s*:\s*([0-9\/\-]+)/i);
+                const mFec = metaSearchText.match(/FECHA\s+(?:DE\s+)?(?:EMISI[OÓ]N|EXPEDICI[OÓ]N|FACTURA)\s*:\s*([0-9\/\-]+)/i) ||
+                             metaSearchText.match(/Fecha\s+(?:de\s+)?(?:Emisi[oó]n|Expedici[oó]n)\s*:\s*([0-9\/\-]+)/i) ||
+                             fullText.match(/FECHA\s+(?:DE\s+)?(?:EMISI[OÓ]N|EXPEDICI[OÓ]N)\s*:\s*([0-9\/\-]+)/i);
                 if (mFec) {
                     const fRaw = mFec[1].trim();
                     const mYMD = fRaw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
@@ -3547,48 +3580,162 @@
                     }
                 }
 
+                // Emisor / Proveedor (Protegiendo contra coincidencia con ProteinAgro como adquirente)
                 let emisor = 'Sevillana';
-                const mEmisor = fullText.match(/NOMBRE\s*:\s*([^\n\r]+?)(?=\s+DIRECCI[OÓ]N|\s+TIPO|\s+TELEFONO|$)/i);
+                const emisorScope = metaSearchText.split(/DATOS\s+DEL\s+ADQUIRENTE|DATOS\s+DEL\s+CLIENTE|CLIENTE\s*:/i)[0] || metaSearchText;
+                const mEmisor = emisorScope.match(/(?:DATOS\s+DEL\s+EMISOR|DATOS\s+DEL\s+FACTURADOR)[\s\S]*?NOMBRE\s*:\s*([^\n\r]+?)(?=\s+DIRECCI[OÓ]N|\s+TIPO|\s+TELEFONO|\s+NIT|$)/i) ||
+                                emisorScope.match(/NOMBRE\s*:\s*([^\n\r]+?)(?=\s+DIRECCI[OÓ]N|\s+TIPO|\s+TELEFONO|\s+NIT|$)/i);
                 if (mEmisor) {
                     const emRaw = mEmisor[1].trim().toUpperCase();
-                    if (emRaw.includes('SEVILLANA')) emisor = 'Sevillana';
-                    else if (emRaw.includes('SANTA ELENA') || emRaw.includes('SANTA HELENA')) emisor = 'Bodega Santa Elena';
-                    else if (emRaw.includes('CARIBE')) emisor = 'Caribe';
-                    else if (emRaw.includes('FRIGORIVALLE')) emisor = 'Frigorivalle';
-                    else emisor = emRaw;
+                    if (!emRaw.includes('PROTEINAGRO')) {
+                        if (emRaw.includes('SEVILLANA')) emisor = 'Sevillana';
+                        else if (emRaw.includes('SANTA ELENA') || emRaw.includes('SANTA HELENA')) emisor = 'Bodega Santa Elena';
+                        else if (emRaw.includes('CARIBE')) emisor = 'Caribe';
+                        else if (emRaw.includes('FRIGORIVALLE')) emisor = 'Frigorivalle';
+                        else if (emRaw.includes('CARNES Y DERIVADOS')) emisor = 'Carnes y Derivados';
+                        else emisor = emRaw;
+                    }
+                }
+                if (emisor === 'Sevillana' && !/SEVILLANA/i.test(emisorScope)) {
+                    if (/SANTA ELENA|SANTA HELENA/i.test(emisorScope)) emisor = 'Bodega Santa Elena';
+                    else if (/CARIBE/i.test(emisorScope)) emisor = 'Caribe';
+                    else if (/FRIGORIVALLE/i.test(emisorScope)) emisor = 'Frigorivalle';
                 }
 
+                // Sucursal / Punto de Entrega
                 let puntoSucursal = '';
-                const mPunto = fullText.match(/ALMAC[EÉ]N\s*(?:\/\s*DIRECCI[OÓ]N)?\s*(?:\/\s*TEL[EÉ]FONO)?\s*:\s*([^\/\n\r]+)/i);
-                if (mPunto) puntoSucursal = mPunto[1].trim();
+                const mPunto = metaSearchText.match(/ALMAC[EÉ]N(?:\s*\/\s*DIRECCI[OÓ]N)?(?:\s*\/\s*TEL[EÉ]FONO)?\s*:\s*([^\/\n\r]+)/i) ||
+                               metaSearchText.match(/SUCURSAL\s*:\s*([^\/\n\r]+)/i) ||
+                               fullText.match(/ALMAC[EÉ]N(?:\s*\/\s*DIRECCI[OÓ]N)?(?:\s*\/\s*TEL[EÉ]FONO)?\s*:\s*([^\/\n\r]+)/i);
+                if (mPunto) {
+                    puntoSucursal = mPunto[1].trim();
+                    puntoSucursal = puntoSucursal.replace(/\s+(DIRECCI[OÓ]N|CIUDAD|TEL[EÉ]FONO|NIT).*$/i, '').trim();
+                }
 
-                // Tabla de Ítems
-                const rawTokens = [];
-                allLines.forEach(l => l.forEach(it => rawTokens.push(it.str)));
-
+                // --- EXTRACCIÓN DE ÍTEMS EN TODAS LAS PÁGINAS ---
                 const items = [];
-                for (let i = 0; i < rawTokens.length; i++) {
-                    if (/^ÍTEM$|^ITEM$/i.test(rawTokens[i])) {
-                        let j = i + 1;
-                        while (j < rawTokens.length && !/^\d+$/.test(rawTokens[j])) j++;
-                        while (j < rawTokens.length && /^\d+$/.test(rawTokens[j])) {
-                            const itemNum = rawTokens[j];
-                            const code = rawTokens[j+1] || '';
-                            const desc = rawTokens[j+2] || '';
-                            const um = rawTokens[j+3] || '';
-                            const cant = parseFloat((rawTokens[j+4] || '0').replace(/,/g, '')) || 0;
-                            const unitVal = parseFloat((rawTokens[j+5] || '0').replace(/,/g, '')) || 0;
-                            const descVal = parseFloat((rawTokens[j+6] || '0').replace(/,/g, '')) || 0;
-                            const impVal = parseFloat((rawTokens[j+7] || '0').replace(/,/g, '')) || 0;
-                            const totVal = parseFloat((rawTokens[j+8] || '0').replace(/,/g, '')) || 0;
+                let expectedItemNum = 1;
 
-                            items.push({ itemNum, code, desc, cant, unitVal, totVal });
-                            j += 9;
+                for (const pData of pagesData) {
+                    const pageLines = pData.lines;
+                    let enTablaDePagina = false;
+
+                    for (let lIdx = 0; lIdx < pageLines.length; lIdx++) {
+                        const lineItems = pageLines[lIdx];
+                        const rawLineTokens = lineItems.map(it => it.str);
+                        const fullLineStr = rawLineTokens.join(' ').trim();
+
+                        // 1. Detectar cabecera de tabla de ítems en esta página
+                        if (/^ÍTEM$|^ITEM$/i.test(rawLineTokens[0]) || /\b(?:ÍTEM|ITEM)\s+C[OÓ]DIGO\s+DESCRIPCI[OÓ]N\b/i.test(fullLineStr)) {
+                            enTablaDePagina = true;
+                            continue;
                         }
-                        break;
+
+                        // 2. Detectar fin de tabla en la página (subtotales, notas, resoluciones)
+                        if (enTablaDePagina && /^(?:SUBTOTAL|TOTAL|VALOR TOTAL|SON:|RESOLUCI[OÓ]N|CUFE|OBSERVACIONES|P[AÁ]GINA)\b/i.test(fullLineStr)) {
+                            enTablaDePagina = false;
+                            continue;
+                        }
+
+                        // 3. Evaluar si la línea corresponde a un ítem
+                        const primerToken = rawLineTokens[0] || '';
+                        const esNumeroItem = /^\d{1,4}$/.test(primerToken) && 
+                                             (enTablaDePagina || Number(primerToken) === expectedItemNum || (expectedItemNum > 1 && Number(primerToken) === expectedItemNum));
+
+                        if (esNumeroItem) {
+                            const itemNum = primerToken;
+
+                            if (rawLineTokens.length === 9) {
+                                // Caso estándar directo
+                                const code = rawLineTokens[1] || '';
+                                const desc = rawLineTokens[2] || '';
+                                const um = rawLineTokens[3] || '';
+                                const cant = parseFloat((rawLineTokens[4] || '0').replace(/,/g, '')) || 0;
+                                const unitVal = parseFloat((rawLineTokens[5] || '0').replace(/,/g, '')) || 0;
+                                const totVal = parseFloat((rawLineTokens[8] || '0').replace(/,/g, '')) || 0;
+
+                                items.push({ itemNum, code, desc, cant, unitVal, totVal });
+                                expectedItemNum = Number(itemNum) + 1;
+                                enTablaDePagina = true;
+                            } else if (rawLineTokens.length >= 6) {
+                                // Caso robusto para descripciones multipalabra o columnas variables
+                                const numerosAlFinal = [];
+                                let idxCorte = rawLineTokens.length - 1;
+
+                                while (idxCorte >= 2) {
+                                    const valStr = rawLineTokens[idxCorte].replace(/,/g, '');
+                                    if (/^-?\d+(?:\.\d+)?$/.test(valStr)) {
+                                        numerosAlFinal.unshift(parseFloat(valStr));
+                                        idxCorte--;
+                                    } else {
+                                        break;
+                                    }
+                                }
+
+                                if (numerosAlFinal.length >= 2) {
+                                    const code = rawLineTokens[1] || '';
+                                    let descTokens = [];
+
+                                    const posibleUm = rawLineTokens[idxCorte] || '';
+                                    if (/^(?:KILO|KG|UN|UND|GR|LT|M3)$/i.test(posibleUm)) {
+                                        descTokens = rawLineTokens.slice(2, idxCorte);
+                                    } else {
+                                        descTokens = rawLineTokens.slice(2, idxCorte + 1);
+                                    }
+
+                                    const desc = descTokens.join(' ').trim();
+                                    let cant = 0, unitVal = 0, totVal = 0;
+
+                                    if (numerosAlFinal.length >= 5) {
+                                        cant = numerosAlFinal[0];
+                                        unitVal = numerosAlFinal[1];
+                                        totVal = numerosAlFinal[numerosAlFinal.length - 1];
+                                    } else if (numerosAlFinal.length === 3) {
+                                        cant = numerosAlFinal[0];
+                                        unitVal = numerosAlFinal[1];
+                                        totVal = numerosAlFinal[2];
+                                    } else if (numerosAlFinal.length === 2) {
+                                        cant = numerosAlFinal[0];
+                                        totVal = numerosAlFinal[1];
+                                        unitVal = cant > 0 ? (totVal / cant) : 0;
+                                    }
+
+                                    items.push({ itemNum, code, desc, cant, unitVal, totVal });
+                                    expectedItemNum = Number(itemNum) + 1;
+                                    enTablaDePagina = true;
+                                }
+                            }
+                        }
                     }
                 }
 
+                // --- FALLBACK POR TOKEN STREAM MULTI-PÁGINA (Sin break) ---
+                if (items.length === 0) {
+                    const rawTokens = [];
+                    allLines.forEach(l => l.forEach(it => rawTokens.push(it.str)));
+
+                    for (let i = 0; i < rawTokens.length; i++) {
+                        if (/^ÍTEM$|^ITEM$/i.test(rawTokens[i])) {
+                            let j = i + 1;
+                            while (j < rawTokens.length && !/^\d+$/.test(rawTokens[j])) j++;
+                            while (j < rawTokens.length && /^\d+$/.test(rawTokens[j])) {
+                                const itemNum = rawTokens[j];
+                                const code = rawTokens[j+1] || '';
+                                const desc = rawTokens[j+2] || '';
+                                const cant = parseFloat((rawTokens[j+4] || '0').replace(/,/g, '')) || 0;
+                                const unitVal = parseFloat((rawTokens[j+5] || '0').replace(/,/g, '')) || 0;
+                                const totVal = parseFloat((rawTokens[j+8] || '0').replace(/,/g, '')) || 0;
+
+                                items.push({ itemNum, code, desc, cant, unitVal, totVal });
+                                j += 9;
+                            }
+                            // Permite continuar escaneando las páginas 2, 3... en lugar de abortar con break
+                            i = j - 1;
+                        }
+                    }
+                }
+
+                // Poblar Workbook con los ítems consolidados de todas las páginas
                 ws.addRow(['FECHA', 'PROVEEDOR', 'SUCURSAL', 'PRODUCTO', 'NUMERO_FACTURA', 'KG', 'PRECIO', 'VALOR', 'TIPO_DOCUMENTO']);
                 if (items.length > 0) {
                     items.forEach(it => {
@@ -3603,10 +3750,10 @@
                 }
 
             } else if (esLibroAuxiliar) {
-                // B. Libro Auxiliar Contable
+                // B. Libro Auxiliar Contable Multi-Página
                 ws.addRow(['FECHA', 'PROVEEDOR', 'SUCURSAL', 'PRODUCTO', 'NUMERO_FACTURA', 'KG', 'PRECIO', 'VALOR', 'TIPO_DOCUMENTO']);
                 for (const line of allLines) {
-                    const fullStr = line.map(x => x.str).join(' ');
+                    const fullStr = line.map(x => x.str).join(' ').trim();
                     if (/^TOTAL|SALDO INICIAL|P[AÁ]GINA|FECHA Y HORA|NIT\b|LIBRO AUXILIAR|220501/i.test(fullStr)) continue;
 
                     const mDate = fullStr.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
@@ -3636,9 +3783,12 @@
                     ws.addRow([fechaStr, 'Sevillana', '', prodName, numFactura, 0, 0, valNum, 'LIBRO_AUXILIAR']);
                 }
             } else {
-                // C. Planilla / Matriz estándar en PDF
+                // C. Planilla / Matriz estándar en PDF Multi-Página
                 for (const line of allLines) {
-                    ws.addRow(line.map(x => x.str));
+                    const rowValues = line.map(x => x.str);
+                    if (rowValues.some(v => v && v.trim())) {
+                        ws.addRow(rowValues);
+                    }
                 }
             }
 

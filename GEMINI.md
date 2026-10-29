@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.8.6)  
+> **Última Actualización:** Octubre 2026 (Versión 1.8.7)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -445,6 +445,29 @@ i.fecha), consolidándose directamente en la fila de ese día.
   3. *Regla de Exclusión Estricta de Rutas:*
      - Queda estrictamente prohibido modificar, sincronizar o interactuar con `G:\Mi unidad\Antigravity\CONCILIADOR\CONCILIADOR.html`.
      - La única ruta canónica de desarrollo es `G:\Mi unidad\Antigravity\PROTEINAGRO\CONCILIADOR.html` y su réplica de producción `G:\Mi unidad\PROTEINAGRO\CONCILIADOR.html`.
+
+---
+
+### 29. Extracción y Conciliación Vectorial de Facturas Electrónicas PDF Multi-Página (v1.8.7)
+- **Diagnóstico y Causa Raíz:**
+  - Al cargar facturas electrónicas en formato PDF con 2 o más páginas (ej. Facturas de Sevillana, Carnes y Derivados o DIAN con decenas de renglones), el conciliador solo extraía los ítems de la Página 1, omitiendo la totalidad de las páginas siguientes.
+  - La causa raíz residía en una instrucción `break;` prematura al término del primer bloque de tabla en `procesarArchivoPDF(file)`, la cual abortaba el bucle exterior tras leer la primera página.
+  - Además, un paso fijo `j += 9` provocaba desalineaciones de columnas al procesar descripciones de productos con múltiples palabras o espacios fragmentados por PDF.js.
+  - En documentos con tablas continuas sin repetición de encabezado `ÍTEM` en la página 2, el sistema no detectaba la continuación de los ítems subsecuentes.
+- **Solución Implementada en `CONCILIADOR.html` (v1.8.7):**
+  1. *Arquitectura de Extracción Estructurada por Páginas (`pagesData`):*
+     - Cada página se extrae de manera estructurada conservando su contexto espacial, sus líneas ordenadas en el eje Y descendente y X ascendente, y su flujo de texto delimitado por saltos de línea `\n`.
+  2. *Aislamiento y Blindaje de Metadatos:*
+     - Número de factura, fecha de emisión, emisor y sucursal se obtienen evaluando la Página 1 (`primeraPaginaText`), impidiendo que autorizaciones DIAN o textos del receptor (`PROTEINAGRO S.A.S.`) contaminen la identidad del proveedor.
+  3. *Motor Híbrido Multi-Página con Rastreo Secuencial de Ítems:*
+     - Mantiene un contador continuo de ítems esperados (`expectedItemNum`: 1, 2, 3...) entre páginas.
+     - Si la página siguiente repite el encabezado `ÍTEM`, se detecta y sincroniza la tabla.
+     - Si la página siguiente no repite el encabezado, detecta la continuación secuencial de números de ítem y extrae los renglones sin interrupción.
+     - Extracción flexible de valores numéricos desde el final de la fila (`totVal`, `unitVal`, `cant`), tolerando descripciones extensas sin depender de un stride fijo de 9 tokens.
+     - Detección de pies de página (`SUBTOTAL`, `TOTAL`, `PÁGINA`, `CUFE`) para cerrar la tabla de la página sin abortar el escaneo global.
+     - Fallback secundario por stream de tokens sin `break;` que consolida todos los bloques de ítems encontrados.
+  4. *Garantía de Normalización de Fechas:*
+     - La columna `FECHA` almacena siempre fechas válidas `DD/MM/YYYY`, evitando que etiquetas de lote o factura se inserten como fecha en las matrices de liquidación o en las actas de exportación Excel.
 
 ---
 

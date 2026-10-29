@@ -923,6 +923,22 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 ---
 
+### 12.21 Extracción y Conciliación Vectorial de Facturas Electrónicas PDF Multi-Página (v1.8.7)
+
+> **Objetivo:** Garantizar la lectura integral y sin pérdida de datos en facturas electrónicas PDF que consten de 2 o más páginas, asegurando que todos los ítems y despachos se procesen, homologuen y concilien automáticamente contra las recolecciones de campo registradas en ProteinAgro.
+
+- **Diagnóstico y Causa Raíz:**
+  - El bucle previo contenía un `break;` prematuro tras el primer bloque de tabla en la página 1, descartando las páginas 2 en adelante.
+  - Descripciones con nombres largos provocaban desfase al asumir un salto fijo de 9 tokens por renglón.
+- **Optimizaciones Implementadas:**
+  - Estructuración espacial por páginas (`pagesData`) con ordenamiento bidimensional (Y descendente, X ascendente).
+  - Algoritmo de continuación de tabla entre páginas mediante `expectedItemNum`, funcionando con o sin cabecera repetida en la página 2.
+  - Extracción tolerante desde el final de cada línea para cantidades, precios unitarios y totales.
+  - Aislamiento de metadatos en la página 1 y protección contra confusión de ProteinAgro como adquirente.
+  - Sincronización transparente con Google Sheets mediante `getConciliadorHtmlOutput()`.
+
+---
+
 *Sistema desarrollado para ProteinAgro - Optimización Tecnológica y Trazabilidad en Campo.*
 
 
