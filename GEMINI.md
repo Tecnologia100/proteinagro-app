@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.8.7)  
+> **Última Actualización:** Octubre 2026 (Versión 1.8.8)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -468,6 +468,35 @@ i.fecha), consolidándose directamente en la fila de ese día.
      - Fallback secundario por stream de tokens sin `break;` que consolida todos los bloques de ítems encontrados.
   4. *Garantía de Normalización de Fechas:*
      - La columna `FECHA` almacena siempre fechas válidas `DD/MM/YYYY`, evitando que etiquetas de lote o factura se inserten como fecha en las matrices de liquidación o en las actas de exportación Excel.
+
+---
+
+### 30. Persistencia de Facturas Físicas en Sitio (Caribe) y Desplazamiento Seguro de Columnas en Google Sheets (v1.8.8)
+- **Diagnóstico y Requerimiento Operativo:**
+  - Para el proveedor **Caribe**, la PWA captura obligatoriamente tres datos clave del comprobante físico entregado en sitio: **Número de Factura**, **Valor Total de la Factura** y la **Foto del Comprobante**.
+  - En la base oficial de Google Sheets (Recolecciones), estos datos deben quedar registrados a partir de la columna O:
+    - Columna O (15): Numero_Factura
+    - Columna P (16): Valor_Factura
+    - Columna Q (17): Foto_Factura (URL descargable de Firebase Storage)
+  - Sin embargo, a partir de la antigua columna P (columnas P a U) se encontraban ubicados el bloque de métricas KPI y la tabla de auditoría de registros duplicados (REGISTROS DUPLICADOS, KILOGRAMOS DUPLICADOS, IMPACTO ECONÓMICO y DETALLE DE RECOLECCIONES DUPLICADAS). Escribir directamente en P y Q habría sobreescrito y destruido dicha información relevante.
+- **Solución Técnica Implementada:**
+  1. *Desplazamiento Atómico y Seguro de Columnas (garantizarEstructuraColumnasFactura en Code.gs):*
+     - El script evalúa proactivamente la cabecera de la columna P (16). Si detecta etiquetas de duplicados o texto ajeno a Valor_Factura, invoca sheet.insertColumnsAfter(15, 2).
+     - Esto inserta 2 columnas nuevas vacías inmediatamente después de la columna O, corriendo automáticamente todo el bloque de duplicados 2 columnas hacia la derecha (de P:U hacia R:W).
+     - Google Sheets ajusta de manera nativa e inmediata las fórmulas internas del bloque de duplicados sin romper referencias ni perder datos.
+  2. *Creación e Inicialización de Encabezados O1:Q1:*
+     - Columna O (15): Numero_Factura (Texto limpio).
+     - Columna P (16): Valor_Factura (Formato moneda $#,##0).
+     - Columna Q (17): Foto_Factura (Enlace URL directo o estado de evidencia).
+  3. *Persistencia Automatizada en guardarRecoleccionSheet:*
+     - Antes de escribir cualquier fila en Recolecciones, el script verifica y asegura la estructura de columnas.
+     - Escribe en lote las columnas A:L (datos operativos) y en O:Q las columnas de factura. Para recolecciones que no corresponden a Caribe o que no manejan factura física, limpia O:Q con cadenas vacías para evitar celdas residuales.
+  4. *Menú Interactivo y Endpoints:*
+     - Opción de menú directo en Google Sheets: *🚀 ProteinAgro > 🧾 Habilitar Columnas Factura Caribe (Desplazar a la derecha)* (menuHabilitarColumnasFactura).
+     - Endpoints en doGet y doPost: ction=habilitarColumnasFactura y ction=desplazarColumnasFactura.
+  5. *Blindaje en Cliente (pp.js):*
+     - Sanitización de dataLight.fotoFactura para evitar desbordamiento de payload por Base64 pesados si Firebase Storage opera sin red.
+     - Incremento de versión del sistema a **v1.8.8** en PWA, Service Worker (proteinagro-v1.8.8) y encabezados.
 
 ---
 

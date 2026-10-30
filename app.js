@@ -2820,6 +2820,9 @@ async function enviarAGoogleSheets(data) {
     if (dataLight.foto && dataLight.foto.length > 300 && !dataLight.foto.startsWith('http')) {
         dataLight.foto = "Foto Evidencia Registrada";
     }
+    if (dataLight.fotoFactura && dataLight.fotoFactura.length > 300 && !dataLight.fotoFactura.startsWith('http')) {
+        dataLight.fotoFactura = "Foto Factura Registrada";
+    }
 
     if (dataLight.ruta) {
         dataLight.ruta = homologarRuta(dataLight.ruta);

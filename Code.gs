@@ -77,6 +77,11 @@ function doGet(e) {
       return restaurarEncabezadosPuntosRutasHttp(ss);
     }
 
+    // 0.086 Habilitar o desplazar columnas de Factura (Caribe) O:Q hacia la derecha
+    if (e && e.parameter && (e.parameter.action === 'habilitarColumnasFactura' || e.parameter.action === 'desplazarColumnasFactura')) {
+      return habilitarColumnasFacturaHttp(ss);
+    }
+
     // 0.09 Inicializar o sincronizar pestaña Tarifas (precios vigentes y pendientes)
     if (e && e.parameter && e.parameter.action === 'inicializarTarifas') {
       return inicializarPestanaTarifas(ss);
@@ -645,18 +650,18 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         var filasFaltantes = filaFinalRequerida - maxFilasActuales;
         sheet.insertRowsAfter(maxFilasActuales, Math.max(filasFaltantes, 200));
       }
-      var maxColsActuales = sheet.getMaxColumns();
-      if (maxColsActuales < 17) {
-        sheet.insertColumnsAfter(maxColsActuales, 17 - maxColsActuales);
-      }
-      // Asegurar encabezados O1:Q1
-      var hdrOQ = sheet.getRange(1, 15, 1, 3).getValues()[0];
-      if (!hdrOQ[0] || String(hdrOQ[0]).trim() === '') {
-        sheet.getRange(1, 15, 1, 3).setValues([["Numero_Factura", "Valor_Factura", "Foto_Factura"]]);
-      }
+      // Garantizar que existan las columnas de Factura O, P, Q y que los duplicados estén corridos a la derecha
+      garantizarEstructuraColumnasFactura(sheet);
+
       sheet.getRange(targetRow + 1, 1, filasNuevas.length, 12).setValues(filasNuevas);
       if (numeroFactura || (valorFactura !== '' && valorFactura > 0) || fotoFactura) {
         sheet.getRange(targetRow + 1, 15, filasFactura.length, 3).setValues(filasFactura);
+      } else {
+        var cleanEmpty = [];
+        for (var cEmpty = 0; cEmpty < filasNuevas.length; cEmpty++) {
+          cleanEmpty.push(['', '', '']);
+        }
+        sheet.getRange(targetRow + 1, 15, cleanEmpty.length, 3).setValues(cleanEmpty);
       }
     }
 
@@ -673,6 +678,112 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     if (lockAcquired) {
       try { lock.releaseLock(); } catch(eRel) {}
     }
+  }
+}
+
+// ==============================================================================
+// GARANTIZAR ESTRUCTURA Y DESPLAZAMIENTO SEGURO DE COLUMNAS DE FACTURA (v1.8.8)
+// Desplaza las columnas de auditoría/duplicados (antiguas P:U) 2 posiciones a la derecha
+// y habilita las columnas O:Q para Numero_Factura, Valor_Factura, Foto_Factura
+// ==============================================================================
+
+function garantizarEstructuraColumnasFactura(sheet) {
+  if (!sheet) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    sheet = ss.getSheetByName("Recolecciones");
+  }
+  if (!sheet) return { desplazado: false, razon: "No existe la hoja Recolecciones" };
+
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols < 22) {
+    sheet.insertColumnsAfter(maxCols, 22 - maxCols);
+  }
+
+  var hdrO = String(sheet.getRange(1, 15).getValue() || '').trim();
+  var hdrP = String(sheet.getRange(1, 16).getValue() || '').trim();
+  var hdrQ = String(sheet.getRange(1, 17).getValue() || '').trim();
+
+  // Si ya están correctamente configuradas las 3 columnas
+  if (hdrO === "Numero_Factura" && hdrP === "Valor_Factura" && hdrQ === "Foto_Factura") {
+    return { desplazado: false, razon: "Columnas O:Q ya configuradas" };
+  }
+
+  // Verificar si en Columna 16 (P) o 15 (O) todavía residen los datos de duplicados
+  var desplazado = false;
+  var tieneDuplicadosEnP = (
+    hdrP.toUpperCase().indexOf("DUPLICADO") !== -1 ||
+    hdrO.toUpperCase().indexOf("DUPLICADO") !== -1 ||
+    (hdrP !== "" && hdrP !== "Valor_Factura")
+  );
+
+  if (tieneDuplicadosEnP) {
+    // Insertar 2 columnas después de la columna 15 (O).
+    // Esto empuja todo el bloque de la antigua columna P hacia la columna R (desplazamiento seguro).
+    sheet.insertColumnsAfter(15, 2);
+    desplazado = true;
+  }
+
+  // Establecer encabezados limpios en O1:Q1
+  var rangeHdr = sheet.getRange(1, 15, 1, 3);
+  rangeHdr.setValues([["Numero_Factura", "Valor_Factura", "Foto_Factura"]]);
+  rangeHdr.setBackground('#1e293b')
+          .setFontColor('#ffffff')
+          .setFontWeight('bold')
+          .setHorizontalAlignment('center');
+
+  // Formatear columna P (Valor_Factura) como moneda
+  var lastRow = Math.max(sheet.getLastRow(), 2);
+  sheet.getRange(2, 16, lastRow - 1, 1).setNumberFormat("$#,##0");
+
+  return { desplazado: desplazado, razon: desplazado ? "Columnas P:U desplazadas exitosamente a R:W" : "Encabezados O:Q asegurados" };
+}
+
+function menuHabilitarColumnasFactura() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert("Error: No se encontró la hoja Recolecciones.");
+      return;
+    }
+    var res = garantizarEstructuraColumnasFactura(sheet);
+    if (res.desplazado) {
+      SpreadsheetApp.getUi().alert(
+        "✅ Columnas Habilitadas con Éxito:\n\n" +
+        "1. Se desplazaron las columnas de auditoría/duplicados 2 posiciones hacia la derecha (a partir de la columna R).\n" +
+        "2. Se crearon los encabezados oficiales en las columnas O, P, Q:\n" +
+        "   - Columna O: Numero_Factura\n" +
+        "   - Columna P: Valor_Factura\n" +
+        "   - Columna Q: Foto_Factura\n\n" +
+        "Las recolecciones de Caribe y demás proveedores con factura física caerán ahora en estas columnas automáticamente."
+      );
+    } else {
+      SpreadsheetApp.getUi().alert(
+        "ℹ️ La estructura ya estaba configurada:\n\n" +
+        "Las columnas O, P, Q ya corresponden a Numero_Factura, Valor_Factura y Foto_Factura."
+      );
+    }
+  } catch(e) {
+    SpreadsheetApp.getUi().alert("Error: " + e.toString());
+  }
+}
+
+function habilitarColumnasFacturaHttp(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) throw new Error("No existe la hoja Recolecciones.");
+    var res = garantizarEstructuraColumnasFactura(sheet);
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "success",
+      message: res.desplazado ? "Columnas desplazadas y encabezados O:Q configurados" : "Columnas O:Q ya estaban configuradas",
+      detalle: res
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "error",
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -1959,6 +2070,10 @@ function doPost(e) {
     if (action === 'updateRecoleccion') {
       return actualizarRecoleccionSheet(ss, payload);
     }
+
+    if (action === 'habilitarColumnasFactura' || action === 'desplazarColumnasFactura') {
+      return habilitarColumnasFacturaHttp(ss);
+    }
     
     return guardarRecoleccionSheet(ss, payload);
   } catch (error) {
@@ -2536,6 +2651,8 @@ function onOpen() {
       .addItem('🥩 Corregir Kilos Convertidos a Fechas', 'corregirKilosFechasSheet')
       .addItem('💰 Liquidar Recolecciones Pendientes', 'liquidarRecoleccionesPendientes')
       .addItem('📋 Organizar Rutas y Planta San Joaquín', 'restaurarEncabezadosPuntosRutas')
+      .addSeparator()
+      .addItem('🧾 Habilitar Columnas Factura Caribe (Desplazar a la derecha)', 'menuHabilitarColumnasFactura')
       .addToUi();
   } catch (e) {
     Logger.log('Error creando menús: ' + e.toString());
