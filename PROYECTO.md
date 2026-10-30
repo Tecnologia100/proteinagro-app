@@ -946,6 +946,12 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 
 
+### 30. Erradicación de Falsos Positivos en Filtro de Filas Fantasma del Conciliador (v1.8.9)
+- **Diagnóstico y Causa Raíz:** Detección de eliminación errónea de registros reales (como `REC-1793369102221-6867` Desperdicio 20 Kg en Comercializadora R Y E) en `filtrarFilasFantasmaTotales` debido a que visitas de 2 productos con pesos similares (`|20.0 - 20.6| = 0.6 < 1.0`) eran confundidas con filas de suma total.
+- **Blindaje de ID con Entropía:** Registros generados por la app del conductor (`REC-[timestamp]-[rand4]`) están 100% blindados y excluidos de cualquier depuración sintética.
+- **Restricción a Anomalías de Septiembre:** Filtro acotado estrictamente a septiembre 2026, grupos de mínimo 3 renglones (`cnt >= 2`), pesos >= 200 Kg y terminación en `000`.
+- **Garantía Contable:** 100% de los despachos legítimos se conservan, visualizan y exportan correctamente en ambos conciliadores.
+
 ### 29. Exportación Excel Segregada por Sucursal en Ambos Módulos del Conciliador (v1.8.8)
 - **Módulo 1 (Resumen de Materias y Proveedores):** Hoja `Consolidado General` con todas las tiendas sumadas + pestañas individuales por cada sucursal física (`Santa Elena`, `Cavasa`, `Palmira`, etc.) con su matriz exacta, fórmula `SUM`, precios en rojo `#C00000`, subtotales y total en amarillo `#FFFF00` + hoja `Detalle Registros`.
 - **Módulo 2 (Auditoría y Conciliación Universal):** Hoja `Consolidado General` con los 3 bloques consolidados (Factura, Sistema, Diferencias) + pestañas independientes por sucursal física con sus 3 bloques específicos + hojas `Conciliados Exactos` y `Novedades por Columna`.

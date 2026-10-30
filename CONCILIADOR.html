@@ -549,7 +549,7 @@
     <div class="modal-overlay" id="modalConciliacion">
         <div class="modal-card">
             <div class="modal-header">
-                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.8.8 · Multi-Sucursal</span></h2>
+                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.8.9 · Multi-Sucursal</span></h2>
                 <button class="modal-close-btn" onclick="cerrarModalConciliacion()" title="Cerrar ventana">✕</button>
             </div>
             <div class="modal-body">
@@ -807,22 +807,29 @@
                 }
             }
 
-            // 2. Detectar filas fantasma totalizadoras por grupo de visita (suma de los demás ítems)
+            // 2. Detectar filas fantasma totalizadoras sintéticas (anomalía de septiembre 2026)
+            // Blindaje: los registros reales con ID de entropía móvil (REC-[ts]-[rand4]) y visitas legítimas nunca se descartan
             const visits = {};
             for (let i = 0; i < items.length; i++) {
                 if (ghostMap[i]) continue;
                 const it = items[i];
+                const rid = String(it.ID || '').trim();
+                if (rid.includes('-') && rid.split('-').length >= 3) continue; // Registros reales con ID de entropía generados por app
+
                 const f = String(it.FECHA || '').trim().split(' ')[0];
                 const p = String(it.PROVEEDOR || '').trim().toLowerCase();
                 if (!f || !p) continue;
+                if (!f.includes('/9/2026') && !f.includes('/09/2026')) continue; // Restringido exclusivamente al lote histórico de sep 2026
+
                 const k = f + '||' + p;
                 if (!visits[k]) visits[k] = [];
-                visits[k].push({ idx: i, kg: Number(it.KG) || 0 });
+                visits[k].push({ idx: i, kg: Number(it.KG) || 0, id: rid });
             }
 
             for (const k in visits) {
                 const grp = visits[k];
-                if (grp.length <= 1) continue;
+                // Un totalizador requiere al menos 3 filas (suma de mínimo 2 materias distintas)
+                if (grp.length < 3) continue;
 
                 for (let j = 0; j < grp.length; j++) {
                     const candKg = grp[j].kg;
@@ -832,7 +839,8 @@
                         if (m !== j) sumOthers += grp[m].kg;
                     }
 
-                    if (cnt >= 1 && candKg > 0 && Math.abs(candKg - sumOthers) < 1.0) {
+                    // Debe sumar al menos 2 otros productos, tener peso significativo (>= 200 kg) y tener ID sintético terminado en 000
+                    if (cnt >= 2 && candKg >= 200 && Math.abs(candKg - sumOthers) < 1.0 && String(grp[j].id || '').endsWith('000')) {
                         ghostMap[grp[j].idx] = true;
                         break;
                     }

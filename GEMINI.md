@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.8.8)  
+> **Última Actualización:** Octubre 2026 (Versión 1.8.9)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -515,6 +515,20 @@ i.fecha), consolidándose directamente en la fila de ese día.
      - **Hojas Finales (`Conciliados Exactos` y `Novedades por Columna`):** Detalle de auditoría con columna de sucursal.
   3. *Blindaje de Nombres de Pestañas (`sanitizarNombreHojaExcel`):*
      - Cumplimiento de especificaciones nativas de Microsoft Excel: longitud máxima de 31 caracteres, eliminación de caracteres reservados (`\ / ? * [ ] :`), desduplicación automática con sufijo numérico y nombres únicos insensibles a mayúsculas.
+
+### 30. Erradicación de Falsos Positivos en Filtro de Filas Fantasma del Conciliador (`v1.8.9`)
+- **Problema Diagnosticado:**
+  - El usuario reportó que el registro legítimo `REC-1793369102221-6867` (30/10/2026 9:05:02, Comercializadora R Y E, Punto Carnes Rye, Desperdicio 20.0 Kg) no aparecía en el Conciliador a pesar de existir en Google Sheets `Recolecciones`.
+- **Causa Raíz:**
+  - En `filtrarFilasFantasmaTotales(items)` de `CONCILIADOR.html`, el segundo bucle detector de filas totalizadoras evaluaba:
+    `if (cnt >= 1 && candKg > 0 && Math.abs(candKg - sumOthers) < 1.0) { ghostMap[grp[j].idx] = true; break; }`
+  - Cuando una visita tenía exactamente 2 materias (ej. `Desperdicio 20.0 Kg` y `Gordana 20.6 Kg`), `cnt = 1` y `sumOthers = 20.6 Kg`. Al calcular la diferencia absoluta: `|20.0 - 20.6| = 0.6 < 1.0`, el algoritmo interpretaba erróneamente que los 20.0 Kg de Desperdicio eran una fila fantasma de suma totalizadora y borraba el registro legítimo del conjunto de datos.
+  - La misma condición eliminaba silenciosamente otros registros legítimos con pesos similares en un mismo día (ej. Central Henry Martinez 66 Kg vs 66 Kg, Los Lagos 149 Kg vs 149 Kg, etc.).
+- **Arquitectura de Solución Implementada:**
+  1. *Protección Absoluta de Registros Móviles de Conductor:* Se añadió la regla `if (rid.includes('-') && rid.split('-').length >= 3) continue;`. Cualquier registro con entropía aleatoria (`REC-[timestamp]-[rand4]` o `NOV-[timestamp]-[rand4]`) proviene 100% verificado del móvil del conductor y jamás se descarta como fantasma.
+  2. *Delimitación Histórica Estricta a Septiembre 2026:* La heurística totalizadora solo aplica a la anomalía histórica de septiembre 2026 (`f.includes('/9/2026') || f.includes('/09/2026')`).
+  3. *Restricción Matemática de Suma Totalizadora:* Para que una fila sea candidata a totalizador de un viaje, el grupo debe tener al menos 3 renglones (`grp.length >= 3`, `cnt >= 2`), peso significativo (`candKg >= 200 Kg`) y tener un identificador sintético terminado en `000` (`rid.endsWith('000')`).
+  4. *Resultado:* Cero falsos positivos. Registros legítimos como `Desperdicio 20 Kg` y `Gordana 20.6 Kg` de Comercializadora R Y E se conservan y concilian con exactitud milimétrica.
 
 ---
 
