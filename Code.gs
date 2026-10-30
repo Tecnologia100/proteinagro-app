@@ -82,6 +82,13 @@ function doGet(e) {
       return habilitarColumnasFacturaHttp(ss);
     }
 
+    // 0.087 Sincronizar facturas históricas de Caribe del 29 de Octubre
+    if (e && e.parameter && e.parameter.action === 'sincronizarFacturasCaribe29Oct') {
+      var resCaribe = sincronizarFacturasCaribe29Oct(ss);
+      return ContentService.createTextOutput(JSON.stringify(resCaribe))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 0.09 Inicializar o sincronizar pestaña Tarifas (precios vigentes y pendientes)
     if (e && e.parameter && e.parameter.action === 'inicializarTarifas') {
       return inicializarPestanaTarifas(ss);
@@ -784,6 +791,77 @@ function habilitarColumnasFacturaHttp(ss) {
       result: "error",
       message: err.toString()
     })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==============================================================================
+// SINCRONIZACIÓN RETROACTIVA DE FACTURAS CARIBE DEL 29 DE OCTUBRE (v1.8.8)
+// ==============================================================================
+
+function sincronizarFacturasCaribe29Oct(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) throw new Error("No existe la hoja Recolecciones.");
+
+    // 1. Asegurar primero que las columnas O:Q existan y que la data de duplicados esté desplazada a la derecha
+    garantizarEstructuraColumnasFactura(sheet);
+
+    var facturasMap = {
+      "REC-1793281876290-3159": { num: "04fb-24275", val: 8000, foto: "Foto Registrada en Firebase" },
+      "REC-1793285214479-5693": { num: "05fc20706", val: 24, foto: "Foto Registrada en Firebase" },
+      "REC-1793290917140-6935": { num: "09fE-27190", val: 84, foto: "Foto Registrada en Firebase" },
+      "REC-1793294216561-2000": { num: "01fd24546", val: 61, foto: "Foto Registrada en Firebase" },
+      "REC-1793299297299-5799": { num: "02fd-20330", val: 163, foto: "Foto Registrada en Firebase" },
+      "REC-1793302599866-1387": { num: "03fH-46791", val: 27, foto: "Foto Registrada en Firebase" }
+    };
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return { actualizadas: 0 };
+
+    var idCol = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    var filasActualizadas = 0;
+
+    for (var r = 0; r < idCol.length; r++) {
+      var rowId = String(idCol[r][0] || '').trim();
+      if (facturasMap[rowId]) {
+        var rowNum = r + 2; // base 1
+        var fData = facturasMap[rowId];
+        sheet.getRange(rowNum, 15, 1, 3).setValues([[
+          fData.num,
+          fData.val,
+          fData.foto
+        ]]);
+        filasActualizadas++;
+      }
+    }
+
+    return {
+      success: true,
+      filasActualizadas: filasActualizadas,
+      recolecciones: Object.keys(facturasMap).length
+    };
+  } catch(e) {
+    Logger.log("Error sincronizando facturas caribe 29 oct: " + e.toString());
+    return { success: false, error: e.toString() };
+  }
+}
+
+function menuSincronizarFacturasCaribe29Oct() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var res = sincronizarFacturasCaribe29Oct(ss);
+    if (res.success) {
+      SpreadsheetApp.getUi().alert(
+        "✅ Sincronización Exitosa:\n\n" +
+        "Se actualizaron " + res.filasActualizadas + " filas en la hoja Recolecciones con los datos de las 6 facturas de Caribe del 29 de Octubre:\n" +
+        "- Columnas O, P y Q actualizadas con Número de Factura, Valor y Evidencia."
+      );
+    } else {
+      SpreadsheetApp.getUi().alert("Error: " + res.error);
+    }
+  } catch(e) {
+    SpreadsheetApp.getUi().alert("Error: " + e.toString());
   }
 }
 
@@ -2653,6 +2731,7 @@ function onOpen() {
       .addItem('📋 Organizar Rutas y Planta San Joaquín', 'restaurarEncabezadosPuntosRutas')
       .addSeparator()
       .addItem('🧾 Habilitar Columnas Factura Caribe (Desplazar a la derecha)', 'menuHabilitarColumnasFactura')
+      .addItem('📥 Sincronizar Facturas Caribe (29 Oct)', 'menuSincronizarFacturasCaribe29Oct')
       .addToUi();
   } catch (e) {
     Logger.log('Error creando menús: ' + e.toString());
