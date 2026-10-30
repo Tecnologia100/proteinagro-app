@@ -808,6 +808,9 @@ function sincronizarFacturasCaribe29Oct(ss) {
     garantizarEstructuraColumnasFactura(sheet);
 
     var facturasMap = {
+      // 27 de Octubre (Caribe Buga - Filas 2967 y 2968)
+      "REC-1793138468485-4889": { num: "10fb-16946", val: 33050, foto: "Foto Registrada en Firebase" },
+      // 29 de Octubre (Caribe Puerto Tejada y Jamundí - Filas 3007 a 3036)
       "REC-1793281876290-3159": { num: "04fb-24275", val: 8000, foto: "Foto Registrada en Firebase" },
       "REC-1793285214479-5693": { num: "05fc20706", val: 24, foto: "Foto Registrada en Firebase" },
       "REC-1793290917140-6935": { num: "09fE-27190", val: 84, foto: "Foto Registrada en Firebase" },
