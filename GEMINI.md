@@ -498,6 +498,24 @@ i.fecha), consolidándose directamente en la fila de ese día.
      - Sanitización de dataLight.fotoFactura para evitar desbordamiento de payload por Base64 pesados si Firebase Storage opera sin red.
      - Incremento de versión del sistema a **v1.8.8** en PWA, Service Worker (proteinagro-v1.8.8) y encabezados.
 
+### 29. Exportación Excel Segregada por Sucursal en Ambos Módulos del Conciliador (`v1.8.8`)
+- **Problema Diagnosticado:**
+  - En el Módulo 1 (*Resumen de Materias y Proveedores*), todas las sucursales de un proveedor se volcaban en una única matriz continua, sumando los kilos y totales de distintas sedes físicas sin discriminar la liquidación de cada tienda.
+  - En el Módulo 2 (*Auditoría y Conciliación Universal*), el agrupador `obtenerEstructuraMatrizConciliacion` usaba únicamente la fecha como clave (`fKey = fechaLimpia`), perdiendo el atributo `puntoDoc` y haciendo que la columna `SUCURSAL` mostrara el nombre genérico del proveedor (`Sevillana`) en lugar de la sede física real (`Santa Elena`, `Cavasa`, etc.). Además, todas las tiendas quedaban consolidadas en una sola hoja.
+- **Arquitectura de Solución Implementada (Patrón Multi-Pestaña + Consolidado General):**
+  1. *Módulo 1 (`exportToExcelStyled` - Botón "Exportar a Excel"):*
+     - **Hoja 1 (`Consolidado General`):** Matriz global con todos los registros del proveedor consolidando todas las sucursales.
+     - **Hojas 2..N+1 (`[Nombre Sucursal]`):** Una pestaña independiente por cada sucursal física detectada (`Santa Elena`, `Cavasa`, `Palmira`, etc.), donde se renderiza la **misma estructura idéntica**: encabezado azul suave `#BDD7EE`, filas diarias, fila separadora, `CANTIDAD` (fórmula Excel `SUM`), `PRECIOS` (fuente roja `#C00000`), `SUBTOTAL` (fórmula `CANTIDAD * PRECIO`) y `TOTAL GENERAL` (fórmula `SUM(subtotales)` en pastilla amarilla `#FFFF00`). Cada sede solo lista las columnas de materias que efectivamente despachó.
+     - **Hoja Final (`Detalle Registros`):** Listado plano de auditoría con fórmulas de multiplicación y links a fotos.
+  2. *Módulo 2 (`exportarActaConciliacionExcelJS` - Botón "Descargar Acta Oficial"):*
+     - Propagación garantizada de `puntoDoc` en todas las pasadas del motor forense (0, 0B, 1, 2, 3, 4 y 5) y en `recMeta[key].punto`.
+     - Agrupamiento en `obtenerEstructuraMatrizConciliacion` por clave compuesta `${fechaLimpia}||${sucItem}`, eliminando colisiones y mostrando la sucursal real de cada ítem.
+     - **Hoja 1 (`Consolidado General`):** Los 3 bloques consolidados (Factura, Sistema, Diferencias).
+     - **Hojas 2..N+1 (`[Nombre Sucursal]`):** Pestañas dedicadas por cada sede física, conteniendo los 3 bloques específicos de esa tienda con sus fórmulas y total amarillo autónomos.
+     - **Hojas Finales (`Conciliados Exactos` y `Novedades por Columna`):** Detalle de auditoría con columna de sucursal.
+  3. *Blindaje de Nombres de Pestañas (`sanitizarNombreHojaExcel`):*
+     - Cumplimiento de especificaciones nativas de Microsoft Excel: longitud máxima de 31 caracteres, eliminación de caracteres reservados (`\ / ? * [ ] :`), desduplicación automática con sufijo numérico y nombres únicos insensibles a mayúsculas.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue

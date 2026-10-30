@@ -946,6 +946,12 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 
 
+### 29. Exportación Excel Segregada por Sucursal en Ambos Módulos del Conciliador (v1.8.8)
+- **Módulo 1 (Resumen de Materias y Proveedores):** Hoja `Consolidado General` con todas las tiendas sumadas + pestañas individuales por cada sucursal física (`Santa Elena`, `Cavasa`, `Palmira`, etc.) con su matriz exacta, fórmula `SUM`, precios en rojo `#C00000`, subtotales y total en amarillo `#FFFF00` + hoja `Detalle Registros`.
+- **Módulo 2 (Auditoría y Conciliación Universal):** Hoja `Consolidado General` con los 3 bloques consolidados (Factura, Sistema, Diferencias) + pestañas independientes por sucursal física con sus 3 bloques específicos + hojas `Conciliados Exactos` y `Novedades por Columna`.
+- **Preservación Forense de Sucursal:** Asignación garantizada de `puntoDoc` en todas las pasadas del motor (0, 0B, 1, 2, 3, 4 y 5) y corrección de la columna `SUCURSAL` para reflejar la sede real en lugar del nombre genérico del proveedor.
+- **Sanitización de Nombres de Pestaña (`sanitizarNombreHojaExcel`):** Límite de 31 caracteres, eliminación de caracteres prohibidos y prevención de nombres duplicados.
+
 ### 28. Sincronización Automática en Vivo Apps Script ↔ GitHub y Desacoplamiento de Rutas Excluidas (v1.8.6)
 - Carga dinámica de `CONCILIADOR.html` en vivo desde GitHub (`https://raw.githubusercontent.com/...`) en `Code.gs`.
 - Desacoplamiento permanente de la ruta `G:\Mi unidad\Antigravity\CONCILIADOR\CONCILIADOR.html`.

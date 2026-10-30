@@ -549,7 +549,7 @@
     <div class="modal-overlay" id="modalConciliacion">
         <div class="modal-card">
             <div class="modal-header">
-                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.8.2 · Lotes</span></h2>
+                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.8.8 · Multi-Sucursal</span></h2>
                 <button class="modal-close-btn" onclick="cerrarModalConciliacion()" title="Cerrar ventana">✕</button>
             </div>
             <div class="modal-body">
@@ -1949,6 +1949,22 @@
         // =========================================================================
         // EXPORTACIÓN A EXCEL EN FORMATO MATRIZ / LIQUIDACIÓN (SEGÚN MODELO)
         // =========================================================================
+        function sanitizarNombreHojaExcel(nombre, nombresUsados) {
+            let limpio = String(nombre || 'SUCURSAL')
+                .replace(/[\\/?*[\]:]/g, '_')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 28);
+            let candidato = limpio || 'SUCURSAL';
+            let idx = 1;
+            while (nombresUsados.has(candidato.toUpperCase())) {
+                const suffix = '_' + idx++;
+                candidato = limpio.slice(0, 31 - suffix.length) + suffix;
+            }
+            nombresUsados.add(candidato.toUpperCase());
+            return candidato;
+        }
+
         async function exportToExcelStyled() {
             if (!filteredData || filteredData.length === 0) {
                 alert("No hay registros para exportar con los filtros seleccionados.");
@@ -1964,24 +1980,6 @@
                 workbook.creator = "Sistema Conciliador - Liquidación de Materias";
                 workbook.created = new Date();
 
-                // 1. Hoja principal: LIQUIDACIÓN POR PROVEEDOR (Formato Matriz Exacto)
-                const ws = workbook.addWorksheet("Liquidación Proveedores", {
-                    views: [{ showGridLines: true }]
-                });
-
-                // Agrupar los registros por Proveedor
-                const groupedByProv = {};
-                filteredData.forEach(item => {
-                    const prov = (item.PROVEEDOR || 'PROVEEDOR GENERAL').trim();
-                    if (!groupedByProv[prov]) {
-                        groupedByProv[prov] = [];
-                    }
-                    groupedByProv[prov].push(item);
-                });
-
-                const sortedProvs = Object.keys(groupedByProv).sort((a, b) => a.localeCompare(b, 'es'));
-                let startRow = 2; // Iniciar en fila 2 dejando margen superior
-
                 const borderThin = {
                     top: { style: 'thin', color: { argb: 'FF000000' } },
                     left: { style: 'thin', color: { argb: 'FF000000' } },
@@ -1989,26 +1987,34 @@
                     right: { style: 'thin', color: { argb: 'FF000000' } }
                 };
 
-                sortedProvs.forEach(provName => {
-                    const provItems = groupedByProv[provName];
+                function getColLetter(colIdx) {
+                    let letter = '';
+                    let temp = colIdx;
+                    while (temp > 0) {
+                        let rem = (temp - 1) % 26;
+                        letter = String.fromCharCode(65 + rem) + letter;
+                        temp = Math.floor((temp - 1) / 26);
+                    }
+                    return letter;
+                }
 
-                    // 1. Identificar productos únicos del proveedor
+                // Renderizador universal de matriz contable (FECHA, SUCURSAL, MATERIAS, CANTIDAD, PRECIOS, SUBTOTAL, TOTAL AMARILLO)
+                const renderizarMatrizEnHoja = (ws, startRow, tituloBloque, itemsList) => {
                     const productsMap = {};
-                    provItems.forEach(r => {
+                    itemsList.forEach(r => {
                         const m = (r.MATERIA || 'GENERAL').trim();
                         if (m) productsMap[m] = true;
                     });
                     const products = Object.keys(productsMap).sort((a, b) => a.localeCompare(b, 'es'));
-                    if (products.length === 0) return;
+                    if (products.length === 0) return startRow;
 
-                    // 2. Extraer precios unitarios por producto
                     const unitPrices = {};
                     products.forEach(p => {
-                        const matched = provItems.filter(r => (r.MATERIA || '').trim() === p && Number(r.PRECIO) > 0);
+                        const matched = itemsList.filter(r => (r.MATERIA || '').trim() === p && Number(r.PRECIO) > 0);
                         if (matched.length > 0) {
                             unitPrices[p] = Number(matched[matched.length - 1].PRECIO);
                         } else {
-                            const matchedVal = provItems.filter(r => (r.MATERIA || '').trim() === p && Number(r.KG) > 0 && Number(r.VALOR) > 0);
+                            const matchedVal = itemsList.filter(r => (r.MATERIA || '').trim() === p && Number(r.KG) > 0 && Number(r.VALOR) > 0);
                             if (matchedVal.length > 0) {
                                 unitPrices[p] = Math.round(Number(matchedVal[0].VALOR) / Number(matchedVal[0].KG));
                             } else {
@@ -2017,14 +2023,12 @@
                         }
                     });
 
-                    // 3. Estructurar filas de datos (agrupadas cronológicamente respetando múltiples viajes por fecha)
-                    const sortedItems = [...provItems].sort((a, b) => {
+                    const sortedItems = [...itemsList].sort((a, b) => {
                         const da = parseDate(a.FECHA) || new Date(0);
                         const db = parseDate(b.FECHA) || new Date(0);
                         return da - db;
                     });
 
-                    // Construcción de tickets / filas
                     const matrixRows = [];
                     let currentRowData = null;
 
@@ -2057,15 +2061,13 @@
 
                     const hasFacturasProv = matrixRows.some(m => Boolean(m.numeroFactura || m.valorFactura || m.fotoFactura));
 
-                    // --- RENDERIZADO EN LA HOJA DE EXCEL ---
-
-                    // Fila 1: Título del Proveedor (Ej: ORLANDO MARTINEZ SUPERCARNES-LOS ANDES)
+                    // Fila 1: Título
                     const titleRow = ws.getRow(startRow);
-                    titleRow.getCell(1).value = provName.toUpperCase();
+                    titleRow.getCell(1).value = tituloBloque.toUpperCase();
                     titleRow.getCell(1).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF000000' } };
                     startRow++;
 
-                    // Fila 2: Encabezados (FECHA, SUCURSAL, PRODUCTO 1, PRODUCTO 2, ..., [N° FACTURA, VALOR FACTURA, SOPORTE FOTO])
+                    // Fila 2: Encabezados (FECHA, SUCURSAL, MATERIAS...)
                     const headerRow = ws.getRow(startRow);
                     headerRow.height = 26;
                     const extraHeaders = hasFacturasProv ? ['N° FACTURA', 'VALOR FACTURA ($)', 'SOPORTE FOTO'] : [];
@@ -2074,25 +2076,12 @@
                         const cell = headerRow.getCell(idx + 1);
                         cell.value = val.toUpperCase();
                         cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF000000' } };
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } }; // Azul grisáceo suave idéntico a foto
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } };
                         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                         cell.border = borderThin;
                     });
                     startRow++;
 
-                    // Helper para obtener letra de columna en Excel (1 -> A, 2 -> B, 27 -> AA, etc.)
-                    function getColLetter(colIdx) {
-                        let letter = '';
-                        let temp = colIdx;
-                        while (temp > 0) {
-                            let rem = (temp - 1) % 26;
-                            letter = String.fromCharCode(65 + rem) + letter;
-                            temp = Math.floor((temp - 1) / 26);
-                        }
-                        return letter;
-                    }
-
-                    // Filas 3..N: Datos (Fechas, Sucursal y Kilos)
                     const sumKg = {};
                     products.forEach(p => sumKg[p] = 0);
                     const firstDataRow = startRow;
@@ -2101,21 +2090,18 @@
                         const row = ws.getRow(startRow);
                         row.height = 20;
 
-                        // Columna 1: Fecha
                         const dateCell = row.getCell(1);
                         dateCell.value = mData.fecha;
                         dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
                         dateCell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF000000' } };
                         dateCell.border = borderThin;
 
-                        // Columna 2: Sucursal
                         const puntoCell = row.getCell(2);
                         puntoCell.value = mData.punto;
                         puntoCell.alignment = { horizontal: 'center', vertical: 'middle' };
                         puntoCell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF000000' } };
                         puntoCell.border = borderThin;
 
-                        // Columnas de Productos
                         products.forEach((p, idx) => {
                             const pCell = row.getCell(idx + 3);
                             const val = mData.values[p];
@@ -2126,7 +2112,7 @@
                                 pCell.numFmt = '#,##0.00';
                                 sumKg[p] += validNum;
                             } else {
-                                pCell.value = null; // Celda vacía sin valor para Excel
+                                pCell.value = null;
                             }
                             pCell.alignment = { horizontal: 'right', vertical: 'middle' };
                             pCell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF000000' } };
@@ -2163,7 +2149,7 @@
                     });
                     const lastDataRow = startRow - 1;
 
-                    // Fila Separadora vacía con bordes (como en el modelo oficial)
+                    // Fila Separadora vacía con bordes
                     const emptySepRow = ws.getRow(startRow);
                     emptySepRow.height = 14;
                     for (let c = 1; c <= products.length + 2; c++) {
@@ -2171,7 +2157,7 @@
                     }
                     startRow++;
 
-                    // Fila CANTIDAD (Fórmula Excel SUM de Kilos)
+                    // Fila CANTIDAD (Fórmula SUM de Kilos)
                     const cantidadRowNumber = startRow;
                     const cantidadRow = ws.getRow(cantidadRowNumber);
                     cantidadRow.height = 22;
@@ -2181,7 +2167,7 @@
                     cLabelCell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF000000' } };
                     cLabelCell.alignment = { horizontal: 'left', vertical: 'middle' };
                     cLabelCell.border = borderThin;
-                    cantidadRow.getCell(2).border = borderThin; // En caso de que el merge no expanda el borde derecho
+                    cantidadRow.getCell(2).border = borderThin;
 
                     products.forEach((p, idx) => {
                         const colIdx = idx + 3;
@@ -2202,14 +2188,14 @@
                     });
                     startRow++;
 
-                    // Fila PRECIOS (Texto en Rojo)
+                    // Fila PRECIOS (Texto en Rojo #C00000)
                     const preciosRowNumber = startRow;
                     const preciosRow = ws.getRow(preciosRowNumber);
                     preciosRow.height = 22;
                     ws.mergeCells(preciosRowNumber, 1, preciosRowNumber, 2);
                     const pLabelCell = preciosRow.getCell(1);
                     pLabelCell.value = 'PRECIOS';
-                    pLabelCell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFC00000' } }; // Rojo
+                    pLabelCell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFC00000' } };
                     pLabelCell.alignment = { horizontal: 'left', vertical: 'middle' };
                     pLabelCell.border = borderThin;
                     preciosRow.getCell(2).border = borderThin;
@@ -2220,13 +2206,13 @@
                         const pVal = Number(unitPrices[p] || 0);
                         cell.value = isNaN(pVal) ? 0 : pVal;
                         cell.numFmt = '#,##0';
-                        cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFC00000' } }; // Rojo
+                        cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFC00000' } };
                         cell.alignment = { horizontal: 'right', vertical: 'middle' };
                         cell.border = borderThin;
                     });
                     startRow++;
 
-                    // Fila SUBTOTAL (Fórmula Excel: Cantidad * Precio) + TOTAL GENERAL EN AMARILLO
+                    // Fila SUBTOTAL (Cantidad * Precio) + TOTAL GENERAL EN AMARILLO
                     const subtotalRowNumber = startRow;
                     const subtotalRow = ws.getRow(subtotalRowNumber);
                     subtotalRow.height = 24;
@@ -2255,7 +2241,7 @@
                         cell.border = borderThin;
                     });
 
-                    // Celda adyacente resaltada en amarillo: TOTAL GENERAL (Fórmula Excel SUM de subtotales)
+                    // Celda TOTAL GENERAL en amarillo vivo
                     const firstSubCol = getColLetter(3);
                     const lastSubCol = getColLetter(products.length + 2);
                     const totalCellCol = products.length + 3;
@@ -2266,21 +2252,73 @@
                     };
                     totalCell.numFmt = '$#,##0';
                     totalCell.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF000000' } };
-                    totalCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // Amarillo puro
+                    totalCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
                     totalCell.alignment = { horizontal: 'center', vertical: 'middle' };
                     totalCell.border = borderThin;
 
-                    // Espacio de separación antes del siguiente bloque
-                    startRow += 3;
+                    ws.getColumn(1).width = 16;
+                    ws.getColumn(2).width = 24;
+                    for (let c = 3; c <= products.length + 5; c++) {
+                        ws.getColumn(c).width = 18;
+                    }
+
+                    return startRow + 3;
+                };
+
+                // Agrupar registros por Proveedor
+                const groupedByProv = {};
+                filteredData.forEach(item => {
+                    const prov = (item.PROVEEDOR || 'PROVEEDOR GENERAL').trim();
+                    if (!groupedByProv[prov]) groupedByProv[prov] = [];
+                    groupedByProv[prov].push(item);
+                });
+                const sortedProvs = Object.keys(groupedByProv).sort((a, b) => a.localeCompare(b, 'es'));
+
+                // =========================================================================
+                // 1. HOJA PRINCIPAL: "Consolidado General" (Matriz consolidada)
+                // =========================================================================
+                const wsConsolidado = workbook.addWorksheet("Consolidado General", {
+                    views: [{ showGridLines: true }]
+                });
+                let startRowCons = 2;
+                sortedProvs.forEach(provName => {
+                    startRowCons = renderizarMatrizEnHoja(wsConsolidado, startRowCons, provName, groupedByProv[provName]);
                 });
 
-                // Ajustar anchos automáticos de columnas
-                ws.getColumn(1).width = 16;
-                for (let c = 2; c <= 20; c++) {
-                    ws.getColumn(c).width = 18;
-                }
+                // =========================================================================
+                // 2. HOJAS INDIVIDUALES POR SUCURSAL
+                // =========================================================================
+                const usedSheetNames = new Set(['CONSOLIDADO GENERAL', 'DETALLE REGISTROS']);
+                const sucursalesMap = {};
+                filteredData.forEach(item => {
+                    const suc = (item.PUNTO || 'SEDE PRINCIPAL').trim();
+                    if (!sucursalesMap[suc]) sucursalesMap[suc] = [];
+                    sucursalesMap[suc].push(item);
+                });
+                const sortedSucursales = Object.keys(sucursalesMap).sort((a, b) => a.localeCompare(b, 'es'));
 
-                // 2. Hoja secundaria: "Detalle Registros" (auditoría fila por fila)
+                sortedSucursales.forEach(sucName => {
+                    const sucItems = sucursalesMap[sucName];
+                    const sheetName = sanitizarNombreHojaExcel(sucName, usedSheetNames);
+                    const wsSuc = workbook.addWorksheet(sheetName, { views: [{ showGridLines: true }] });
+
+                    const provsEnSuc = {};
+                    sucItems.forEach(it => {
+                        const p = (it.PROVEEDOR || 'PROVEEDOR GENERAL').trim();
+                        if (!provsEnSuc[p]) provsEnSuc[p] = [];
+                        provsEnSuc[p].push(it);
+                    });
+
+                    let rSuc = 2;
+                    Object.keys(provsEnSuc).sort().forEach(pName => {
+                        const title = `${pName} — ${sucName}`;
+                        rSuc = renderizarMatrizEnHoja(wsSuc, rSuc, title, provsEnSuc[pName]);
+                    });
+                });
+
+                // =========================================================================
+                // 3. HOJA AUDITORÍA: "Detalle Registros" (auditoría fila por fila)
+                // =========================================================================
                 const wsDetalle = workbook.addWorksheet("Detalle Registros", {
                     views: [{ showGridLines: true }]
                 });
@@ -2332,41 +2370,29 @@
                     row.getCell(9).numFmt = '$#,##0';
                 });
 
-                wsDetalle.getColumn(1).width = 14; // Fecha
-                wsDetalle.getColumn(2).width = 28; // Proveedor
-                wsDetalle.getColumn(3).width = 30; // Punto de Recolección
-                wsDetalle.getColumn(4).width = 20; // Número de Factura
-                wsDetalle.getColumn(5).width = 20; // Valor Facturado ($)
-                wsDetalle.getColumn(6).width = 20; // Materia Prima
-                wsDetalle.getColumn(7).width = 16; // Cantidad (KG)
-                wsDetalle.getColumn(8).width = 18; // Precio Unitario ($)
-                wsDetalle.getColumn(9).width = 18; // Valor Total ($)
-                wsDetalle.getColumn(10).width = 26; // Enlace Soporte Fotográfico
+                wsDetalle.getColumn(1).width = 14;
+                wsDetalle.getColumn(2).width = 28;
+                wsDetalle.getColumn(3).width = 30;
+                wsDetalle.getColumn(4).width = 20;
+                wsDetalle.getColumn(5).width = 20;
+                wsDetalle.getColumn(6).width = 20;
+                wsDetalle.getColumn(7).width = 16;
+                wsDetalle.getColumn(8).width = 18;
+                wsDetalle.getColumn(9).width = 18;
+                wsDetalle.getColumn(10).width = 26;
 
-                // Determinación dinámica del nombre de archivo según el proveedor seleccionado
-                const fechaStr = new Date().toISOString().slice(0, 10);
-                let provNameForFile = "GENERAL";
-
+                // Generar Nombre del Archivo y Descarga
+                const now = new Date();
+                const fechaStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+                let safeProvName = "Consolidado";
                 if (sortedProvs.length === 1) {
-                    provNameForFile = sortedProvs[0];
-                } else if (selectedProveedores.size === 1) {
-                    provNameForFile = Array.from(selectedProveedores)[0];
-                } else if (sortedProvs.length > 1 && sortedProvs.length <= 2) {
-                    provNameForFile = sortedProvs.join("_");
-                } else if (sortedProvs.length > 2) {
-                    provNameForFile = `${sortedProvs.length}_PROVEEDORES`;
+                    safeProvName = sortedProvs[0].replace(/[^A-Za-z0-9]/g, '_');
+                } else if (sortedProvs.length > 1) {
+                    safeProvName = `${sortedProvs[0].replace(/[^A-Za-z0-9]/g, '_')}_y_${sortedProvs.length - 1}_mas`;
                 }
 
-                // Limpiar caracteres inválidos para nombres de archivo en Windows
-                const safeProvName = provNameForFile
-                    .replace(/[/\\?%*:|"<>]/g, '')
-                    .trim()
-                    .replace(/\s+/g, '_')
-                    .toUpperCase();
-
-                // Añadir rango de fechas si fue filtrado
-                const fDesde = document.getElementById('fechaDesde').value;
-                const fHasta = document.getElementById('fechaHasta').value;
+                const fDesde = (document.getElementById('fechaDesde')?.value || '').replace(/-/g, '');
+                const fHasta = (document.getElementById('fechaHasta')?.value || '').replace(/-/g, '');
                 let rangoStr = '';
                 if (fDesde && fHasta) {
                     rangoStr = `_${fDesde}_a_${fHasta}`;
@@ -2380,16 +2406,13 @@
 
                 const fileName = `Liquidacion_${safeProvName}${rangoStr}.xlsx`;
 
-                // 1. Descargar archivo Excel con nombre personalizado en el navegador
                 const buffer = await workbook.xlsx.writeBuffer();
                 const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
                 saveAs(blob, fileName);
 
-                // 2. Guardar automáticamente una copia en Google Drive (carpeta Proveedores)
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     updateStatus('💾 Guardando copia en Google Drive (carpeta Proveedores)...', 'normal');
 
-                    // Convertir buffer a Base64
                     let binary = '';
                     const bytes = new Uint8Array(buffer);
                     const len = bytes.byteLength;
@@ -2421,7 +2444,7 @@
                 } else {
                     btn.disabled = false;
                     btn.innerHTML = '📊 Exportar Excel';
-                    updateStatus(`✅ Archivo <b>${fileName}</b> descargado correctamente`, 'success');
+                    updateStatus(`✅ Archivo <b>${fileName}</b> descargado correctamente (Consolidado + Sucursales)`, 'success');
                 }
 
             } catch (err) {
@@ -4648,11 +4671,11 @@
 
                 const key = `${dInfo.fechaStr}||${prodHom}`;
                 recAgrupado[key] = (recAgrupado[key] || 0) + kg;
-                recIndividuales.push({ key, kg, fecha: dInfo.fechaStr, prod: prodHom, mes: dInfo.mes, sortKey: dInfo.sortKey, id: r.ID || '' });
+                recIndividuales.push({ key, kg, fecha: dInfo.fechaStr, prod: prodHom, mes: dInfo.mes, sortKey: dInfo.sortKey, id: r.ID || '', PUNTO: r.PUNTO || '' });
                 let pDia = Number(r.PRECIO) || 0;
                 if (pDia > 0 && pDia < 20) pDia = Math.round(pDia * 1000);
                 if (pDia > 0) recPreciosDia[key] = pDia;
-                recMeta[key] = dInfo;
+                recMeta[key] = { ...dInfo, punto: r.PUNTO || '' };
             });
 
             // 6. Motor Forense Universal + Opción 2 (Smart Match por Peso y Fecha)
@@ -4769,6 +4792,8 @@
                         delta_kg: deltaKg, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: sumaKg * precio,
                         delta_valor: deltaKg * precio,
+                        puntoDoc: item.puntoDoc || (r1 ? r1.PUNTO : '') || autoInfo.docPunto || '',
+                        facturaDoc: item.facturaDoc || '',
                         estado: `🟢 Conciliado (Lote ↔ ${fechaRango})`,
                         obs: `${item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ suma de recolecciones ${r1.fecha.slice(0, 5)} (${r1.kg} Kg) + ${r2.fecha.slice(0, 5)} (${r2.kg} Kg) = ${sumaKg.toFixed(2)} Kg.`
                     });
@@ -4881,7 +4906,10 @@
                                 kg_proveedor: itemD.kg_proveedor, kg_recoleccion: itemD.kg_proveedor,
                                 delta_kg: 0, precio_unit: itemD.precio_unit,
                                 valor_proveedor: itemD.valor_proveedor, valor_recoleccion: itemD.valor_proveedor,
-                                delta_valor: 0, estado: `🟢 Conciliado (Recogido el ${fechaSig.slice(0, 5)})`,
+                                delta_valor: 0,
+                                puntoDoc: itemD.puntoDoc || (recMeta[keySig] ? recMeta[keySig].punto : '') || autoInfo.docPunto || '',
+                                facturaDoc: itemD.facturaDoc || '',
+                                estado: `🟢 Conciliado (Recogido el ${fechaSig.slice(0, 5)})`,
                                 obs: `Despacho acumulado y recolectado el ${fechaSig} junto con el viaje del día siguiente (${sumaEsperada.toLocaleString()} Kg totales).`
                             });
                             const deltaSig = kgRecSig - sumaEsperada;
@@ -4890,7 +4918,10 @@
                                 kg_proveedor: despSig.kg_proveedor, kg_recoleccion: despSig.kg_proveedor + deltaSig,
                                 delta_kg: deltaSig, precio_unit: despSig.precio_unit,
                                 valor_proveedor: despSig.valor_proveedor, valor_recoleccion: (despSig.kg_proveedor + deltaSig) * despSig.precio_unit,
-                                delta_valor: deltaSig * despSig.precio_unit, estado: '🟢 Conciliado Exacto',
+                                delta_valor: deltaSig * despSig.precio_unit,
+                                puntoDoc: despSig.puntoDoc || (recMeta[keySig] ? recMeta[keySig].punto : '') || autoInfo.docPunto || '',
+                                facturaDoc: despSig.facturaDoc || '',
+                                estado: '🟢 Conciliado Exacto',
                                 obs: `Registro conjunto de ${kgRecSig.toLocaleString()} Kg en plataforma (incluye ${itemD.kg_proveedor.toLocaleString()} Kg del ${itemD.fecha.slice(0, 5)}).`
                             });
                             despKeysConsumidas.add(keyD);
@@ -4905,7 +4936,10 @@
                                 kg_proveedor: itemD.kg_proveedor, kg_recoleccion: kgRecSig,
                                 delta_kg: delta, precio_unit: itemD.precio_unit,
                                 valor_proveedor: itemD.valor_proveedor, valor_recoleccion: kgRecSig * itemD.precio_unit,
-                                delta_valor: delta * itemD.precio_unit, estado: `🟢 Conciliado (Recogido el ${fechaSig.slice(0, 5)})`,
+                                delta_valor: delta * itemD.precio_unit,
+                                puntoDoc: itemD.puntoDoc || (recMeta[keySig] ? recMeta[keySig].punto : '') || autoInfo.docPunto || '',
+                                facturaDoc: itemD.facturaDoc || '',
+                                estado: `🟢 Conciliado (Recogido el ${fechaSig.slice(0, 5)})`,
                                 obs: `Despacho del ${itemD.fecha.slice(0, 5)} registrado en plataforma el día siguiente (${fechaSig}).`
                             });
                             despKeysConsumidas.add(keyD);
@@ -4933,7 +4967,10 @@
                             kg_proveedor: item.kg_proveedor, kg_recoleccion: kgRec,
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
-                            delta_valor: deltaVal, estado: '🟢 Conciliado Exacto',
+                            delta_valor: deltaVal,
+                            puntoDoc: item.puntoDoc || (recMeta[key] ? recMeta[key].punto : '') || autoInfo.docPunto || '',
+                            facturaDoc: item.facturaDoc || '',
+                            estado: '🟢 Conciliado Exacto',
                             obs: 'Cuadre exacto dentro de la tolerancia de báscula.'
                         });
                     } else {
@@ -4942,7 +4979,10 @@
                             kg_proveedor: item.kg_proveedor, kg_recoleccion: kgRec,
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
-                            delta_valor: deltaVal, estado: '🟡 Desviación de Peso',
+                            delta_valor: deltaVal,
+                            puntoDoc: item.puntoDoc || (recMeta[key] ? recMeta[key].punto : '') || autoInfo.docPunto || '',
+                            facturaDoc: item.facturaDoc || '',
+                            estado: '🟡 Desviación de Peso',
                             obs: `Diferencia de ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(1)} Kg entre factura proveedor y recolección.`
                         });
                     }
@@ -4972,7 +5012,10 @@
                                 kg_proveedor: item.kg_proveedor, kg_recoleccion: kgRec,
                                 delta_kg: deltaKg, precio_unit: precio,
                                 valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
-                                delta_valor: deltaKg * precio, estado: '🟢 Conciliado (🧠 Smart Match Peso)',
+                                delta_valor: deltaKg * precio,
+                                puntoDoc: item.puntoDoc || (recMeta[cand.rKey] ? recMeta[cand.rKey].punto : '') || autoInfo.docPunto || '',
+                                facturaDoc: item.facturaDoc || '',
+                                estado: '🟢 Conciliado (🧠 Smart Match Peso)',
                                 obs: `🧠 Emparejado por peso idéntico (${kgRec.toLocaleString()} Kg): Excel "${rawLabel}" ↔ Sistema "${rProd}".`,
                                 _smartMatchRaw: rawLabel,
                                 _smartMatchTarget: rProd
@@ -5006,7 +5049,10 @@
                                 kg_proveedor: item.kg_proveedor, kg_recoleccion: kgRec,
                                 delta_kg: deltaKg, precio_unit: precio,
                                 valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
-                                delta_valor: deltaKg * precio, estado: `🟢 Smart Match Peso (${fechaSig.slice(0, 5)})`,
+                                delta_valor: deltaKg * precio,
+                                puntoDoc: item.puntoDoc || (recMeta[cand.rKey] ? recMeta[cand.rKey].punto : '') || autoInfo.docPunto || '',
+                                facturaDoc: item.facturaDoc || '',
+                                estado: `🟢 Smart Match Peso (${fechaSig.slice(0, 5)})`,
                                 obs: `🧠 Recogido el día siguiente (${fechaSig}) con peso idéntico como "${rProd}" (${kgRec.toLocaleString()} Kg).`,
                                 _smartMatchRaw: rawLabel,
                                 _smartMatchTarget: rProd
@@ -5032,7 +5078,7 @@
                         const kgRec = recAgrupado[rKey];
                         const diffPct = item.kg_proveedor > 0 ? Math.abs(kgRec - item.kg_proveedor) / item.kg_proveedor : 1;
                         if (diffPct <= 0.20) {
-                            candidatosMismoDia.push({ rKey, rProd, kgRec, diffPct });
+                            candidatosMismoDia.push({ rKey, rProd, kgRec, diffPct, rPunto: (recMeta[rKey] ? recMeta[rKey].punto : '') });
                         }
                     }
                 }
@@ -5048,7 +5094,10 @@
                         kg_proveedor: item.kg_proveedor, kg_recoleccion: cand.kgRec,
                         delta_kg: deltaKg, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: cand.kgRec * precio,
-                        delta_valor: deltaKg * precio, estado: '🟡 Desviación (🧠 Smart Match Fecha)',
+                        delta_valor: deltaKg * precio,
+                        puntoDoc: item.puntoDoc || (cand && cand.rPunto) || (recMeta[cand.rKey] ? recMeta[cand.rKey].punto : '') || autoInfo.docPunto || '',
+                        facturaDoc: item.facturaDoc || '',
+                        estado: '🟡 Desviación (🧠 Smart Match Fecha)',
                         obs: `🧠 Emparejado en misma fecha: Excel "${rawLabel}" (${item.kg_proveedor.toLocaleString()} Kg) ↔ Sistema "${cand.rProd}" (${cand.kgRec.toLocaleString()} Kg).`,
                         _smartMatchRaw: rawLabel,
                         _smartMatchTarget: cand.rProd
@@ -5071,6 +5120,8 @@
                     delta_kg: -item.kg_proveedor, precio_unit: precio,
                     valor_proveedor: valProv, valor_recoleccion: 0,
                     delta_valor: -valProv, estado: '🟠 Pendiente en Sistema',
+                    puntoDoc: item.puntoDoc || autoInfo.docPunto || '',
+                    facturaDoc: item.facturaDoc || '',
                     obs: `Facturado por ${nombreProveedorDisplay} (como "${item.rawProdLabel || item.producto}"), pendiente de registro en recolecciones de plataforma.`
                 });
                 despKeysConsumidas.add(key);
@@ -5090,6 +5141,8 @@
                     delta_kg: kgRec, precio_unit: precio,
                     valor_proveedor: 0, valor_recoleccion: kgRec * precio,
                     delta_valor: kgRec * precio, estado: '🔵 Sobrante en Plataforma',
+                    puntoDoc: (recMeta[rKey] ? recMeta[rKey].punto : '') || autoInfo.docPunto || '',
+                    facturaDoc: '',
                     obs: 'Registrado en recolecciones pero no aparece cobrado en el Excel del proveedor.'
                 });
             }
@@ -5212,12 +5265,13 @@
                         fechaLimpia = d.periodoStr;
                     }
                 }
-                const fKey = fechaLimpia;
+                const sucItem = (it.puntoDoc || it.PUNTO || d.puntoNombre || (typeof autoInfo !== 'undefined' && autoInfo ? autoInfo.docPunto : '') || d.proveedorNombre || 'PROVEEDOR').trim();
+                const fKey = `${fechaLimpia}||${sucItem}`;
                 if (!mapPorFecha[fKey]) {
                     mapPorFecha[fKey] = {
                         fecha: fechaLimpia,
                         sortKey: it.sortKey || 0,
-                        sucursal: it.puntoDoc || d.proveedorNombre || 'PROVEEDOR',
+                        sucursal: sucItem,
                         celdasPorProducto: {},
                         observacionesDia: [],
                         smartFixesDia: []
@@ -5813,9 +5867,9 @@
                 const allPrices = globalStruct.unitPrices;
 
                 // =========================================================================
-                // HOJA 1: LIQUIDACIÓN CONCILIADA (Estructura Idéntica al Conciliador: Materias por Columnas)
+                // 1. HOJA PRINCIPAL: "Consolidado General" (Estructura Idéntica: Materias por Columnas)
                 // =========================================================================
-                const wsMain = wb.addWorksheet('Liquidación Proveedores', { views: [{ showGridLines: true }] });
+                const wsMain = wb.addWorksheet('Consolidado General', { views: [{ showGridLines: true }] });
                 let currentRow = 2;
 
                 // Bloque 1: Liquidación Conciliada Oficial (según despacho/conciliación)
@@ -5860,6 +5914,71 @@
                 for (let c = 3; c <= allProds.length + 4; c++) {
                     wsMain.getColumn(c).width = 18;
                 }
+
+                // =========================================================================
+                // 2. HOJAS INDIVIDUALES POR SUCURSAL (Separado por sede física)
+                // =========================================================================
+                const usedSheetNamesActa = new Set(['CONSOLIDADO GENERAL', 'CONCILIADOS EXACTOS', 'NOVEDADES POR COLUMNA']);
+                const sucursalesActaSet = new Set();
+                (d.todos || []).forEach(it => {
+                    const s = (it.puntoDoc || it.PUNTO || '').trim();
+                    if (s) sucursalesActaSet.add(s);
+                });
+                const sortedSucursalesActa = [...sucursalesActaSet].sort((a, b) => a.localeCompare(b, 'es'));
+
+                sortedSucursalesActa.forEach(sucName => {
+                    const matchSuc = (it) => (it.puntoDoc || it.PUNTO || '').trim().toUpperCase() === sucName.toUpperCase();
+                    const exactosSuc = (d.exactos || []).filter(matchSuc);
+                    const desvSuc = (d.desviaciones || []).filter(matchSuc);
+                    const faltSuc = (d.faltantes || []).filter(matchSuc);
+                    const sobrSuc = (d.sobrantes || []).filter(matchSuc);
+                    const itemsFacturaSuc = [...exactosSuc, ...desvSuc, ...faltSuc];
+                    const itemsSistemaSuc = [...exactosSuc, ...desvSuc, ...sobrSuc];
+                    const itemsTodosSuc = (d.todos || []).filter(matchSuc);
+
+                    const sheetName = sanitizarNombreHojaExcel(sucName, usedSheetNamesActa);
+                    const wsSuc = wb.addWorksheet(sheetName, { views: [{ showGridLines: true }] });
+                    let rSuc = 2;
+
+                    // Bloque 1: Liquidación Factura de esta sucursal
+                    rSuc = renderizarBloqueMatrizEnHoja(
+                        wsSuc,
+                        rSuc,
+                        `${provUpper} — ${sucName.toUpperCase()} — LIQUIDACIÓN FACTURA (${d.mesAnio})`,
+                        itemsFacturaSuc.length > 0 ? itemsFacturaSuc : itemsTodosSuc,
+                        null,
+                        allPrices,
+                        'proveedor'
+                    );
+
+                    // Bloque 2: Sistema ProteinAgro de esta sucursal (si hay diferencias/recolecciones)
+                    if (desvSuc.length > 0 || faltSuc.length > 0 || sobrSuc.length > 0) {
+                        rSuc = renderizarBloqueMatrizEnHoja(
+                            wsSuc,
+                            rSuc,
+                            `${provUpper} — ${sucName.toUpperCase()} — RECOLECCIONES SISTEMA (${d.mesAnio})`,
+                            itemsSistemaSuc,
+                            null,
+                            allPrices,
+                            'sistema'
+                        );
+
+                        // Bloque 3: Diferencias de esta sucursal
+                        rSuc = renderizarBloqueMatrizEnHoja(
+                            wsSuc,
+                            rSuc,
+                            `${provUpper} — ${sucName.toUpperCase()} — MATRIZ DE DIFERENCIAS (${d.mesAnio})`,
+                            itemsTodosSuc,
+                            null,
+                            allPrices,
+                            'diferencia'
+                        );
+                    }
+
+                    wsSuc.getColumn(1).width = 16;
+                    wsSuc.getColumn(2).width = 24;
+                    for (let c = 3; c <= 25; c++) wsSuc.getColumn(c).width = 18;
+                });
 
                 // =========================================================================
                 // HOJA 2: CONCILIADOS EXACTOS (Formato Matriz por Columnas)
