@@ -982,3 +982,8 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - Retiradas 14 funciones obsoletas de migraciones pasadas (~1.066 lineas). Code.gs: 3.805 -> 2.739 lineas.
 - PWA y Conciliador sin cambios. Respaldo en backups/Code_pre_limpieza_v1.9.2.gs.
 
+
+## v1.9.2 - Navegacion horizontal en Recolecciones en Vivo (5/11/2026)
+- Barra de desplazamiento horizontal superior sincronizada + botones de navegacion rapida.
+- Tabla con alto maximo 70vh, encabezado fijo y columnas Fecha (izquierda) y Acciones (derecha) fijas.
+- Funcion reutilizable `inicializarScrollHorizontalSuperior` en app.js. Cache PWA proteinagro-v1.9.2.

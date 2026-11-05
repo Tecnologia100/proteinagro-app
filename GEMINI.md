@@ -584,6 +584,13 @@ i.fecha), consolidándose directamente en la fila de ese día.
 - **PWA intacta:** `app.js`, `index.html`, `sw.js` y `CONCILIADOR.html` sin cambios. Acciones `getRecolecciones`, `updateRecoleccion`, `deleteRecoleccion`, `aplicarNovedadesConciliacion`, guardado `doPost` y RPC del Conciliador verificados activos.
 - **Respaldo:** `backups/Code_pre_limpieza_v1.9.2.gs`; migraciones históricas siguen como archivos independientes (`Migracion_Ruta1.gs`, `Migrar_Tarifas_Ruta1.gs`, `Reparar_Duplicados_Septiembre.gs`).
 
+### 34. Navegación Horizontal Práctica en "Recolecciones en Vivo" (`v1.9.2` PWA)
+- **Barra de desplazamiento superior sincronizada** (`#admin-scroll-toolbar` / `#admin-top-scroll`) sobre la tabla admin, en espejo bidireccional con el scroll del contenedor `#admin-table-scroll`. La rueda vertical del mouse sobre la barra superior desplaza horizontalmente.
+- **Botones ◀ ▶** (`.btn-scroll-nav`, `data-scroll-dir`) que avanzan 60% del ancho visible con scroll suave; se deshabilitan en los extremos. La barra se oculta sola (`.is-hidden`) si la tabla no desborda.
+- **Contenedor `.table-scroll-pro`:** `max-height: 70vh` con scroll interno (la barra inferior siempre visible), `thead th` sticky, columna **Fecha** sticky a la izquierda y **Acciones** sticky a la derecha (`background: inherit` respeta el fondo `#fffdfa` de filas Novedad; celdas `td[colspan]` excluidas).
+- **JS:** `inicializarScrollHorizontalSuperior(containerId, topScrollId, toolbarId)` al final de `app.js`, reutilizable; recalcula ancho con `ResizeObserver` + `MutationObserver` sobre el `tbody` (re-render en vivo de Firestore).
+- **Versión PWA:** `sw.js` cache `proteinagro-v1.9.2`, query strings `?v=1.9.2` en `index.html` y `app.js`. Commit `f267949`.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
