@@ -977,3 +977,8 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - Desacoplamiento permanente de la ruta `G:\Mi unidad\Antigravity\CONCILIADOR\CONCILIADOR.html`.
 - Normalización definitiva de la columna `FECHA` con propagación de `mes` y `anio`.
 
+
+## v1.9.2 - Depuracion de Code.gs (5/11/2026)
+- Retiradas 14 funciones obsoletas de migraciones pasadas (~1.066 lineas). Code.gs: 3.805 -> 2.739 lineas.
+- PWA y Conciliador sin cambios. Respaldo en backups/Code_pre_limpieza_v1.9.2.gs.
+
