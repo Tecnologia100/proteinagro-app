@@ -576,6 +576,14 @@ i.fecha), consolidándose directamente en la fila de ese día.
   7. *Sincronización Espejo:*
      - Replicado en `G:\Mi unidad\Antigravity\PROTEINAGRO\CONCILIADOR.html`, `G:\Mi unidad\PROTEINAGRO\CONCILIADOR.html` y `G:\Mi unidad\Antigravity\CONCILIADOR\CONCILIADOR.html`.
 
+### 33. Depuración de Código Muerto en `Code.gs` (`v1.9.2`)
+- **Retiradas 14 funciones obsoletas (~1.066 líneas; 3.805 ➔ 2.739 líneas):** `repararDuplicadosSeptiembre(+Http)`, `migrarTarifasRuta1(+Http)`, `migrarRuta1_SantaElena` / `migrarRuta1SantaElenaHttp`, `sincronizarFacturasCaribe29Oct` / `menuSincronizarFacturasCaribe29Oct`, `corregirKilosFechasSheet`, `inicializarTablasYCatalogos`, `inicializarPestanaTarifas`, `convertirHistoricoANombrePropio`, `restaurarPlantaSanJoaquin`, `cleanNumberValue`.
+- **Router `doGet` depurado:** retiradas las acciones `migrarRuta1`, `migrarTarifasRuta1`, `repararDuplicadosSeptiembre`, `corregirKilosFechas`, `sincronizarFacturasCaribe29Oct`, `inicializarTarifas`.
+- **Menú `🚀 ProteinAgro` depurado:** conserva Homologar Rutas, Liquidar Pendientes, Organizar Puntos_Rutas y Habilitar Columnas Factura.
+- **Riesgo eliminado:** `inicializarTablasYCatalogos` e `inicializarPestanaTarifas` ejecutaban `clearContents()` sobre `Productos`, `Rutas`, `Puntos_Rutas` y `Tarifas`.
+- **PWA intacta:** `app.js`, `index.html`, `sw.js` y `CONCILIADOR.html` sin cambios. Acciones `getRecolecciones`, `updateRecoleccion`, `deleteRecoleccion`, `aplicarNovedadesConciliacion`, guardado `doPost` y RPC del Conciliador verificados activos.
+- **Respaldo:** `backups/Code_pre_limpieza_v1.9.2.gs`; migraciones históricas siguen como archivos independientes (`Migracion_Ruta1.gs`, `Migrar_Tarifas_Ruta1.gs`, `Reparar_Duplicados_Septiembre.gs`).
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
@@ -595,3 +603,6 @@ Al completar y verificar con éxito cualquier corrección, cambio de código o n
 2. **Generación de Respaldos:** Crear la carpeta `PROTEINAGRO_Backup_vX.X.X` y el archivo comprimido `PROTEINAGRO_BACKUP_vX.X.X_...zip` en la raíz.
 3. **Despliegue Inmediato:** Realizar `git add`, `git commit` descriptivo y `git push origin main` para publicación en Vercel.
 4. **Entrega Final:** Presentar al usuario la solución ya probada junto con la confirmación de que todo quedó respaldado, versionado y desplegado.
+
+> **v1.9.2 (complemento):** Retirado por completo el menu `🚀 ProteinAgro` de `onOpen()`. En Sheets solo queda el menu `📊 Conciliador`. Las funciones de mantenimiento (`homologarRutasYLimpiarSheet`, `liquidarRecoleccionesPendientes`, `restaurarEncabezadosPuntosRutas`, `garantizarEstructuraColumnasFactura`) siguen en el codigo porque las usan internamente el webhook y `doGet`.
+
