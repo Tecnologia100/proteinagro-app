@@ -470,6 +470,80 @@ label {
     color: var(--text-muted);
 }
 
+/* v1.9.2: Navegación práctica de la tabla "Recolecciones en Vivo"
+   - Barra horizontal superior sincronizada + botones ◀ ▶
+   - Contenedor con alto máximo: la barra inferior siempre queda visible en pantalla
+   - Encabezado fijo, columna Fecha fija a la izquierda y Acciones fija a la derecha */
+.table-scroll-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 6px;
+}
+.table-scroll-toolbar.is-hidden { display: none; }
+.table-top-scroll {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 16px;
+}
+.table-top-scroll-inner { height: 1px; }
+.btn-scroll-nav {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 28px;
+    border: 1px solid var(--border-color);
+    background: #f1f5f9;
+    color: #0f172a;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    line-height: 1;
+}
+.btn-scroll-nav:hover { background: #e2e8f0; }
+.btn-scroll-nav:disabled { opacity: 0.35; cursor: default; }
+
+.table-scroll-pro {
+    max-height: 70vh;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+.table-scroll-pro .admin-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #f8fafc;
+}
+.table-scroll-pro .admin-table tbody tr { background: #ffffff; }
+.table-scroll-pro .admin-table tbody td:first-child,
+.table-scroll-pro .admin-table tbody td:last-child {
+    position: sticky;
+    z-index: 2;
+    background: inherit;
+}
+.table-scroll-pro .admin-table thead th:first-child,
+.table-scroll-pro .admin-table thead th:last-child {
+    z-index: 4;
+}
+.table-scroll-pro .admin-table th:first-child,
+.table-scroll-pro .admin-table td:first-child {
+    position: sticky;
+    left: 0;
+    box-shadow: 2px 0 4px -2px rgba(15, 23, 42, 0.18);
+}
+.table-scroll-pro .admin-table th:last-child,
+.table-scroll-pro .admin-table td:last-child {
+    position: sticky;
+    right: 0;
+    box-shadow: -2px 0 4px -2px rgba(15, 23, 42, 0.18);
+}
+/* Celdas de mensaje (colspan) no deben quedar fijas */
+.table-scroll-pro .admin-table td[colspan] {
+    position: static;
+    box-shadow: none;
+}
+
 .badge {
     padding: 6px 12px;
     border-radius: 20px;

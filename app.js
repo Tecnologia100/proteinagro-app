@@ -4250,7 +4250,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.1&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.2&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -5592,12 +5592,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.9.1 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.9.2 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.9.1')
+            navigator.serviceWorker.register('/sw.js?v=1.9.2')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.9.1 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.9.2 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -5605,8 +5605,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.9.1 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.1&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.9.2 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.2&t=' + Date.now();
                                 }
                             };
                         }
@@ -5635,7 +5635,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.9.1&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.9.2&t=' + Date.now();
             }
         });
 
@@ -5644,7 +5644,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.1&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.2&t=' + Date.now();
                 }
             }
         });
@@ -6333,3 +6333,75 @@ procesarPuntosRutasDinamicos = function(puntosArray) {
     _original_procesarPuntosRutasDinamicos_cierre(puntosArray);
     actualizarSelectRutasCierre();
 };
+
+// ===================================================================================
+// v1.9.2: Barra de desplazamiento horizontal SUPERIOR sincronizada para la tabla
+// "Recolecciones en Vivo" + botones ◀ ▶ + soporte de rueda del mouse (Shift no requerido
+// sobre la barra superior). Evita bajar hasta el final de la tabla para moverse a la derecha.
+// ===================================================================================
+function inicializarScrollHorizontalSuperior(containerId, topScrollId, toolbarId) {
+    const container = document.getElementById(containerId);
+    const topScroll = document.getElementById(topScrollId);
+    const toolbar = document.getElementById(toolbarId);
+    if (!container || !topScroll || !toolbar) return;
+    const inner = topScroll.querySelector('.table-top-scroll-inner');
+    const table = container.querySelector('table');
+    const btnPrev = toolbar.querySelector('[data-scroll-dir="-1"]');
+    const btnNext = toolbar.querySelector('[data-scroll-dir="1"]');
+
+    const actualizarBotones = () => {
+        const maxScroll = container.scrollWidth - container.clientWidth;
+        if (btnPrev) btnPrev.disabled = container.scrollLeft <= 1;
+        if (btnNext) btnNext.disabled = container.scrollLeft >= maxScroll - 1;
+    };
+
+    const actualizarAncho = () => {
+        if (inner && table) inner.style.width = table.scrollWidth + 'px';
+        const hayDesborde = container.scrollWidth > container.clientWidth + 1;
+        toolbar.classList.toggle('is-hidden', !hayDesborde);
+        topScroll.scrollLeft = container.scrollLeft;
+        actualizarBotones();
+    };
+
+    topScroll.addEventListener('scroll', () => {
+        if (container.scrollLeft !== topScroll.scrollLeft) container.scrollLeft = topScroll.scrollLeft;
+    }, { passive: true });
+
+    container.addEventListener('scroll', () => {
+        actualizarBotones();
+        if (topScroll.scrollLeft !== container.scrollLeft) topScroll.scrollLeft = container.scrollLeft;
+    }, { passive: true });
+
+    // Rueda vertical sobre la barra superior => desplazamiento horizontal
+    topScroll.addEventListener('wheel', (e) => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault();
+            container.scrollLeft += e.deltaY;
+        }
+    }, { passive: false });
+
+    [btnPrev, btnNext].forEach(btn => {
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const dir = parseInt(btn.getAttribute('data-scroll-dir'), 10) || 1;
+            container.scrollBy({ left: dir * Math.max(200, container.clientWidth * 0.6), behavior: 'smooth' });
+        });
+    });
+
+    if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(actualizarAncho);
+        ro.observe(container);
+        if (table) ro.observe(table);
+    } else {
+        window.addEventListener('resize', actualizarAncho);
+    }
+    const tbody = table ? table.querySelector('tbody') : null;
+    if (tbody && typeof MutationObserver !== 'undefined') {
+        new MutationObserver(() => requestAnimationFrame(actualizarAncho)).observe(tbody, { childList: true, subtree: true });
+    }
+    actualizarAncho();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    inicializarScrollHorizontalSuperior('admin-table-scroll', 'admin-top-scroll', 'admin-scroll-toolbar');
+});
