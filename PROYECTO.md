@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.8.8`  
+> **Versión Actual:** `v=1.9.1`  
 > **Última Actualización:** Octubre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -945,6 +945,15 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 
 
+
+
+### 32. Automatización Integral de Novedades de Conciliación: Resolución 1-Clic y Sincronización Masiva en Google Sheets (v1.9.1)
+- **Opción 1 (Resolución 1-Clic por Renglón / Novedad):** Botones contextuales en la columna `DIAGNÓSTICO / NOVEDAD DEL DÍA` (`➕ Registrar en Sheets` para faltantes y `⚖️ Igualar a Proveedor` para desviaciones de peso) para registrar o actualizar de forma atómica en Google Sheets.
+- **Opción 2 (Sincronización Masiva con Casillas y Barra Flotante):** Casilla maestra en encabezado `<thead>` y casillas por fecha en `<tbody>` vinculadas a la barra de acciones `#barraAccionesNovedades`, permitiendo sincronizar múltiples novedades simultáneamente con un solo clic.
+- **Modal de Auditoría y Confirmación Preventiva (`#modalConfirmarNovedades`):** Previsualización estructurada de las operaciones a realizar con fecha, proveedor, punto, producto y kilos antes de impactar la base contable.
+- **Endpoint Backend en Google Apps Script (`Code.gs`):** Acción `action=aplicarNovedadesConciliacion` (en `doGet` y `doPost`) con control de concurrencia (`LockService.tryLock(25000)`), cálculo automático de precios/tarifas vigentes, auto-expansión dinámica de filas y sanitización contra inyección de fórmulas.
+- **Actualización en Memoria en Tiempo Real (Zero Reload):** Al sincronizar, el cliente actualiza `rawData` localmente y re-ejecuta la conciliación sin recargar la página, moviendo los registros a `🟢 Conciliados Exactos (100%)` y actualizando todos los contadores KPI y totales.
+- **Exportaciones Contables Preservadas:** Las exportaciones al portapapeles y archivos ExcelJS `.xlsx` omiten las columnas interactivas, garantizando matrices contables 100% limpias.
 
 ### 31. Selector Interactivo de Sucursal / Punto y Alineación de Matrices PDF sin Columna Fecha (v1.9.0)
 - **Selector Desplegable `#concSelectSucursal` (`📍 SUCURSAL / PUNTO`):** Permite elegir directamente la sucursal del proveedor (con conteo en vivo de recolecciones en el mes seleccionado), `✨ Todas las sucursales (Consolidado)`, `🔗 Cavasa + Sevillana Santa Elena` o `✏️ Escribir alias / filtro manual...`.

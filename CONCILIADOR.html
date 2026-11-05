@@ -549,7 +549,7 @@
     <div class="modal-overlay" id="modalConciliacion">
         <div class="modal-card">
             <div class="modal-header">
-                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.9.0 · Multi-Sucursal</span></h2>
+                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.9.1 · Sincronización Automática</span></h2>
                 <button class="modal-close-btn" onclick="cerrarModalConciliacion()" title="Cerrar ventana">✕</button>
             </div>
             <div class="modal-body">
@@ -742,6 +742,23 @@
                         <span id="cantResultadosMostrados" style="font-size: 0.85em; color: #64748b;"></span>
                     </div>
 
+                    <!-- Barra de Acciones Masivas de Novedades (Opción 2) -->
+                    <div id="barraAccionesNovedades" style="display: none; margin-bottom: 12px; padding: 10px 16px; background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 8px; color: white; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 1.3em;">⚡</span>
+                            <div>
+                                <span style="font-weight: 700; font-size: 0.95em; color: #f8fafc;" id="txtCantNovedadesSeleccionadas">0 novedades seleccionadas</span>
+                                <div style="font-size: 0.78em; color: #94a3b8;" id="txtDetalleNovedadesSeleccionadas">Marque los días o casillas para sincronizar masivamente con Google Sheets</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" onclick="deseleccionarTodasNovedades()" style="background: transparent; border: 1px solid #475569; color: #cbd5e1; padding: 6px 12px; border-radius: 6px; font-size: 0.82em; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">❌ Desmarcar</button>
+                            <button type="button" id="btnSincronizarMasivo" onclick="confirmarYAplicarNovedadesMasivas()" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 0.88em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(16,185,129,0.3); transition: all 0.2s;" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+                                <span>🚀 Sincronizar con Google Sheets (<span id="btnSincronizarMasivoCount">0</span>)</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Tabla de Resultados de Conciliación (Formato Matriz: Materias por Columnas) -->
                     <div style="overflow-x: auto; max-height: 460px; border: 1px solid #cbd5e1; border-radius: 8px;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.88em;">
@@ -752,6 +769,27 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIRMACIÓN DE SINCRONIZACIÓN DE NOVEDADES -->
+    <div id="modalConfirmarNovedades" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: #ffffff; border-radius: 12px; max-width: 650px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
+            <div style="padding: 16px 20px; background: #0f172a; color: white; display: flex; align-items: center; justify-content: space-between;">
+                <h3 style="margin: 0; font-size: 1.1em; display: flex; align-items: center; gap: 8px;" id="modalConfNovTitulo">
+                    🚀 Confirmar Sincronización con Google Sheets
+                </h3>
+                <button type="button" onclick="cerrarModalConfirmarNovedades()" style="background: transparent; border: none; color: #94a3b8; font-size: 1.2em; cursor: pointer;">✕</button>
+            </div>
+            <div style="padding: 16px 20px; overflow-y: auto; flex: 1;" id="modalConfNovCuerpo">
+                <!-- Contenido dinámico -->
+            </div>
+            <div style="padding: 14px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" onclick="cerrarModalConfirmarNovedades()" style="padding: 8px 16px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #475569; font-weight: 600; cursor: pointer;">Cancelar</button>
+                <button type="button" id="btnEjecutarSyncNovedades" style="padding: 8px 18px; border: none; border-radius: 6px; background: #10b981; color: #ffffff; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                    <span>✓ Confirmar y Sincronizar</span>
+                </button>
             </div>
         </div>
     </div>
@@ -768,6 +806,10 @@
         let allProveedores = [];
         let selectedProveedores = new Set();
         let isLoading = false;
+        const GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbx4X0yiSS7Tisgyn2Xn2NuAlB9uWRwAP019Jurc4TvSyBseg3un47xA2d6o0rFs0Y5o9A/exec";
+        let mapaNovedadesPorUid = {};
+        let novedadesSeleccionadasUids = new Set();
+        let modalConfirmacionCallback = null;
 
         function filtrarFilasFantasmaTotales(items) {
             if (!items || !items.length) return items;
@@ -1221,7 +1263,7 @@
 
             const cols = (table.cols || []).map(c => String(c ? (c.label || c.id) : '').toLowerCase().trim());
             
-            const colMap = { fecha: -1, proveedor: -1, punto: -1, materia: -1, kg: -1, precio: -1, valor: -1, id: -1, numFactura: -1, valorFactura: -1, fotoFactura: -1 };
+            const colMap = { fecha: -1, proveedor: -1, punto: -1, materia: -1, kg: -1, precio: -1, valor: -1, id: -1, ruta: -1, conductor: -1, observaciones: -1, numFactura: -1, valorFactura: -1, fotoFactura: -1 };
             for (let c = 0; c < cols.length; c++) {
                 const h = cols[c];
                 if (/fecha/i.test(h) && colMap.fecha === -1) colMap.fecha = c;
@@ -1232,17 +1274,24 @@
                 else if (/precio|tarifa/i.test(h) && colMap.precio === -1) colMap.precio = c;
                 else if (/^valor$/i.test(h) && colMap.valor === -1) colMap.valor = c;
                 else if (/^id/i.test(h) && colMap.id === -1) colMap.id = c;
+                else if (/^ruta/i.test(h) && colMap.ruta === -1) colMap.ruta = c;
+                else if (/conductor|chofer/i.test(h) && colMap.conductor === -1) colMap.conductor = c;
+                else if (/observ/i.test(h) && colMap.observaciones === -1) colMap.observaciones = c;
                 else if (/numero_factura|num_factura|factura/i.test(h) && !/valor|foto/i.test(h) && colMap.numFactura === -1) colMap.numFactura = c;
                 else if (/valor_factura/i.test(h) && colMap.valorFactura === -1) colMap.valorFactura = c;
                 else if (/foto_factura/i.test(h) && colMap.fotoFactura === -1) colMap.fotoFactura = c;
                 else if (/valor|total/i.test(h) && colMap.valor === -1) colMap.valor = c;
             }
 
+            if (colMap.id === -1) colMap.id = 0;
             if (colMap.fecha === -1) colMap.fecha = 1;
+            if (colMap.ruta === -1) colMap.ruta = 2;
+            if (colMap.conductor === -1) colMap.conductor = 3;
             if (colMap.proveedor === -1) colMap.proveedor = 4;
             if (colMap.punto === -1) colMap.punto = 5;
             if (colMap.materia === -1) colMap.materia = 6;
             if (colMap.kg === -1) colMap.kg = 7;
+            if (colMap.observaciones === -1) colMap.observaciones = 8;
             if (colMap.precio === -1) colMap.precio = 10;
             if (colMap.valor === -1) colMap.valor = 11;
             if (colMap.numFactura === -1) colMap.numFactura = 14;
@@ -1305,6 +1354,9 @@
                     PRECIO: precio,
                     VALOR: val,
                     ID: colMap.id !== -1 ? String(getVal(colMap.id)).trim() : '',
+                    RUTA: colMap.ruta !== -1 ? String(getVal(colMap.ruta)).trim() : '',
+                    CONDUCTOR: colMap.conductor !== -1 ? String(getVal(colMap.conductor)).trim() : '',
+                    OBSERVACIONES: colMap.observaciones !== -1 ? String(getVal(colMap.observaciones)).trim() : '',
                     NUMERO_FACTURA: colMap.numFactura !== -1 ? String(getVal(colMap.numFactura)).trim() : '',
                     VALOR_FACTURA: colMap.valorFactura !== -1 ? getNum(colMap.valorFactura) : 0,
                     FOTO_FACTURA: colMap.fotoFactura !== -1 ? String(getVal(colMap.fotoFactura)).trim() : ''
@@ -1324,6 +1376,9 @@
                         PRECIO: Number(cItem.PRECIO) || 0,
                         VALOR: Number(cItem.VALOR) || 0,
                         ID: String(cItem.ID || '').trim(),
+                        RUTA: String(cItem.RUTA || '').trim(),
+                        CONDUCTOR: String(cItem.CONDUCTOR || '').trim(),
+                        OBSERVACIONES: String(cItem.OBSERVACIONES || '').trim(),
                         NUMERO_FACTURA: String(cItem.NUMERO_FACTURA || '').trim(),
                         VALOR_FACTURA: Number(cItem.VALOR_FACTURA) || 0,
                         FOTO_FACTURA: String(cItem.FOTO_FACTURA || '').trim()
@@ -4470,9 +4525,379 @@
             });
         }
 
+        function normalizarTextoBusqueda(str) {
+            return String(str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        }
+
+        function obtenerRutaYConductorHabitual(proveedor, sucursal) {
+            let ruta = '';
+            let conductor = '';
+            const normProv = normalizarTextoBusqueda(proveedor || '');
+            const normSuc = normalizarTextoBusqueda(sucursal || '');
+
+            if (Array.isArray(rawData) && rawData.length > 0) {
+                for (let i = rawData.length - 1; i >= 0; i--) {
+                    const r = rawData[i];
+                    const pNorm = normalizarTextoBusqueda(r.PROVEEDOR || '');
+                    const sNorm = normalizarTextoBusqueda(r.PUNTO || '');
+                    const matchProv = pNorm && (pNorm.includes(normProv) || normProv.includes(pNorm));
+                    const matchSuc = !normSuc || (sNorm && (sNorm.includes(normSuc) || normSuc.includes(sNorm)));
+
+                    if (matchProv && matchSuc) {
+                        if (r.RUTA && !ruta) ruta = r.RUTA;
+                        if (r.CONDUCTOR && !conductor) conductor = r.CONDUCTOR;
+                        if (ruta && conductor) break;
+                    }
+                }
+                if (!ruta || !conductor) {
+                    for (let i = rawData.length - 1; i >= 0; i--) {
+                        const r = rawData[i];
+                        const pNorm = normalizarTextoBusqueda(r.PROVEEDOR || '');
+                        if (pNorm && (pNorm.includes(normProv) || normProv.includes(pNorm))) {
+                            if (r.RUTA && !ruta) ruta = r.RUTA;
+                            if (r.CONDUCTOR && !conductor) conductor = r.CONDUCTOR;
+                            if (ruta && conductor) break;
+                        }
+                    }
+                }
+            }
+
+            if (!ruta) {
+                if (normProv.includes('santa elena') || normProv.includes('cavasa') || normProv.includes('garay')) {
+                    ruta = 'RUTA 1: Santa Elena / Cavasa';
+                } else if (normProv.includes('cali')) {
+                    ruta = 'RUTA 2: Cali (Norte / Centro / Sur / Oriente)';
+                } else if (normProv.includes('palmira')) {
+                    ruta = 'RUTA 5: Palmira / Villagorgona / Carmelo';
+                } else {
+                    ruta = 'RUTA 1: Santa Elena / Cavasa';
+                }
+            }
+            if (!conductor) {
+                conductor = 'Conductor Asignado';
+            }
+            return { ruta, conductor };
+        }
+
+        function crearObjetoNovedad(tipo, datos) {
+            const uid = 'nov_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+            const nov = {
+                _uid: uid,
+                tipoNovedad: tipo, // 'FALTANTE' | 'DESVIACION'
+                dia: datos.dia,
+                sortKey: datos.sortKey,
+                fecha: datos.fecha,
+                producto: datos.producto,
+                kg_proveedor: datos.kg_proveedor,
+                kg_recoleccion: datos.kg_recoleccion || 0,
+                delta_kg: datos.delta_kg,
+                precio_unit: datos.precio_unit || 0,
+                valor_proveedor: datos.valor_proveedor || 0,
+                valor_recoleccion: datos.valor_recoleccion || 0,
+                delta_valor: datos.delta_valor || 0,
+                puntoDoc: datos.puntoDoc || '',
+                facturaDoc: datos.facturaDoc || '',
+                estado: datos.estado,
+                obs: datos.obs || '',
+                // Atributos para persistencia contable
+                id: datos.id || '',
+                rKey: datos.rKey || '',
+                diffKilos: datos.delta_kg,
+                kilosProveedor: datos.kg_proveedor,
+                kilosSistema: datos.kg_recoleccion || 0,
+                precio: datos.precio_unit || 0,
+                proveedor: datos.proveedor || currentProveedorDisplayName || '',
+                sucursal: datos.puntoDoc || '',
+                factura: datos.facturaDoc || '',
+                ruta: datos.ruta || '',
+                conductor: datos.conductor || ''
+            };
+            if (tipo === 'FALTANTE' && (!nov.ruta || !nov.conductor)) {
+                const hab = obtenerRutaYConductorHabitual(nov.proveedor, nov.sucursal);
+                if (!nov.ruta) nov.ruta = hab.ruta;
+                if (!nov.conductor) nov.conductor = hab.conductor;
+            }
+            mapaNovedadesPorUid[uid] = nov;
+            return nov;
+        }
+
+        function mostrarToastNotificacion(mensaje, tipo = 'success') {
+            let container = document.getElementById('concToastContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'concToastContainer';
+                container.style.cssText = 'position: fixed; bottom: 24px; right: 24px; z-index: 99999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;';
+                document.body.appendChild(container);
+            }
+            const toast = document.createElement('div');
+            const bg = tipo === 'success' ? '#10b981' : (tipo === 'error' ? '#ef4444' : '#3b82f6');
+            toast.style.cssText = `background: ${bg}; color: white; padding: 12px 18px; border-radius: 8px; font-size: 0.9em; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 8px; pointer-events: auto; opacity: 0; transform: translateY(10px); transition: all 0.3s ease;`;
+            toast.innerHTML = mensaje;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; }, 20);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 4500);
+        }
+
+        function onToggleRowCheckbox(fKeyEsc, isChecked) {
+            const fKey = decodeURIComponent(fKeyEsc);
+            const items = (conciliacionData && (conciliacionData[pestanaConciliacionActual] || conciliacionData.todos)) || [];
+            const { dateRows } = obtenerEstructuraMatrizConciliacion(items);
+            const dRow = dateRows.find(r => r.fKey === fKey);
+            if (dRow && dRow.novedades) {
+                dRow.novedades.forEach(nov => {
+                    if (isChecked) {
+                        novedadesSeleccionadasUids.add(nov._uid);
+                    } else {
+                        novedadesSeleccionadasUids.delete(nov._uid);
+                    }
+                });
+            }
+            actualizarBarraAccionesNovedades();
+        }
+
+        function toggleSeleccionarTodasNovedades(isChecked) {
+            const items = (conciliacionData && (conciliacionData[pestanaConciliacionActual] || conciliacionData.todos)) || [];
+            const { dateRows } = obtenerEstructuraMatrizConciliacion(items);
+            dateRows.forEach(dRow => {
+                if (dRow.novedades) {
+                    dRow.novedades.forEach(nov => {
+                        if (isChecked) {
+                            novedadesSeleccionadasUids.add(nov._uid);
+                        } else {
+                            novedadesSeleccionadasUids.delete(nov._uid);
+                        }
+                    });
+                }
+            });
+            document.querySelectorAll('.conc-row-checkbox').forEach(cb => { cb.checked = isChecked; });
+            actualizarBarraAccionesNovedades();
+        }
+
+        function deseleccionarTodasNovedades() {
+            novedadesSeleccionadasUids.clear();
+            const chkAll = document.getElementById('concCheckAllNovedades');
+            if (chkAll) chkAll.checked = false;
+            document.querySelectorAll('.conc-row-checkbox').forEach(cb => { cb.checked = false; });
+            actualizarBarraAccionesNovedades();
+        }
+
+        function actualizarBarraAccionesNovedades() {
+            const barra = document.getElementById('barraAccionesNovedades');
+            const txtCount = document.getElementById('txtCantNovedadesSeleccionadas');
+            const btnCount = document.getElementById('btnSincronizarMasivoCount');
+            const chkAll = document.getElementById('concCheckAllNovedades');
+            if (!barra) return;
+
+            const count = novedadesSeleccionadasUids.size;
+            if (count > 0) {
+                barra.style.display = 'flex';
+                if (txtCount) txtCount.innerText = `${count} novedad${count > 1 ? 'es' : ''} seleccionada${count > 1 ? 's' : ''}`;
+                if (btnCount) btnCount.innerText = count;
+            } else {
+                barra.style.display = 'none';
+                if (chkAll) chkAll.checked = false;
+            }
+        }
+
+        function confirmarYAplicarNovedadIndividual(uid) {
+            const nov = mapaNovedadesPorUid[uid];
+            if (!nov) {
+                alert('No se encontró la información de la novedad.');
+                return;
+            }
+            const accionTitulo = nov.tipoNovedad === 'FALTANTE' ? 'Registrar Faltante en Google Sheets' : 'Igualar Peso al Proveedor en Google Sheets';
+            mostrarModalConfirmacionNovedades(accionTitulo, [nov], async () => {
+                await ejecutarSincronizacionNovedades([nov]);
+            });
+        }
+
+        function confirmarYAplicarNovedadesMasivas() {
+            const uids = Array.from(novedadesSeleccionadasUids);
+            const lista = uids.map(u => mapaNovedadesPorUid[u]).filter(Boolean);
+            if (!lista.length) {
+                alert('Por favor selecciona al menos una novedad para sincronizar.');
+                return;
+            }
+            mostrarModalConfirmacionNovedades(`Sincronizar ${lista.length} Novedades en Google Sheets`, lista, async () => {
+                await ejecutarSincronizacionNovedades(lista);
+            });
+        }
+
+        function mostrarModalConfirmacionNovedades(titulo, listaNovedades, onConfirmar) {
+            const modal = document.getElementById('modalConfirmarNovedades');
+            const titEl = document.getElementById('modalConfNovTitulo');
+            const bodyEl = document.getElementById('modalConfNovCuerpo');
+            const btnSync = document.getElementById('btnEjecutarSyncNovedades');
+            if (!modal || !bodyEl) return;
+
+            if (titEl) titEl.innerHTML = `🚀 ${titulo}`;
+
+            let filasHtml = listaNovedades.map((nov) => {
+                const esFalt = nov.tipoNovedad === 'FALTANTE';
+                const color = esFalt ? '#ea580c' : '#d97706';
+                const icono = esFalt ? '➕ FALTANTE' : '⚖️ AJUSTE';
+                const detalle = esFalt
+                    ? `Se creará nuevo registro por <strong>${nov.kilosProveedor.toLocaleString('es-CO')} Kg</strong> en Recolecciones.`
+                    : `Se ajustará peso de <strong>${nov.kilosSistema.toLocaleString()} Kg</strong> ➔ <strong>${nov.kilosProveedor.toLocaleString()} Kg</strong> (Δ ${nov.diffKilos > 0 ? '+' : ''}${nov.diffKilos.toFixed(1)} Kg).`;
+
+                return `
+                    <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px;">
+                        <span style="font-size: 0.75em; font-weight: 800; background: ${color}; color: white; padding: 3px 6px; border-radius: 4px; white-space: nowrap;">${icono}</span>
+                        <div style="flex: 1; font-size: 0.86em; color: #1e293b;">
+                            <div><strong>${nov.fecha}</strong> · <strong>${nov.producto}</strong> (${nov.sucursal || nov.proveedor})</div>
+                            <div style="color: #64748b; font-size: 0.9em; margin-top: 2px;">${detalle}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            bodyEl.innerHTML = `
+                <div style="margin-bottom: 12px; font-size: 0.9em; color: #334155;">
+                    Se enviarán las siguientes operaciones directamente a la base de datos oficial en <strong>Google Sheets (Recolecciones)</strong>:
+                </div>
+                <div style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
+                    ${filasHtml}
+                </div>
+                <div style="margin-top: 12px; font-size: 0.82em; color: #64748b; background: #eff6ff; padding: 8px 12px; border-radius: 6px; border: 1px solid #bfdbfe;">
+                    💡 <strong>Actualización Inmediata:</strong> Al confirmar, la base contable se actualizará en Sheets y la matriz del Conciliador moverá automáticamente estos registros a 🟢 <em>Conciliados Exactos (100%)</em> sin recargar la página.
+                </div>
+            `;
+
+            modalConfirmacionCallback = onConfirmar;
+            btnSync.onclick = () => {
+                if (typeof modalConfirmacionCallback === 'function') {
+                    modalConfirmacionCallback();
+                }
+            };
+            modal.style.display = 'flex';
+        }
+
+        function cerrarModalConfirmarNovedades() {
+            const modal = document.getElementById('modalConfirmarNovedades');
+            if (modal) modal.style.display = 'none';
+            modalConfirmacionCallback = null;
+        }
+
+        async function enviarNovedadesConciliacionASheets(novedadesAEnviar) {
+            const payload = JSON.stringify({
+                action: 'aplicarNovedadesConciliacion',
+                novedades: novedadesAEnviar
+            });
+
+            try {
+                const response = await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `action=aplicarNovedadesConciliacion&payload=${encodeURIComponent(payload)}`
+                });
+
+                if (response.ok) {
+                    const resJson = await response.json();
+                    return resJson;
+                }
+            } catch (ePost) {
+                console.warn("Fallo POST a webhook, reintentando vía GET:", ePost);
+            }
+
+            const urlGet = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=aplicarNovedadesConciliacion&payload=${encodeURIComponent(payload)}`;
+            const responseGet = await fetch(urlGet);
+            if (!responseGet.ok) throw new Error(`HTTP error ${responseGet.status}`);
+            return await responseGet.json();
+        }
+
+        async function ejecutarSincronizacionNovedades(listaNovedades) {
+            const btnSync = document.getElementById('btnEjecutarSyncNovedades');
+            if (btnSync) {
+                btnSync.disabled = true;
+                btnSync.innerHTML = `<span>⏳ Sincronizando con Sheets...</span>`;
+            }
+
+            try {
+                const respuesta = await enviarNovedadesConciliacionASheets(listaNovedades);
+                if (respuesta && respuesta.result === 'success') {
+                    cerrarModalConfirmarNovedades();
+                    actualizarEstadoLocalTrasSincronizacion(listaNovedades, respuesta);
+                    mostrarToastNotificacion(`✅ ${listaNovedades.length} novedad${listaNovedades.length > 1 ? 'es' : ''} sincronizada${listaNovedades.length > 1 ? 's' : ''} con éxito en Google Sheets`);
+                    deseleccionarTodasNovedades();
+                } else {
+                    throw new Error((respuesta && respuesta.error) || 'Respuesta desconocida del servidor');
+                }
+            } catch (err) {
+                alert(`Error al sincronizar con Google Sheets: ${err.message || err.toString()}`);
+            } finally {
+                if (btnSync) {
+                    btnSync.disabled = false;
+                    btnSync.innerHTML = `<span>✓ Confirmar y Sincronizar</span>`;
+                }
+            }
+        }
+
+        function actualizarEstadoLocalTrasSincronizacion(novedadesAplicadas, respuestaServidor) {
+            const detalles = (respuestaServidor && respuestaServidor.detalles) || [];
+            const detallesPorUid = {};
+            detalles.forEach(d => { if (d._uid) detallesPorUid[d._uid] = d; });
+
+            novedadesAplicadas.forEach(nov => {
+                const det = detallesPorUid[nov._uid] || {};
+                if (nov.tipoNovedad === 'FALTANTE') {
+                    const nuevoId = det.id || ('REC-' + Date.now());
+                    const precioFinal = Number(det.precio !== undefined && det.precio !== '' ? det.precio : (nov.precio || 0));
+                    const kgFinal = Number(det.kg !== undefined ? det.kg : nov.kilosProveedor);
+                    const valorFinal = Number(det.valor !== undefined && det.valor !== '' ? det.valor : (kgFinal * precioFinal));
+
+                    rawData.push({
+                        ID: nuevoId,
+                        FECHA: nov.fecha,
+                        PROVEEDOR: nov.proveedor,
+                        PUNTO: nov.sucursal || '',
+                        MATERIA: det.producto || nov.producto,
+                        KG: kgFinal,
+                        PRECIO: precioFinal,
+                        VALOR: valorFinal,
+                        RUTA: nov.ruta || '',
+                        CONDUCTOR: nov.conductor || '',
+                        OBSERVACIONES: 'Conciliación Automática: Faltante Registrado',
+                        NUMERO_FACTURA: nov.factura || '',
+                        VALOR_FACTURA: 0,
+                        FOTO_FACTURA: ''
+                    });
+                } else if (nov.tipoNovedad === 'DESVIACION') {
+                    const kgTarget = Number(det.kgNuevo !== undefined ? det.kgNuevo : nov.kilosProveedor);
+                    let encontrado = false;
+                    if (nov.id) {
+                        const recExistente = rawData.find(r => r.ID === nov.id && (productosCoinciden(r.MATERIA, nov.producto) || !nov.producto));
+                        if (recExistente) {
+                            recExistente.KG = kgTarget;
+                            if (recExistente.PRECIO > 0) recExistente.VALOR = kgTarget * recExistente.PRECIO;
+                            encontrado = true;
+                        }
+                    }
+                    if (!encontrado) {
+                        const recExistente = rawData.find(r => r.FECHA === nov.fecha && productosCoinciden(r.MATERIA, nov.producto));
+                        if (recExistente) {
+                            recExistente.KG = kgTarget;
+                            if (recExistente.PRECIO > 0) recExistente.VALOR = kgTarget * recExistente.PRECIO;
+                        }
+                    }
+                }
+            });
+
+            // Re-ejecutar conciliación en memoria
+            ejecutarConciliacionUniversal(false);
+        }
+
         function ejecutarConciliacionUniversal(esCargaInicialArchivo = false) {
             if (!currentConcWorkbook) return;
             const wb = currentConcWorkbook;
+
+            // Inicializar / limpiar mapa de novedades y selección
+            mapaNovedadesPorUid = {};
+            novedadesSeleccionadasUids.clear();
+            actualizarBarraAccionesNovedades();
 
             // 1. Elegir pestaña del Excel
             const selHojaVal = document.getElementById('concSelectHoja')?.value || 'AUTO';
@@ -5127,11 +5552,11 @@
 
                 const key = `${dInfo.fechaStr}||${prodHom}`;
                 recAgrupado[key] = (recAgrupado[key] || 0) + kg;
-                recIndividuales.push({ key, kg, fecha: dInfo.fechaStr, prod: prodHom, mes: dInfo.mes, sortKey: dInfo.sortKey, id: r.ID || '', PUNTO: r.PUNTO || '' });
+                recIndividuales.push({ key, kg, fecha: dInfo.fechaStr, prod: prodHom, mes: dInfo.mes, sortKey: dInfo.sortKey, id: r.ID || '', PUNTO: r.PUNTO || '', ruta: r.RUTA || '', conductor: r.CONDUCTOR || '' });
                 let pDia = Number(r.PRECIO) || 0;
                 if (pDia > 0 && pDia < 20) pDia = Math.round(pDia * 1000);
                 if (pDia > 0) recPreciosDia[key] = pDia;
-                recMeta[key] = { ...dInfo, punto: r.PUNTO || '' };
+                recMeta[key] = { ...dInfo, punto: r.PUNTO || '', id: r.ID || '', ruta: r.RUTA || '', conductor: r.CONDUCTOR || '' };
             });
 
             // 6. Motor Forense Universal + Opción 2 (Smart Match por Peso y Fecha)
@@ -5314,7 +5739,7 @@
                             obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} ${ri.kg.toLocaleString()} Kg.`
                         });
                     } else {
-                        desviaciones.push({
+                        const nov = crearObjetoNovedad('DESVIACION', {
                             dia: item.dia, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
                             kg_proveedor: item.kg_proveedor, kg_recoleccion: ri.kg,
                             delta_kg: deltaKg, precio_unit: precio,
@@ -5323,11 +5748,15 @@
                             puntoDoc: ri.PUNTO || item.puntoDoc || sucursalActivaLabel || autoInfo.docPunto || '',
                             facturaDoc: item.facturaDoc,
                             estado: '🟡 Desviación (Lote ↔ ' + ri.fecha.slice(0, 5) + ')',
-                            obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} (${ri.kg.toLocaleString()} Kg, Δ ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(2)} Kg).`
+                            obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} (${ri.kg.toLocaleString()} Kg, Δ ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(2)} Kg).`,
+                            id: ri.id || '',
+                            rKey: ri.key,
+                            proveedor: nombreProveedorDisplay
                         });
+                        desviaciones.push(nov);
                     }
                 } else {
-                    faltantes.push({
+                    const nov = crearObjetoNovedad('FALTANTE', {
                         dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                         kg_proveedor: item.kg_proveedor, kg_recoleccion: 0,
                         delta_kg: -item.kg_proveedor, precio_unit: precio,
@@ -5335,8 +5764,10 @@
                         delta_valor: -valProv, estado: '🟠 Pendiente en Sistema',
                         puntoDoc: item.puntoDoc || sucursalActivaLabel || autoInfo.docPunto || '',
                         facturaDoc: item.facturaDoc,
-                        obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" facturado sin fecha exacta; no se encontró recolección con ese peso.`
+                        obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" facturado sin fecha exacta; no se encontró recolección con ese peso.`,
+                        proveedor: nombreProveedorDisplay
                     });
+                    faltantes.push(nov);
                 }
                 despKeysConsumidas.add(key);
             });
@@ -5430,7 +5861,7 @@
                             obs: 'Cuadre exacto dentro de la tolerancia de báscula.'
                         });
                     } else {
-                        desviaciones.push({
+                        const nov = crearObjetoNovedad('DESVIACION', {
                             dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                             kg_proveedor: item.kg_proveedor, kg_recoleccion: kgRec,
                             delta_kg: deltaKg, precio_unit: precio,
@@ -5439,8 +5870,14 @@
                             puntoDoc: item.puntoDoc || (recMeta[key] ? recMeta[key].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                             facturaDoc: item.facturaDoc || '',
                             estado: '🟡 Desviación de Peso',
-                            obs: `Diferencia de ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(1)} Kg entre factura proveedor y recolección.`
+                            obs: `Diferencia de ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(1)} Kg entre factura proveedor y recolección.`,
+                            id: (recMeta[key] ? recMeta[key].id : '') || '',
+                            rKey: key,
+                            ruta: (recMeta[key] ? recMeta[key].ruta : '') || '',
+                            conductor: (recMeta[key] ? recMeta[key].conductor : '') || '',
+                            proveedor: nombreProveedorDisplay
                         });
+                        desviaciones.push(nov);
                     }
                     despKeysConsumidas.add(key);
                     recKeysConsumidas.add(key);
@@ -5545,7 +5982,7 @@
                     const precio = item.precio_unit || recPreciosDia[cand.rKey] || preciosPlataforma[item.producto] || 0;
                     const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
                     const rawLabel = item.rawProdLabel || item.producto;
-                    desviaciones.push({
+                    const nov = crearObjetoNovedad('DESVIACION', {
                         dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                         kg_proveedor: item.kg_proveedor, kg_recoleccion: cand.kgRec,
                         delta_kg: deltaKg, precio_unit: precio,
@@ -5556,8 +5993,14 @@
                         estado: '🟡 Desviación (🧠 Smart Match Fecha)',
                         obs: `🧠 Emparejado en misma fecha: Excel "${rawLabel}" (${item.kg_proveedor.toLocaleString()} Kg) ↔ Sistema "${cand.rProd}" (${cand.kgRec.toLocaleString()} Kg).`,
                         _smartMatchRaw: rawLabel,
-                        _smartMatchTarget: cand.rProd
+                        _smartMatchTarget: cand.rProd,
+                        id: (recMeta[cand.rKey] ? recMeta[cand.rKey].id : '') || '',
+                        rKey: cand.rKey,
+                        ruta: (recMeta[cand.rKey] ? recMeta[cand.rKey].ruta : '') || '',
+                        conductor: (recMeta[cand.rKey] ? recMeta[cand.rKey].conductor : '') || '',
+                        proveedor: nombreProveedorDisplay
                     });
+                    desviaciones.push(nov);
                     despKeysConsumidas.add(key);
                     recKeysConsumidas.add(cand.rKey);
                 }
@@ -5570,7 +6013,7 @@
                 const precio = item.precio_unit || preciosPlataforma[item.producto] || 0;
                 const valProv = item.valor_proveedor > 0 ? item.valor_proveedor : (item.kg_proveedor * precio);
 
-                faltantes.push({
+                const nov = crearObjetoNovedad('FALTANTE', {
                     dia: item.dia, sortKey: item.sortKey, fecha: item.fecha, producto: item.producto,
                     kg_proveedor: item.kg_proveedor, kg_recoleccion: 0,
                     delta_kg: -item.kg_proveedor, precio_unit: precio,
@@ -5578,8 +6021,10 @@
                     delta_valor: -valProv, estado: '🟠 Pendiente en Sistema',
                     puntoDoc: item.puntoDoc || sucursalActivaLabel || autoInfo.docPunto || '',
                     facturaDoc: item.facturaDoc || '',
-                    obs: `Facturado por ${nombreProveedorDisplay} (como "${item.rawProdLabel || item.producto}"), pendiente de registro en recolecciones de plataforma.`
+                    obs: `Facturado por ${nombreProveedorDisplay} (como "${item.rawProdLabel || item.producto}"), pendiente de registro en recolecciones de plataforma.`,
+                    proveedor: nombreProveedorDisplay
                 });
+                faltantes.push(nov);
                 despKeysConsumidas.add(key);
             });
 
@@ -5728,12 +6173,19 @@
                         fecha: fechaLimpia,
                         sortKey: it.sortKey || 0,
                         sucursal: sucItem,
+                        fKey: fKey,
+                        novedades: [],
                         celdasPorProducto: {},
                         observacionesDia: [],
                         smartFixesDia: []
                     };
                 }
                 const rowObj = mapPorFecha[fKey];
+                if (it._uid && (it.tipoNovedad === 'FALTANTE' || it.tipoNovedad === 'DESVIACION')) {
+                    if (!rowObj.novedades.some(n => n._uid === it._uid)) {
+                        rowObj.novedades.push(it);
+                    }
+                }
                 if (etiquetaFacturaObs && !rowObj.observacionesDia.some(o => o.includes(etiquetaFacturaObs))) {
                     rowObj.observacionesDia.push(etiquetaFacturaObs);
                 }
@@ -5809,22 +6261,25 @@
 
             if (!items || !items.length) {
                 if (thead) {
-                    thead.innerHTML = `<tr style="background:#BDD7EE;"><th style="padding:10px;border:1px solid #94a3b8;">FECHA</th><th style="padding:10px;border:1px solid #94a3b8;">SUCURSAL</th><th style="padding:10px;border:1px solid #94a3b8;">MATERIAS</th></tr>`;
+                    thead.innerHTML = `<tr style="background:#BDD7EE;"><th style="padding:10px;border:1px solid #94a3b8; width:38px;"></th><th style="padding:10px;border:1px solid #94a3b8;">FECHA</th><th style="padding:10px;border:1px solid #94a3b8;">SUCURSAL</th><th style="padding:10px;border:1px solid #94a3b8;">MATERIAS</th></tr>`;
                 }
-                tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 30px; color: #94a3b8;">No hay registros en esta sección</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 30px; color: #94a3b8;">No hay registros en esta sección</td></tr>`;
                 return;
             }
 
             const { products, unitPrices, dateRows } = obtenerEstructuraMatrizConciliacion(items);
             const modoPestana = pestanaConciliacionActual === 'sobrantes' ? 'sistema' : 'default';
 
-            // 1. Renderizar Encabezado de Matriz (Idéntico al Conciliador: FECHA | SUCURSAL | MATERIA 1 | MATERIA 2 ... | DIAGNÓSTICO)
+            // 1. Renderizar Encabezado de Matriz con selector de casillas (Opción 2)
             if (thead) {
                 const thMaterias = products.map(p =>
                     `<th style="padding: 9px 10px; text-align: center; background: #BDD7EE; color: #000000; font-weight: 700; border: 1px solid #94a3b8; white-space: nowrap;">${p}</th>`
                 ).join('');
                 thead.innerHTML = `
                     <tr style="position: sticky; top: 0; z-index: 2;">
+                        <th style="padding: 9px 6px; text-align: center; background: #BDD7EE; color: #000000; font-weight: 700; border: 1px solid #94a3b8; width: 38px;">
+                            <input type="checkbox" id="concCheckAllNovedades" title="Seleccionar todas las novedades pendientes" onchange="toggleSeleccionarTodasNovedades(this.checked)" style="transform: scale(1.15); cursor: pointer;">
+                        </th>
                         <th style="padding: 9px 10px; text-align: center; background: #BDD7EE; color: #000000; font-weight: 700; border: 1px solid #94a3b8;">FECHA</th>
                         <th style="padding: 9px 10px; text-align: center; background: #BDD7EE; color: #000000; font-weight: 700; border: 1px solid #94a3b8;">SUCURSAL</th>
                         ${thMaterias}
@@ -5898,19 +6353,59 @@
                     ? dRow.observacionesDia.join(' | ')
                     : `<span style="color:#16a34a; font-weight:600;">✓ Conciliado exacto</span>`;
 
+                // Casilla de selección y botones de acción rápida para novedades (Opción 1 y Opción 2)
+                const tieneNovedades = dRow.novedades && dRow.novedades.length > 0;
+                let tdCheck = '';
+                let accionesNovedadesHtml = '';
+
+                if (tieneNovedades) {
+                    const fKeyEsc = encodeURIComponent(dRow.fKey);
+                    const todasMarcadas = dRow.novedades.every(n => novedadesSeleccionadasUids.has(n._uid));
+                    tdCheck = `<td style="padding: 7px 6px; text-align: center; border: 1px solid #cbd5e1; width: 38px; background: ${todasMarcadas ? '#fef3c7' : '#ffffff'};">
+                        <input type="checkbox" class="conc-row-checkbox" data-fkey="${fKeyEsc}" onchange="onToggleRowCheckbox('${fKeyEsc}', this.checked)" ${todasMarcadas ? 'checked' : ''} style="transform: scale(1.15); cursor: pointer;" title="Seleccionar novedades de ${dRow.fecha}">
+                    </td>`;
+
+                    dRow.novedades.forEach(nov => {
+                        const esFaltante = nov.tipoNovedad === 'FALTANTE';
+                        if (esFaltante) {
+                            accionesNovedadesHtml += `
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; padding: 4px 8px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px;">
+                                    <span style="color: #c2410c; font-weight: 700; font-size: 0.84em;">🟠 Faltan ${nov.kilosProveedor.toLocaleString('es-CO')} Kg ${nov.producto}</span>
+                                    <button type="button" class="btn-accion-novedad btn-accion-insertar" onclick="confirmarYAplicarNovedadIndividual('${nov._uid}')" style="background: #ea580c; color: #ffffff; border: none; padding: 4px 9px; border-radius: 5px; font-size: 0.80em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); white-space: nowrap; transition: transform 0.1s;" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='none'">
+                                        <span>➕ Registrar en Sheets</span>
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            const sign = nov.diffKilos > 0 ? '+' : '';
+                            accionesNovedadesHtml += `
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; padding: 4px 8px; background: #fefce8; border: 1px solid #fef08a; border-radius: 6px;">
+                                    <span style="color: #b45309; font-weight: 700; font-size: 0.84em;">🟡 Dif ${sign}${nov.diffKilos.toFixed(1)} Kg ${nov.producto} (Sis: ${nov.kilosSistema.toLocaleString()} ↔ Prov: ${nov.kilosProveedor.toLocaleString()})</span>
+                                    <button type="button" class="btn-accion-novedad btn-accion-ajustar" onclick="confirmarYAplicarNovedadIndividual('${nov._uid}')" style="background: #d97706; color: #ffffff; border: none; padding: 4px 9px; border-radius: 5px; font-size: 0.80em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); white-space: nowrap; transition: transform 0.1s;" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='none'">
+                                        <span>⚖️ Igualar a Proveedor</span>
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    });
+                } else {
+                    tdCheck = `<td style="padding: 7px 6px; text-align: center; border: 1px solid #cbd5e1; width: 38px; color: #cbd5e1; background: #fafafa;">-</td>`;
+                }
+
                 tr.innerHTML = `
+                    ${tdCheck}
                     <td style="padding: 7px 10px; text-align: center; border: 1px solid #cbd5e1; font-weight: 600; white-space: nowrap;">${dRow.fecha}</td>
                     <td style="padding: 7px 10px; text-align: center; border: 1px solid #cbd5e1; white-space: nowrap;">${dRow.sucursal}</td>
                     ${tdsMaterias}
-                    <td style="padding: 7px 10px; border: 1px solid #cbd5e1; font-size: 0.82em; color: #475569;">${obsTexto}${btnsFixHtml}</td>
+                    <td style="padding: 7px 10px; border: 1px solid #cbd5e1; font-size: 0.82em; color: #475569;">${obsTexto}${btnsFixHtml}${accionesNovedadesHtml}</td>
                 `;
                 tbody.appendChild(tr);
             });
 
-            // 3. Filas de Cierre idénticas al Conciliador: Fila Vacía, CANTIDAD, PRECIOS (en Rojo) y SUBTOTAL + TOTAL GENERAL (en Amarillo)
+            // 3. Filas de Cierre: Fila Vacía, CANTIDAD, PRECIOS (en Rojo) y SUBTOTAL + TOTAL GENERAL (en Amarillo)
             const trSep = document.createElement('tr');
             trSep.style.height = '10px';
-            trSep.innerHTML = `<td colspan="${products.length + 3}" style="border: 1px solid #cbd5e1; background: #f8fafc;"></td>`;
+            trSep.innerHTML = `<td colspan="${products.length + 4}" style="border: 1px solid #cbd5e1; background: #f8fafc;"></td>`;
             tbody.appendChild(trSep);
 
             // Fila CANTIDAD
@@ -5923,7 +6418,7 @@
                 return `<td style="padding: 8px 10px; text-align: right; border: 1px solid #94a3b8; font-weight: 700; color: #000000; font-variant-numeric: tabular-nums;">${kgP.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
             }).join('');
             trCantidad.innerHTML = `
-                <td colspan="2" style="padding: 8px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #000000;">CANTIDAD</td>
+                <td colspan="3" style="padding: 8px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #000000;">CANTIDAD</td>
                 ${tdsCant}
                 <td style="padding: 8px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #334155;">Total: ${totalGeneralKg.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Kg</td>
             `;
@@ -5944,7 +6439,7 @@
                         return `<td style="padding: 6px 10px; text-align: right; border: 1px solid #94a3b8; font-weight: 600; color: #1e3a8a; font-variant-numeric: tabular-nums;">${kgS.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${diffBadge}</td>`;
                     }).join('');
                     trCantSis.innerHTML = `
-                        <td colspan="2" style="padding: 6px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #1e3a8a;">CANTIDAD SISTEMA</td>
+                        <td colspan="3" style="padding: 6px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #1e3a8a;">CANTIDAD SISTEMA</td>
                         ${tdsCantSis}
                         <td style="padding: 6px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #1e3a8a;">Sistema: ${totSisKg.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Kg</td>
                     `;
@@ -5959,7 +6454,7 @@
                 return `<td style="padding: 8px 10px; text-align: right; border: 1px solid #94a3b8; font-weight: 700; color: #C00000; font-variant-numeric: tabular-nums;">${pr.toLocaleString('es-CO')}</td>`;
             }).join('');
             trPrecios.innerHTML = `
-                <td colspan="2" style="padding: 8px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #C00000;">PRECIOS</td>
+                <td colspan="3" style="padding: 8px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #C00000;">PRECIOS</td>
                 ${tdsPrec}
                 <td style="padding: 8px 10px; border: 1px solid #94a3b8;"></td>
             `;
@@ -5974,7 +6469,7 @@
                 return `<td style="padding: 8px 10px; text-align: right; border: 1px solid #94a3b8; font-weight: 700; color: #000000; font-variant-numeric: tabular-nums;">${sub.toLocaleString('es-CO')}</td>`;
             }).join('');
             trSubtotal.innerHTML = `
-                <td colspan="2" style="padding: 8px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #000000;">SUBTOTAL</td>
+                <td colspan="3" style="padding: 8px 10px; text-align: left; border: 1px solid #94a3b8; font-weight: 700; color: #000000;">SUBTOTAL</td>
                 ${tdsSub}
                 <td style="padding: 8px 12px; text-align: center; border: 2px solid #000000; background: #FFFF00; font-weight: 800; font-size: 1.05em; color: #000000; font-variant-numeric: tabular-nums;">$${granTotalPesos.toLocaleString('es-CO')}</td>
             `;

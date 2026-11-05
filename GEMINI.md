@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Noviembre 2026 (Versión 1.9.0)  
+> **Última Actualización:** Noviembre 2026 (Versión 1.9.1)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -548,6 +548,33 @@ i.fecha), consolidándose directamente en la fila de ese día.
   4. *Blindaje de Persistencia del Selector de Sucursal Antes y Después de Cargar Archivo:*
      - Se corrigió la condición en `ejecutarConciliacionUniversal(esCargaInicialArchivo)` y `poblarSelectorSucursalesConciliacion(mantenerSeleccion, sucursalForzada, mesOverride, anioOverride)` donde el paso de `''` (en lugar de `null`) evaluaba `'' !== null` como `true`, reseteando `selSuc.value` a `'ALL'` al cargar un archivo o al intentar cambiar de sucursal después de cargado.
      - Se incorporó `inferirProveedorPorSucursal(sucVal)` y fallback de sucursales en modo `'AUTO'` para que las opciones del selector nunca se vacíen ni pierdan la selección activa del usuario.
+
+---
+
+
+### 32. Automatización Integral de Novedades de Conciliación: Resolución 1-Clic y Sincronización Masiva en Google Sheets (`v1.9.1`)
+- **Problema Resuelto:**
+  - En el Conciliador de Proveedores (`CONCILIADOR.html`), cuando se detectaban novedades (Faltantes en Plataforma 🟠 o Desviaciones de Peso 🟡), el usuario tenía que transcribir y registrar manualmente cada fila en la hoja `Recolecciones` de Google Sheets.
+- **Solución Híbrida Implementada (Opción 1 + Opción 2):**
+  1. *Opción 1 (Resolución 1-Clic por Renglón / Novedad):*
+     - En la columna `DIAGNÓSTICO / NOVEDAD DEL DÍA`, cada novedad cuenta con un botón de acción rápida contextual:
+       - Para Faltantes: `➕ Registrar en Sheets` (crea un nuevo registro en `Recolecciones` con ID `REC-[timestamp]-[rand4]`, calculando precio y valor automáticamente).
+       - Para Desviaciones: `⚖️ Igualar a Proveedor` (actualiza los kilos registrados a los facturados por el proveedor, recalculando el valor y registrando trazabilidad en observaciones).
+  2. *Opción 2 (Sincronización Masiva con Casillas y Barra Flotante):*
+     - Columna de casillas de verificación en `<thead>` (casilla maestra para seleccionar/deseleccionar todo) y en cada fila de `<tbody>` con novedades.
+     - Barra de acciones `#barraAccionesNovedades` que se despliega automáticamente al seleccionar casillas: muestra el conteo de novedades seleccionadas y el botón `🚀 Sincronizar con Google Sheets (N)`.
+  3. *Modal de Auditoría y Confirmación Preventiva:*
+     - Antes de aplicar las operaciones, se despliega `#modalConfirmarNovedades` resumiendo las transacciones a persistir (kilos, fecha, proveedor, punto, producto y tipo de acción) para total seguridad operativa.
+  4. *Endpoint Backend en Google Apps Script (`Code.gs`):*
+     - Función `aplicarNovedadesConciliacionSheet(ss, rawPayload)` conectada en `doGet` y `doPost` con `action=aplicarNovedadesConciliacion`.
+     - Control de concurrencia con `LockService` (`tryLock(25000)`).
+     - Inserción en lote en `Recolecciones` (A:L y O:Q), auto-expansión dinámica de renglones si la cuadrícula se agota, cálculo de tarifas vigentes con fallback histórico y sanitización contra inyección de fórmulas.
+  5. *Actualización en Memoria en Tiempo Real (Zero Reload):*
+     - Al confirmarse la sincronización en Sheets, el cliente actualiza `rawData` localmente y re-ejecuta la conciliación sin recargar la página. Los registros resueltos pasan inmediatamente a `🟢 Conciliados Exactos (100%)`, actualizando los badges de conteo y la matriz de la tabla.
+  6. *Preservación Contable de Exportaciones:*
+     - La columna de casillas y los botones de acción rápida quedan aislados en la interfaz web, garantizando que el copiado al portapapeles (`Copiar Acta (Matriz)`) y la exportación Excel (`.xlsx`) mantengan la estructura contable limpia sin columnas adicionales.
+  7. *Sincronización Espejo:*
+     - Replicado en `G:\Mi unidad\Antigravity\PROTEINAGRO\CONCILIADOR.html`, `G:\Mi unidad\PROTEINAGRO\CONCILIADOR.html` y `G:\Mi unidad\Antigravity\CONCILIADOR\CONCILIADOR.html`.
 
 ---
 

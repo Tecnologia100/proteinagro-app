@@ -89,6 +89,12 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 0.088 Aplicar novedades automáticas desde Conciliador (v1.9.1)
+    if (e && e.parameter && e.parameter.action === 'aplicarNovedadesConciliacion') {
+      var payloadConc = e.parameter.payload || e.parameter.data || '';
+      return aplicarNovedadesConciliacionSheet(ss, payloadConc);
+    }
+
     // 0.09 Inicializar o sincronizar pestaña Tarifas (precios vigentes y pendientes)
     if (e && e.parameter && e.parameter.action === 'inicializarTarifas') {
       return inicializarPestanaTarifas(ss);
@@ -905,6 +911,292 @@ function actualizarRecoleccionSheet(ss, rawPayload) {
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==============================================================================
+// APLICACIÓN AUTOMÁTICA DE NOVEDADES DESDE CONCILIADOR (v1.9.1)
+// Soporta Opción 1 (1-clic individual) y Opción 2 (Sincronización masiva con lote)
+// Acciones: INSERTAR_FALTANTE (crea nueva fila en Recolecciones) y AJUSTAR_PESO (actualiza Kg y Valor)
+// ==============================================================================
+function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
+  try {
+    lockAcquired = lock.tryLock(25000);
+  } catch (eLock) {
+    lockAcquired = false;
+  }
+  if (!lockAcquired) {
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "error",
+      error: "El sistema contable está procesando otra transacción concurrente. Por favor intente en unos segundos."
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) throw new Error("No existe la hoja Recolecciones.");
+
+    var data = null;
+    if (typeof rawPayload === 'string') {
+      try { data = JSON.parse(rawPayload); } catch(e) { data = null; }
+    } else {
+      data = rawPayload;
+    }
+
+    if (!data) throw new Error("Payload no válido.");
+    var novedades = Array.isArray(data.novedades) ? data.novedades : (Array.isArray(data) ? data : [data]);
+    if (novedades.length === 0) throw new Error("No se suministraron novedades para aplicar.");
+
+    var lastRow = sheet.getLastRow();
+    var catalogoTarifas = cargarCatalogoTarifas(ss);
+    var catalogoHistorico = null;
+
+    // Indexar filas existentes para búsquedas rápidas por ID o combinación (Fecha + Proveedor + Punto + Producto)
+    var idRowIndexMap = {}; // id -> [rowIndex1, rowIndex2, ...]
+    var allData = [];
+    if (lastRow > 1) {
+      allData = sheet.getRange(2, 1, lastRow - 1, Math.min(sheet.getLastColumn(), 17)).getValues();
+      for (var r = 0; r < allData.length; r++) {
+        var rowId = String(allData[r][0] || '').trim();
+        if (rowId) {
+          if (!idRowIndexMap[rowId]) idRowIndexMap[rowId] = [];
+          idRowIndexMap[rowId].push(r + 2); // 1-based row index en hoja
+        }
+      }
+    }
+
+    var insertados = 0;
+    var actualizados = 0;
+    var detalles = [];
+    var filasNuevas = [];
+    var filasFactura = [];
+
+    // Determinar última fila con datos en Col B
+    var targetRow = 1;
+    if (lastRow > 1) {
+      var colBValues = sheet.getRange(1, 2, Math.max(lastRow, 2), 1).getValues();
+      for (var b = colBValues.length - 1; b >= 0; b--) {
+        if (colBValues[b][0] !== "" && colBValues[b][0] !== null) {
+          targetRow = b + 1;
+          break;
+        }
+      }
+    }
+
+    for (var i = 0; i < novedades.length; i++) {
+      var nov = novedades[i];
+      var tipo = String(nov.tipoNovedad || nov.tipo || '').toUpperCase().trim();
+      var prodNombre = String(nov.producto || nov.materia || '').trim();
+      var kgTarget = parseKilosNumero(nov.kilos !== undefined ? nov.kilos : (nov.kilosProveedor !== undefined ? nov.kilosProveedor : (nov.kg || 0)));
+      var prov = removerEmojisDecorativos(nov.proveedor || '');
+      var punto = nov.punto || nov.sucursal || '';
+      var ruta = nov.ruta || '';
+      var cond = nov.conductor || '';
+      var numFactura = String(nov.factura || nov.numeroFactura || nov.numero_factura || '').trim();
+
+      if (tipo === 'AJUSTAR_PESO' || tipo === 'DESVIACION') {
+        // Buscar fila existente para actualizar peso
+        var rowToUpdate = -1;
+        var rowArrIndex = -1;
+
+        if (nov.id && idRowIndexMap[nov.id]) {
+          var matchedRows = idRowIndexMap[nov.id];
+          for (var m = 0; m < matchedRows.length; m++) {
+            var rIdx = matchedRows[m];
+            var rowArray = allData[rIdx - 2];
+            var pHoja = String(rowArray[6] || '').trim();
+            if (productosCoinciden(pHoja, prodNombre) || matchedRows.length === 1) {
+              rowToUpdate = rIdx;
+              rowArrIndex = rIdx - 2;
+              break;
+            }
+          }
+        }
+
+        // Si no se ubicó por ID, buscar por Fecha + Proveedor + Producto
+        if (rowToUpdate === -1 && nov.fecha && allData.length > 0) {
+          var targetDateNorm = normalizarFechaDia(nov.fecha);
+          var targetProvNorm = normalizarTexto(prov);
+          var targetPuntoNorm = normalizarTexto(punto);
+          for (var ar = allData.length - 1; ar >= 0; ar--) {
+            var fHoja = normalizarFechaDia(allData[ar][1]);
+            var prHoja = normalizarTexto(allData[ar][4]);
+            var ptHoja = normalizarTexto(allData[ar][5]);
+            var pdHoja = String(allData[ar][6] || '').trim();
+
+            if (fHoja === targetDateNorm && productosCoinciden(pdHoja, prodNombre)) {
+              if (!targetProvNorm || prHoja.indexOf(targetProvNorm) !== -1 || targetProvNorm.indexOf(prHoja) !== -1) {
+                if (!targetPuntoNorm || ptHoja.indexOf(targetPuntoNorm) !== -1 || targetPuntoNorm.indexOf(ptHoja) !== -1) {
+                  rowToUpdate = ar + 2;
+                  rowArrIndex = ar;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (rowToUpdate !== -1) {
+          var rowData = allData[rowArrIndex];
+          var prevKg = parseKilosNumero(rowData[7]);
+          var prevPrecio = parsePrecioMoneda(rowData[10]);
+
+          if (prevPrecio === null || prevPrecio <= 0) {
+            var pTarifa = buscarPrecioEnCatalogoTarifas(catalogoTarifas, prov || rowData[4], punto || rowData[5], prodNombre);
+            if (pTarifa !== null && pTarifa > 0) {
+              prevPrecio = pTarifa;
+            } else {
+              if (!catalogoHistorico) catalogoHistorico = cargarHistoricoRecolecciones(ss);
+              prevPrecio = buscarPrecioEnHistorico(catalogoHistorico, prov || rowData[4], punto || rowData[5], prodNombre) || 0;
+            }
+          }
+
+          var nuevoValor = (prevPrecio > 0 && kgTarget > 0) ? Math.round(prevPrecio * kgTarget * 100) / 100 : '';
+          var prevObs = String(rowData[8] || '').trim();
+          var notaAjuste = "Ajustado por Conciliador Proveedor (Antes: " + prevKg + " Kg, Nuevo: " + kgTarget + " Kg)";
+          var obsFinal = prevObs ? (prevObs + " | " + notaAjuste) : notaAjuste;
+
+          // Actualizar Col H (Kg), I (Observaciones), K (Precio si estaba vacío), L (Valor)
+          sheet.getRange(rowToUpdate, 8).setValue(kgTarget);
+          sheet.getRange(rowToUpdate, 9).setValue(sanitizarParaHoja(capitalizarOracion(obsFinal)));
+          if (prevPrecio > 0) {
+            sheet.getRange(rowToUpdate, 11).setValue(prevPrecio);
+          }
+          sheet.getRange(rowToUpdate, 12).setValue(nuevoValor);
+
+          // Si vino factura y la celda Col O está vacía
+          if (numFactura && sheet.getMaxColumns() >= 15) {
+            var curFac = String(sheet.getRange(rowToUpdate, 15).getValue() || '').trim();
+            if (!curFac) {
+              sheet.getRange(rowToUpdate, 15).setValue(sanitizarParaHoja(numFactura));
+            }
+          }
+
+          // Actualizar en memoria local
+          allData[rowArrIndex][7] = kgTarget;
+          allData[rowArrIndex][8] = obsFinal;
+          allData[rowArrIndex][10] = prevPrecio;
+          allData[rowArrIndex][11] = nuevoValor;
+
+          actualizados++;
+          detalles.push({
+            id: rowData[0],
+            accion: 'AJUSTADO',
+            fila: rowToUpdate,
+            producto: prodNombre,
+            kgAnterior: prevKg,
+            kgNuevo: kgTarget,
+            valorNuevo: nuevoValor,
+            _uid: nov._uid || ''
+          });
+        } else {
+          detalles.push({
+            id: nov.id || '',
+            accion: 'NO_ENCONTRADO_PARA_AJUSTE',
+            producto: prodNombre,
+            _uid: nov._uid || ''
+          });
+        }
+      } else {
+        // INSERTAR_FALTANTE (o por defecto)
+        var newId = 'REC-' + new Date().getTime() + '-' + Math.floor(1000 + Math.random() * 9000);
+        var fechaStr = nov.fechaHora || nov.fecha || new Date().toLocaleString();
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(fechaStr).trim())) {
+          fechaStr = String(fechaStr).trim() + ' 12:00:00';
+        }
+
+        var precioItem = '';
+        var pTarifaNew = buscarPrecioEnCatalogoTarifas(catalogoTarifas, prov, punto, prodNombre);
+        if (pTarifaNew !== null && pTarifaNew > 0) {
+          precioItem = pTarifaNew;
+        } else {
+          if (!catalogoHistorico) catalogoHistorico = cargarHistoricoRecolecciones(ss);
+          precioItem = buscarPrecioEnHistorico(catalogoHistorico, prov, punto, prodNombre) || '';
+        }
+
+        var valorItem = '';
+        if (precioItem !== '' && !isNaN(parseFloat(precioItem)) && kgTarget > 0) {
+          valorItem = Math.round(parseFloat(precioItem) * kgTarget * 100) / 100;
+        }
+
+        var obsFaltante = nov.observaciones || ("Conciliación Automática: Faltante de " + (prov || 'Proveedor') + (numFactura ? " (Factura " + numFactura + ")" : ""));
+        var rutaFinal = homologarRuta(ruta);
+        var conductorFinal = aNombrePropio(cond);
+        var proveedorFinal = aNombrePropio(homologarProveedor(prov));
+        var puntoFinal = aNombrePropio(punto);
+        var prodNombreFinal = aNombrePropio(prodNombre);
+        var obsFinalIns = capitalizarOracion(obsFaltante);
+
+        filasNuevas.push([
+          sanitizarParaHoja(newId),
+          sanitizarParaHoja(fechaStr),
+          sanitizarParaHoja(rutaFinal),
+          sanitizarParaHoja(conductorFinal),
+          sanitizarParaHoja(proveedorFinal),
+          sanitizarParaHoja(puntoFinal),
+          sanitizarParaHoja(prodNombreFinal),
+          kgTarget,
+          sanitizarParaHoja(obsFinalIns),
+          'Conciliador Web (Auto)',
+          precioItem,
+          valorItem
+        ]);
+
+        filasFactura.push([
+          sanitizarParaHoja(numFactura),
+          '',
+          ''
+        ]);
+
+        insertados++;
+        detalles.push({
+          id: newId,
+          accion: 'INSERTADO',
+          producto: prodNombreFinal,
+          kg: kgTarget,
+          precio: precioItem,
+          valor: valorItem,
+          fecha: fechaStr,
+          _uid: nov._uid || ''
+        });
+      }
+    }
+
+    // Persistir filas nuevas en Recolecciones
+    if (filasNuevas.length > 0) {
+      var maxFilasActuales = sheet.getMaxRows();
+      var filaFinalRequerida = targetRow + filasNuevas.length;
+      if (filaFinalRequerida > maxFilasActuales) {
+        var filasFaltantes = filaFinalRequerida - maxFilasActuales;
+        sheet.insertRowsAfter(maxFilasActuales, Math.max(filasFaltantes, 200));
+      }
+      garantizarEstructuraColumnasFactura(sheet);
+
+      sheet.getRange(targetRow + 1, 1, filasNuevas.length, 12).setValues(filasNuevas);
+      sheet.getRange(targetRow + 1, 15, filasFactura.length, 3).setValues(filasFactura);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "success",
+      message: "Novedades de conciliación aplicadas exitosamente.",
+      insertados: insertados,
+      actualizados: actualizados,
+      detalles: detalles
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch(err) {
+    Logger.log("Error aplicando novedades de conciliación: " + err.toString());
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "error",
+      error: err.message || err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    if (lockAcquired) {
+      try { lock.releaseLock(); } catch(eRel) {}
+    }
   }
 }
 
@@ -2150,6 +2442,10 @@ function doPost(e) {
 
     if (action === 'updateRecoleccion') {
       return actualizarRecoleccionSheet(ss, payload);
+    }
+
+    if (action === 'aplicarNovedadesConciliacion') {
+      return aplicarNovedadesConciliacionSheet(ss, payload);
     }
 
     if (action === 'habilitarColumnasFactura' || action === 'desplazarColumnasFactura') {
