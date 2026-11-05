@@ -1986,15 +1986,6 @@ function onOpen() {
       .addSeparator()
       .addItem('⚙️ Configurar URL del Web App', 'configurarUrlWebApp')
       .addToUi();
-
-    // 2. Menú de Mantenimiento ProteinAgro (Herramientas Técnicas)
-    ui.createMenu('🚀 ProteinAgro')
-      .addItem('🧹 Homologar Rutas y Limpiar Kilos', 'homologarRutasYLimpiarSheet')
-      .addItem('💰 Liquidar Recolecciones Pendientes', 'liquidarRecoleccionesPendientes')
-      .addItem('📋 Organizar Rutas y Planta San Joaquín', 'restaurarEncabezadosPuntosRutas')
-      .addSeparator()
-      .addItem('🧾 Habilitar Columnas Factura Caribe (Desplazar a la derecha)', 'menuHabilitarColumnasFactura')
-      .addToUi();
   } catch (e) {
     Logger.log('Error creando menús: ' + e.toString());
   }
