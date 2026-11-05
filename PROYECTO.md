@@ -946,6 +946,11 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 
 
+### 31. Selector Interactivo de Sucursal / Punto y Alineación de Matrices PDF sin Columna Fecha (v1.9.0)
+- **Selector Desplegable `#concSelectSucursal` (`📍 SUCURSAL / PUNTO`):** Permite elegir directamente la sucursal del proveedor (con conteo en vivo de recolecciones en el mes seleccionado), `✨ Todas las sucursales (Consolidado)`, `🔗 Cavasa + Sevillana Santa Elena` o `✏️ Escribir alias / filtro manual...`.
+- **Homologación Multi-Sede (`homologarSucursalConciliador` / `coincideRegistroConSucursal`):** Normaliza variantes ortográficas históricas de puntos y filtra con precisión las recolecciones de la sede elegida.
+- **Lectura de Matrices PDF sin Encabezado `FECHA` (`procesarArchivoPDF`):** Detecta tablas PDF cuya primera celda de encabezado está vacía (como `Relación Octubre - La Sevillana.pdf`, 5.906,29 Kg / $3.790.560 COP) y alinea automáticamente sus columnas de productos, lotes y precios.
+
 ### 30. Erradicación de Falsos Positivos en Filtro de Filas Fantasma del Conciliador (v1.8.9)
 - **Diagnóstico y Causa Raíz:** Detección de eliminación errónea de registros reales (como `REC-1793369102221-6867` Desperdicio 20 Kg en Comercializadora R Y E) en `filtrarFilasFantasmaTotales` debido a que visitas de 2 productos con pesos similares (`|20.0 - 20.6| = 0.6 < 1.0`) eran confundidas con filas de suma total.
 - **Blindaje de ID con Entropía:** Registros generados por la app del conductor (`REC-[timestamp]-[rand4]`) están 100% blindados y excluidos de cualquier depuración sintética.

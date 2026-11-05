@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Octubre 2026 (Versión 1.8.9)  
+> **Última Actualización:** Noviembre 2026 (Versión 1.9.0)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -529,6 +529,22 @@ i.fecha), consolidándose directamente en la fila de ese día.
   2. *Delimitación Histórica Estricta a Septiembre 2026:* La heurística totalizadora solo aplica a la anomalía histórica de septiembre 2026 (`f.includes('/9/2026') || f.includes('/09/2026')`).
   3. *Restricción Matemática de Suma Totalizadora:* Para que una fila sea candidata a totalizador de un viaje, el grupo debe tener al menos 3 renglones (`grp.length >= 3`, `cnt >= 2`), peso significativo (`candKg >= 200 Kg`) y tener un identificador sintético terminado en `000` (`rid.endsWith('000')`).
   4. *Resultado:* Cero falsos positivos. Registros legítimos como `Desperdicio 20 Kg` y `Gordana 20.6 Kg` de Comercializadora R Y E se conservan y concilian con exactitud milimétrica.
+
+---
+
+### 31. Selector Interactivo de Sucursal / Punto y Alineación de Matrices PDF sin Columna Fecha (`v1.9.0`)
+- **Requerimiento y Diagnóstico:**
+  - El usuario solicitó poder elegir directamente la **Sucursal / Punto** en un selector desplegable dentro del modal *⚡ Auditoría y Conciliación Universal de Proveedores* (reemplazando el antiguo cuadro de texto plano `🔍 ALIAS / FILTRO SUCURSALES`).
+  - Adicionalmente, al cargar el archivo `Relación Octubre - La Sevillana.pdf` (`Hoja: Documento_PDF`), el sistema mostraba `Total Excel Proveedor: 0 Kg ($0 COP)` porque la tabla del PDF (`SEBO | GORDANA | PIELES | PIELES KILOS | HUESO RES | HUESO PROMO`) tiene la esquina superior izquierda vacía (sin la palabra `FECHA`), mientras que las filas inferiores de resumen sí incluyen una primera columna (`Cantidad`, `Precios`, `Facturar`), desplazando las columnas y provocando `foundFechaCol = -1`.
+- **Arquitectura de Solución Implementada (`CONCILIADOR.html` v1.9.0):**
+  1. *Selector Desplegable Dinámico `#concSelectSucursal` (`📍 SUCURSAL / PUNTO`):*
+     - Lista automáticamente todas las sucursales oficiales del proveedor seleccionado (`CATALOGO_SUCURSALES_POR_PROVEEDOR`) cruzadas en vivo con los puntos detectados en `Recolecciones`, mostrando el conteo de registros del período entre paréntesis (ej. `📍 Cavasa (5 reg.)`, `📍 Sevillana Santa Elena (25 reg.)`, `📍 Sevillana Guacarí (8 reg.)`, `📍 Sevillana Lourdes (24 reg.)`, `📍 Sevillana Palmira (5 reg.)`, `📍 Sevillana Pasoancho (24 reg.)`, `📍 Sevillana República De Israel (8 reg.)`).
+     - Incluye las opciones `✨ Todas las sucursales (Consolidado)`, `🔗 Cavasa + Sevillana Santa Elena` (agrupación rápida para boletines conjuntos de Sevillana) y `✏️ Escribir alias / filtro manual...` (que despliega `#concInputFiltroProv` bajo demanda).
+  2. *Homologación Inteligente de Sedes (`homologarSucursalConciliador` y `coincideRegistroConSucursal`):*
+     - Unifica variaciones ortográficas de la base de datos (ej. `Lasevillana Republica Irael` ➔ `Sevillana República De Israel`, `Sevillana Palmira / Villagorgona` ➔ `Sevillana Palmira`, `Cañaveral Ciudad Córdoba` ➔ `Cañaveral C. Córdoba`), garantizando que al elegir una sucursal se filtren con exactitud sus viajes en plataforma y se rotule el acta con esa sede.
+  3. *Alineación Automática de Matrices PDF sin Encabezado `FECHA` (`procesarArchivoPDF` Rama C):*
+     - Cuando una tabla PDF contiene 2 o más encabezados de materias conocidas pero carece de la etiqueta `FECHA` en su primera celda, el parser antepone `'FECHA'` a la fila de encabezados y `''` a las filas numéricas de lotes, alineándolas columna a columna con las filas de `Cantidad`, `Precios` y `Facturar`.
+     - Corrige simultáneamente las referencias `recMeta[rKey]` en las pasadas `3A` y `3B` del motor Smart Match.
 
 ---
 

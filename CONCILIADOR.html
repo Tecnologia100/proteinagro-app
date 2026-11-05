@@ -549,7 +549,7 @@
     <div class="modal-overlay" id="modalConciliacion">
         <div class="modal-card">
             <div class="modal-header">
-                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.8.9 · Multi-Sucursal</span></h2>
+                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:#10b981; color:#ffffff; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700;">v1.9.0 · Multi-Sucursal</span></h2>
                 <button class="modal-close-btn" onclick="cerrarModalConciliacion()" title="Cerrar ventana">✕</button>
             </div>
             <div class="modal-body">
@@ -562,8 +562,11 @@
                         </select>
                     </div>
                     <div style="flex: 1.2; min-width: 180px;">
-                        <label style="display: block; font-size: 0.78em; font-weight: 700; color: #475569; margin-bottom: 4px; text-transform: uppercase;" title="Palabras clave para agrupar sucursales o excluir con ! (ej: SANTA ELENA, !SEVILLANA)">🔍 Alias / Filtro Sucursales</label>
-                        <input type="text" id="concInputFiltroProv" placeholder="Auto (ej: FRIGORIVALLE o !SEVILLANA)" onchange="recalcularSiHayArchivo()" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88em; background: #fff;">
+                        <label style="display: block; font-size: 0.78em; font-weight: 700; color: #475569; margin-bottom: 4px; text-transform: uppercase;" title="Elige una sucursal específica del proveedor, todas las sucursales o un filtro personalizado">📍 Sucursal / Punto</label>
+                        <select id="concSelectSucursal" onchange="onCambioSucursalConciliacion()" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9em; background: #fff; font-weight: 600; color: #0f172a;">
+                            <option value="ALL">✨ Todas las sucursales (Consolidado)</option>
+                        </select>
+                        <input type="text" id="concInputFiltroProv" placeholder="Filtro manual (ej: FRIGORIVALLE o !SEVILLANA)" onchange="recalcularSiHayArchivo()" style="display: none; width: 100%; margin-top: 5px; padding: 6px 10px; border: 1px solid #94a3b8; border-radius: 6px; font-size: 0.84em; background: #fff;">
                     </div>
                     <div style="flex: 1; min-width: 150px;">
                         <label style="display: block; font-size: 0.78em; font-weight: 700; color: #475569; margin-bottom: 4px; text-transform: uppercase;">📑 Pestaña del Excel</label>
@@ -573,7 +576,7 @@
                     </div>
                     <div style="flex: 0.9; min-width: 135px;">
                         <label style="display: block; font-size: 0.78em; font-weight: 700; color: #475569; margin-bottom: 4px; text-transform: uppercase;">📅 Mes a Conciliar</label>
-                        <select id="concSelectMes" onchange="recalcularSiHayArchivo()" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9em; background: #fff;">
+                        <select id="concSelectMes" onchange="onCambioPeriodoConciliacion()" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9em; background: #fff;">
                             <option value="AUTO">✨ Auto-detectar</option>
                             <option value="1">Enero</option>
                             <option value="2">Febrero</option>
@@ -592,7 +595,7 @@
                     </div>
                     <div style="flex: 0.6; min-width: 90px;">
                         <label style="display: block; font-size: 0.78em; font-weight: 700; color: #475569; margin-bottom: 4px; text-transform: uppercase;">📆 Año</label>
-                        <select id="concSelectAnio" onchange="recalcularSiHayArchivo()" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9em; background: #fff;">
+                        <select id="concSelectAnio" onchange="onCambioPeriodoConciliacion()" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9em; background: #fff;">
                             <option value="2026">2026</option>
                             <option value="2025">2025</option>
                             <option value="2024">2024</option>
@@ -1117,6 +1120,8 @@
                     selConc.value = 'AUTO';
                     const inpFiltro = document.getElementById('concInputFiltroProv');
                     if (inpFiltro) inpFiltro.value = '';
+                    const selSuc = document.getElementById('concSelectSucursal');
+                    if (selSuc) selSuc.value = 'ALL';
                     currentProveedorDisplayName = 'Proveedor';
                 }
             }
@@ -1125,6 +1130,9 @@
             buildProveedorCheckboxes();
             if (typeof poblarSelectorProveedoresConciliacion === 'function') {
                 poblarSelectorProveedoresConciliacion();
+            }
+            if (typeof poblarSelectorSucursalesConciliacion === 'function') {
+                poblarSelectorSucursalesConciliacion(true);
             }
 
             // Refrescar label y métricas/tablas si la selección anterior quedó huérfana
@@ -3260,6 +3268,308 @@
 
         cargarMemoriaProveedores();
 
+        const CATALOGO_SUCURSALES_POR_PROVEEDOR = {
+            'Sevillana': [
+                'Cavasa',
+                'Sevillana Santa Elena',
+                'Sevillana Guacarí',
+                'Sevillana Lourdes',
+                'Sevillana Palmira / Villagorgona',
+                'Sevillana Pasoancho',
+                'Sevillana República de Israel',
+                'Sevillana Frigorivalle',
+                'Sevillana Israel Plaza'
+            ],
+            'Supertienda Cañaveral': [
+                'Cañaveral Matadero',
+                'Cañaveral Punto 14',
+                'Cañaveral Centenario',
+                'Cañaveral Prados del Norte',
+                'Cañaveral Álamos',
+                'Cañaveral Los Pinos',
+                'Cañaveral La Primera',
+                'Cañaveral Villanueva',
+                'Cañaveral Cootraemcali',
+                'Cañaveral Pance',
+                'Cañaveral Tuluá',
+                'Cañaveral Buga Albergue',
+                'Cañaveral Buga Merino',
+                'Cañaveral Zarzal',
+                'Cañaveral Roldanillo',
+                'Cañaveral Palmitex (Palmira)',
+                'Cañaveral Palmicentro (Palmira)',
+                'Cañaveral Villagorgona 1',
+                'Cañaveral Villagorgona 2',
+                'Cañaveral Ingenio',
+                'Cañaveral Limonar',
+                'Cañaveral Pasoancho'
+            ],
+            'Caribe': [
+                'Cavasa',
+                'Caribe Buga',
+                'Puerto Tejada Centro',
+                'Puerto Tejada Punto 2',
+                'Villa Rica Caribe',
+                'Jamundí Principal',
+                'Jamundí Centro',
+                'Jamundí Surtimayorista',
+                'Jamundí Farallones',
+                'Jamundí Rosario',
+                'Jamundí Terranova',
+                'Jamundí Panamericana',
+                'Caribe el Dorado Jamundi'
+            ],
+            'Migan Capital': [
+                'Cavasa',
+                'La Montaña Av. 6A',
+                'La Montaña Torres',
+                'La Montaña Calima',
+                'La Montaña Guadalupe',
+                'La Montaña Cosmocentro',
+                'La Montaña Cristales',
+                'La Montaña Decepaz',
+                'La Montaña Morichal',
+                'La Montaña Palmira',
+                'La Montaña Pasoancho',
+                'Buenaventura'
+            ],
+            'Belalcazar': [
+                'B1-Principal (Carrera 5 # 5-48)',
+                'B2- Galeria (Calle 9 # 2-26)',
+                'B3- Planta Belomo (Carrera 4 # 14-66)',
+                'B5- Guacanda (Transversal 6 # 13-194)',
+                'B6- Rozo (Calle 10 N # 14 A 211 Rozo- Palmira)',
+                'B8- Bolivar (Carrera 3 # 13-44)',
+                'B9- Uribe (Carrera 12 # 11-03)',
+                'B11- Guabinas (Calle 8 #19 B 55)'
+            ],
+            'Ciudad del Campo': [
+                'Ciudad del Campo Granahorrar',
+                'Ciudad del Campo Punto Rojo',
+                'Ciudad del Campo Surtimercar'
+            ],
+            'Bodega Santa Elena': [
+                'Santa Elena'
+            ]
+        };
+
+        function normalizarTextoSucursal(str) {
+            return String(str || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+        }
+
+        function homologarSucursalConciliador(puntoRaw, provRaw) {
+            const pu = normalizarTextoSucursal(puntoRaw);
+            const pv = normalizarTextoSucursal(provRaw);
+            const esSevillana = pv.includes('SEVILLANA') || pu.includes('SEVILLANA');
+
+            if (esSevillana) {
+                if (pu.includes('PALMIRA') || pu.includes('VILLAGORGONA') || pu.includes('RICARDO GIL') || pv.includes('PALMIRA')) return 'Sevillana Palmira / Villagorgona';
+                if (pu.includes('GUACARI') || pu.includes('GUACARY') || pv.includes('GUACARI') || pv.includes('GUACARY')) return 'Sevillana Guacarí';
+                if (pu.includes('LOURDES') || pv.includes('LOURDES')) return 'Sevillana Lourdes';
+                if (pu.includes('PASOANCHO') || pv.includes('PASOANCHO')) return 'Sevillana Pasoancho';
+                if (pu.includes('REPUBLICA') || pu.includes('IRAEL') || pv.includes('REPUBLICA')) return 'Sevillana República de Israel';
+                if (pu.includes('ISRAEL PLAZA') || pv.includes('ISRAEL PLAZA')) return 'Sevillana Israel Plaza';
+                if (pu.includes('SANTA ELENA') || pu.includes('SANTA HELENA') || pv.includes('SANTA ELENA') || pv.includes('SANTA HELENA')) return 'Sevillana Santa Elena';
+                if (pu.includes('FRIGORIVALLE') || pv.includes('FRIGORIVALLE')) return 'Sevillana Frigorivalle';
+                if (pu.includes('CAVASA') || pv.includes('CAVASA') || pv.includes('DERIVADOS')) return 'Cavasa';
+            }
+
+            if (!puntoRaw || !String(puntoRaw).trim()) return '';
+            const rawTrim = String(puntoRaw).trim();
+            if (/^B1-/i.test(rawTrim)) return 'B1-Principal (Carrera 5 # 5-48)';
+            if (/^B2-/i.test(rawTrim)) return 'B2- Galeria (Calle 9 # 2-26)';
+            if (/^B3-/i.test(rawTrim)) return 'B3- Planta Belomo (Carrera 4 # 14-66)';
+            if (/^B5-/i.test(rawTrim)) return 'B5- Guacanda (Transversal 6 # 13-194)';
+            if (/^B6-/i.test(rawTrim)) return 'B6- Rozo (Calle 10 N # 14 A 211 Rozo- Palmira)';
+            if (/^B8-/i.test(rawTrim)) return 'B8- Bolivar (Carrera 3 # 13-44)';
+            if (/^B9-/i.test(rawTrim)) return 'B9- Uribe (Carrera 12 # 11-03)';
+            if (/^B11-/i.test(rawTrim)) return 'B11- Guabinas (Calle 8 #19 B 55)';
+            return rawTrim;
+        }
+
+        function coincideRegistroConSucursal(r, filtroSucursal) {
+            if (!filtroSucursal || filtroSucursal === 'ALL' || filtroSucursal === '__CUSTOM__') return true;
+            if (filtroSucursal === 'CAVASA_Y_SANTA_ELENA') {
+                return coincideRegistroConSucursal(r, 'Cavasa') || coincideRegistroConSucursal(r, 'Sevillana Santa Elena');
+            }
+            const sucHom = homologarSucursalConciliador(r.PUNTO, r.PROVEEDOR);
+            const fNorm = normalizarTextoSucursal(filtroSucursal);
+            const sNorm = normalizarTextoSucursal(sucHom);
+            const pu = normalizarTextoSucursal(r.PUNTO);
+            const pv = normalizarTextoSucursal(r.PROVEEDOR);
+
+            if (sNorm && sNorm === fNorm) return true;
+            if (pu && pu === fNorm) return true;
+
+            if (fNorm.includes('PALMIRA') || fNorm.includes('VILLAGORGONA')) {
+                if (pv.includes('SEVILLANA') || fNorm.includes('SEVILLANA')) {
+                    return pu.includes('PALMIRA') || pu.includes('VILLAGORGONA') || pu.includes('RICARDO GIL') || pv.includes('PALMIRA');
+                }
+                return pu.includes('PALMIRA') || pu.includes('VILLAGORGONA');
+            }
+            if (fNorm === 'CAVASA' || fNorm === 'SEVILLANA CAVASA') {
+                return pu.includes('CAVASA') || pv.includes('CAVASA') || pv.includes('DERIVADOS');
+            }
+            if (fNorm.includes('GUACARI') || fNorm.includes('GUACARY')) {
+                return pu.includes('GUACARI') || pu.includes('GUACARY') || pv.includes('GUACARI') || pv.includes('GUACARY');
+            }
+            if (fNorm.includes('LOURDES')) {
+                return pu.includes('LOURDES') || pv.includes('LOURDES');
+            }
+            if (fNorm.includes('PASOANCHO')) {
+                return pu.includes('PASOANCHO') || pv.includes('PASOANCHO');
+            }
+            if (fNorm.includes('ISRAEL')) {
+                return pu.includes('ISRAEL') || pu.includes('IRAEL') || pu.includes('REPUBLICA') || pv.includes('ISRAEL') || pv.includes('REPUBLICA');
+            }
+            if (fNorm.includes('SANTA ELENA') || fNorm.includes('SANTA HELENA')) {
+                return pu.includes('SANTA ELENA') || pu.includes('SANTA HELENA') || pv.includes('SANTA ELENA') || pv.includes('SANTA HELENA');
+            }
+            if (fNorm.includes('FRIGORIVALLE')) {
+                return pu.includes('FRIGORIVALLE') || pv.includes('FRIGORIVALLE') || pu.includes('MATADERO');
+            }
+
+            const mBel = fNorm.match(/^(B\d+)\s*-/);
+            if (mBel) {
+                return pu.startsWith(mBel[1] + '-') || pu.startsWith(mBel[1] + ' ');
+            }
+
+            if (fNorm.length >= 4 && (pu.includes(fNorm) || (pu.length >= 4 && fNorm.includes(pu)))) {
+                return true;
+            }
+            return false;
+        }
+
+        function obtenerProveedorFamiliaBase(provVal) {
+            if (!provVal || provVal === 'AUTO') return '';
+            if (provVal === 'BODEGA_SANTA_ELENA') return 'Bodega Santa Elena';
+            const pNorm = normalizarTextoSucursal(provVal);
+            if (pNorm.includes('SEVILLANA')) return 'Sevillana';
+            if (pNorm.includes('CANAVERAL') && !pNorm.includes('FRIGORIVALLE') && !pNorm.includes('OLIMPICA')) return 'Supertienda Cañaveral';
+            if (pNorm.includes('CARIBE')) return 'Caribe';
+            if (pNorm.includes('MIGAN')) return 'Migan Capital';
+            if (pNorm.includes('BELALCAZAR')) return 'Belalcazar';
+            if (pNorm.includes('CIUDAD DEL CAMPO')) return 'Ciudad del Campo';
+            return provVal;
+        }
+
+        function poblarSelectorSucursalesConciliacion(mantenerSeleccion = true, sucursalForzada = null) {
+            const selSuc = document.getElementById('concSelectSucursal');
+            const selProv = document.getElementById('concSelectProveedor');
+            const inpFiltro = document.getElementById('concInputFiltroProv');
+            if (!selSuc) return;
+
+            const valorPrevio = sucursalForzada !== null ? sucursalForzada : (mantenerSeleccion ? (selSuc.value || 'ALL') : 'ALL');
+            const provSelVal = selProv ? (selProv.value || 'AUTO') : 'AUTO';
+
+            let provActivo = '';
+            let filtroProvBase = '';
+            if (provSelVal === 'BODEGA_SANTA_ELENA') {
+                provActivo = 'Bodega Santa Elena';
+                filtroProvBase = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
+            } else if (provSelVal !== 'AUTO') {
+                provActivo = obtenerProveedorFamiliaBase(provSelVal);
+                filtroProvBase = provActivo;
+            } else if (currentProveedorDisplayName && currentProveedorDisplayName !== 'Proveedor') {
+                provActivo = obtenerProveedorFamiliaBase(currentProveedorDisplayName);
+                filtroProvBase = provActivo;
+            } else if (selectedProveedores && selectedProveedores.size === 1) {
+                provActivo = obtenerProveedorFamiliaBase([...selectedProveedores][0]);
+                filtroProvBase = provActivo;
+            }
+
+            const selMesVal = document.getElementById('concSelectMes')?.value || 'AUTO';
+            const selAnioVal = document.getElementById('concSelectAnio')?.value || '2026';
+            const mesFiltro = (selMesVal !== 'AUTO' && selMesVal !== 'ALL') ? Number(selMesVal) : null;
+            const anioFiltro = Number(selAnioVal) || 2026;
+
+            const conteoPorSucursal = {};
+            let totalRegistrosProv = 0;
+            const sucursalesSet = new Set();
+
+            if (provActivo && CATALOGO_SUCURSALES_POR_PROVEEDOR[provActivo]) {
+                CATALOGO_SUCURSALES_POR_PROVEEDOR[provActivo].forEach(s => sucursalesSet.add(s));
+            }
+
+            if (Array.isArray(rawData) && rawData.length > 0) {
+                rawData.forEach(r => {
+                    if (filtroProvBase && !coincideProveedorConFiltro(r.PROVEEDOR, filtroProvBase)) return;
+                    if (mesFiltro) {
+                        const dInfo = parsearFechaCeldaUniversal(r.FECHA, mesFiltro, anioFiltro);
+                        if (!dInfo || dInfo.mes !== mesFiltro || dInfo.anio !== anioFiltro) return;
+                    }
+                    totalRegistrosProv++;
+                    const sHom = homologarSucursalConciliador(r.PUNTO, r.PROVEEDOR);
+                    if (sHom) {
+                        sucursalesSet.add(sHom);
+                        conteoPorSucursal[sHom] = (conteoPorSucursal[sHom] || 0) + 1;
+                    }
+                });
+            }
+
+            const listaSucursales = [...sucursalesSet].filter(Boolean).sort((a, b) => {
+                const cA = conteoPorSucursal[a] || 0;
+                const cB = conteoPorSucursal[b] || 0;
+                if (cB !== cA) return cB - cA;
+                return a.localeCompare(b, 'es', { sensitivity: 'base' });
+            });
+
+            const sufijoTotal = (provActivo && totalRegistrosProv > 0) ? ` (${totalRegistrosProv} reg.)` : '';
+            let html = `<option value="ALL">✨ Todas las sucursales${sufijoTotal}</option>`;
+
+            if (provActivo === 'Sevillana') {
+                const cntComb = (conteoPorSucursal['Cavasa'] || 0) + (conteoPorSucursal['Sevillana Santa Elena'] || 0);
+                const lblComb = cntComb > 0 ? ` (${cntComb} reg.)` : '';
+                html += `<option value="CAVASA_Y_SANTA_ELENA">🔗 Cavasa + Sevillana Santa Elena${lblComb}</option>`;
+            }
+
+            if (listaSucursales.length > 0) {
+                const labelGrupo = provActivo ? `📍 Sucursales de ${provActivo}` : `📍 Sucursales en Plataforma`;
+                html += `<optgroup label="${labelGrupo}">`;
+                listaSucursales.forEach(s => {
+                    const cnt = conteoPorSucursal[s] || 0;
+                    const badgeCnt = cnt > 0 ? ` (${cnt} reg.)` : '';
+                    html += `<option value="${s.replace(/"/g, '&quot;')}">📍 ${s}${badgeCnt}</option>`;
+                });
+                html += `</optgroup>`;
+            }
+
+            html += `<optgroup label="⚙️ Filtro Avanzado">`;
+            html += `<option value="__CUSTOM__">✏️ Escribir alias / filtro manual...</option>`;
+            html += `</optgroup>`;
+
+            selSuc.innerHTML = html;
+
+            if ([...selSuc.options].some(o => o.value === valorPrevio)) {
+                selSuc.value = valorPrevio;
+            } else {
+                selSuc.value = 'ALL';
+            }
+
+            if (inpFiltro) {
+                inpFiltro.style.display = (selSuc.value === '__CUSTOM__') ? 'block' : 'none';
+            }
+        }
+
+        function onCambioSucursalConciliacion() {
+            const selSuc = document.getElementById('concSelectSucursal');
+            const inpFiltro = document.getElementById('concInputFiltroProv');
+            if (selSuc && inpFiltro) {
+                if (selSuc.value === '__CUSTOM__') {
+                    inpFiltro.style.display = 'block';
+                    inpFiltro.focus();
+                } else {
+                    inpFiltro.style.display = 'none';
+                }
+            }
+            recalcularSiHayArchivo();
+        }
+
+        function onCambioPeriodoConciliacion() {
+            poblarSelectorSucursalesConciliacion(true);
+            recalcularSiHayArchivo();
+        }
+
         function poblarSelectorProveedoresConciliacion() {
             const sel = document.getElementById('concSelectProveedor');
             if (!sel) return;
@@ -3294,6 +3604,7 @@
         function onCambioProveedorConciliacion() {
             const sel = document.getElementById('concSelectProveedor');
             const inp = document.getElementById('concInputFiltroProv');
+            let sucPreseleccionada = 'ALL';
             if (sel && inp) {
                 if (sel.value === 'BODEGA_SANTA_ELENA') {
                     inp.value = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
@@ -3301,11 +3612,17 @@
                 } else if (sel.value === 'AUTO') {
                     inp.value = '';
                 } else {
-                    inp.value = sel.value;
+                    const famBase = obtenerProveedorFamiliaBase(sel.value);
+                    inp.value = famBase || sel.value;
                     currentProveedorDisplayName = sel.value;
+                    if (famBase === 'Sevillana' && normalizarTextoSucursal(sel.value) !== 'SEVILLANA') {
+                        const sucDet = homologarSucursalConciliador('', sel.value);
+                        if (sucDet) sucPreseleccionada = sucDet;
+                    }
                 }
                 currentProveedorMemoriaKey = obtenerClaveMemoriaProveedor(currentProveedorDisplayName, inp.value);
             }
+            poblarSelectorSucursalesConciliacion(false, sucPreseleccionada);
             recalcularSiHayArchivo();
         }
 
@@ -3318,6 +3635,7 @@
         function abrirModalConciliacion() {
             cargarMemoriaProveedores();
             poblarSelectorProveedoresConciliacion();
+            poblarSelectorSucursalesConciliacion(true);
             document.getElementById('modalConciliacion').classList.add('active');
             inicializarDropzone();
         }
@@ -3813,12 +4131,42 @@
                     ws.addRow([fechaStr, 'Sevillana', '', prodName, numFactura, 0, 0, valNum, 'LIBRO_AUXILIAR']);
                 }
             } else {
-                // C. Planilla / Matriz estándar en PDF Multi-Página
+                // C. Planilla / Matriz estándar en PDF Multi-Página (con soporte para tablas cuya esquina superior izquierda no tiene encabezado 'FECHA')
+                let headerSinFechaColDetectado = false;
+                let numColsProdMatrizPdf = 0;
+
                 for (const line of allLines) {
-                    const rowValues = line.map(x => x.str);
-                    if (rowValues.some(v => v && v.trim())) {
-                        ws.addRow(rowValues);
+                    const rowValues = line.map(x => String(x.str || '').trim());
+                    if (!rowValues.some(v => v)) continue;
+
+                    const upperRow = rowValues.map(v => v.toUpperCase());
+                    const tieneColFechaExplicita = upperRow.slice(0, 4).some(v => v === 'FECHA' || v === 'DIA' || v === 'DÍA');
+                    const cantProdConocidos = upperRow.filter(v =>
+                        v && !/^(?:CANTIDAD|PRECIOS?|FACTURAR|TOTAL|TOTALES|SUBTOTAL|PROMEDIO|FECHA|DIA|DÍA)$/i.test(v) &&
+                        (esProductoConocidoEnDiccionarioBase(v) || /\b(?:SEBO|GORDANA|PIEL|PIELES|HUESO|DESPERDICIO|CEBO|CARNAZA|EMPELLA|CHICHARRON|MANTECA)\b/i.test(v))
+                    ).length;
+
+                    if (!tieneColFechaExplicita && cantProdConocidos >= 2) {
+                        headerSinFechaColDetectado = true;
+                        numColsProdMatrizPdf = rowValues.length;
+                        ws.addRow(['FECHA', ...rowValues]);
+                        continue;
                     }
+
+                    if (headerSinFechaColDetectado) {
+                        const firstToken = upperRow[0] || '';
+                        const firstEsEtiquetaResumen = /^(?:CANTIDAD|PRECIOS?|TARIFA|VR\.?\s*UNIT|FACTURAR|TOTAL|TOTALES|SUBTOTAL|PROMEDIO)\b/i.test(firstToken);
+                        const firstEsFecha = Boolean(parsearFechaCeldaUniversal(rowValues[0], null, 2026));
+                        const esFilaNumericaSinEtiqueta = !firstEsEtiquetaResumen && !firstEsFecha && rowValues.length <= numColsProdMatrizPdf &&
+                            rowValues.some(v => /^[\d.,]+$/.test(v));
+
+                        if (esFilaNumericaSinEtiqueta) {
+                            ws.addRow(['', ...rowValues]);
+                            continue;
+                        }
+                    }
+
+                    ws.addRow(rowValues);
                 }
             }
 
@@ -4096,27 +4444,21 @@
             const autoInfo = autodetectarProveedorYPeriodo(targetSheet, currentConcFileName);
 
             const selProvVal = document.getElementById('concSelectProveedor')?.value || 'AUTO';
+            const selSucEl = document.getElementById('concSelectSucursal');
+            let selSucVal = selSucEl ? selSucEl.value : 'ALL';
             const inpFiltroEl = document.getElementById('concInputFiltroProv');
-            let filtroProvActivo = inpFiltroEl ? inpFiltroEl.value.trim() : '';
+            let filtroProvActivo = (selSucVal === '__CUSTOM__' && inpFiltroEl) ? inpFiltroEl.value.trim() : '';
             let nombreProveedorDisplay = autoInfo.provNombre;
-            // Restricción opcional por punto de recolección (ej. Sevillana sólo en Cavasa para "Carnes y Derivados")
+            // Restricción opcional por punto/sucursal de recolección
             let filtroPuntoActivo = '';
-            const pasaFiltroPunto = (r) => {
-                if (!filtroPuntoActivo) return true;
-                const pv = String(r.PROVEEDOR || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                const pu = String(r.PUNTO || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                if (filtroPuntoActivo.includes('PALMIRA')) {
-                    return pu.includes('PALMIRA') || pu.includes('RICARDO GIL') || pu.includes('VILLAGORGONA');
-                }
-                return pv.includes('DERIVADOS') || pu.includes(filtroPuntoActivo);
-            };
+            let sucursalActivaLabel = '';
 
             if (selProvVal === 'BODEGA_SANTA_ELENA') {
                 nombreProveedorDisplay = 'Bodega Santa Elena';
                 if (!filtroProvActivo) filtroProvActivo = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
             } else if (selProvVal !== 'AUTO') {
                 nombreProveedorDisplay = selProvVal;
-                if (!filtroProvActivo) filtroProvActivo = selProvVal;
+                if (!filtroProvActivo) filtroProvActivo = obtenerProveedorFamiliaBase(selProvVal);
             } else {
                 if (selectedProveedores && selectedProveedores.size > 0 && !autoInfo.filtroStr) {
                     const arrSel = [...selectedProveedores];
@@ -4130,6 +4472,36 @@
             }
 
             currentProveedorDisplayName = nombreProveedorDisplay;
+
+            // Sincronizar opciones del selector de sucursales para el proveedor activo (manteniendo la elección del usuario)
+            if (typeof poblarSelectorSucursalesConciliacion === 'function') {
+                poblarSelectorSucursalesConciliacion(true, (!selSucVal || selSucVal === 'ALL') ? (autoInfo.docPunto || autoInfo.filtroPunto || '') : '');
+                selSucVal = selSucEl ? selSucEl.value : 'ALL';
+            }
+
+            if (selSucVal && selSucVal !== 'ALL' && selSucVal !== '__CUSTOM__') {
+                filtroPuntoActivo = selSucVal;
+                sucursalActivaLabel = selSucVal === '__GRUPO_CAVASA_SANTA_ELENA__'
+                    ? 'Cavasa + Sevillana Santa Elena'
+                    : selSucVal;
+            } else if (selSucVal === '__CUSTOM__' && inpFiltroEl && inpFiltroEl.value.trim()) {
+                const customVal = inpFiltroEl.value.trim();
+                const provBase = obtenerProveedorFamiliaBase(nombreProveedorDisplay);
+                const sucursalesProv = CATALOGO_SUCURSALES_POR_PROVEEDOR[provBase] || [];
+                const matchSuc = sucursalesProv.find(s => normalizarTextoSucursal(s).includes(normalizarTextoSucursal(customVal)));
+                if (matchSuc) {
+                    filtroPuntoActivo = matchSuc;
+                    sucursalActivaLabel = matchSuc;
+                } else {
+                    filtroProvActivo = customVal;
+                }
+            }
+
+            const pasaFiltroPunto = (r) => {
+                if (!filtroPuntoActivo) return true;
+                return coincideRegistroConSucursal(r, filtroPuntoActivo);
+            };
+
             currentProveedorMemoriaKey = obtenerClaveMemoriaProveedor(nombreProveedorDisplay, filtroProvActivo);
             const memProveedorActual = mapaMemoriaProveedores[currentProveedorMemoriaKey] || {};
 
@@ -4341,6 +4713,7 @@
                                 kg: kg,
                                 precio: 0,
                                 valor: 0,
+                                puntoDoc: sucursalActivaLabel || autoInfo.docPunto || '',
                                 esLoteSinDia: dInfo.esLoteSinDia || false,
                                 rawEtiqueta: dInfo.rawEtiqueta || ''
                             });
@@ -4389,7 +4762,7 @@
                         kg: kg,
                         precio: precio,
                         valor: valor,
-                        puntoDoc: puntoRow || autoInfo.docPunto || '',
+                        puntoDoc: puntoRow || sucursalActivaLabel || autoInfo.docPunto || '',
                         facturaDoc: facRow || autoInfo.docFac || '',
                         numItemFactura: numItemFactura,
                         esLoteSinDia: esLoteFactura,
@@ -4743,14 +5116,14 @@
                     const deltaKg = ri.kg - item.kg_proveedor;
                     const otroNombre = ri.prod !== item.producto ? ` (registrado en plataforma como "${ri.prod}")` : '';
                     const etiquetaDoc = item.facturaDoc ? `Factura ${item.facturaDoc}` : 'Lote';
-                    const obsPunto = item.puntoDoc ? ` en ${item.puntoDoc}` : (ri.PUNTO ? ` en ${ri.PUNTO}` : '');
+                    const obsPunto = (ri.PUNTO || item.puntoDoc) ? ` en ${ri.PUNTO || item.puntoDoc}` : '';
                     exactos.push({
                         dia: item.dia, sortKey: ri.sortKey || item.sortKey, fecha: ri.fecha, producto: item.producto,
                         kg_proveedor: item.kg_proveedor, kg_recoleccion: ri.kg,
                         delta_kg: deltaKg, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
                         delta_valor: deltaKg * precio,
-                        puntoDoc: item.puntoDoc,
+                        puntoDoc: ri.PUNTO || item.puntoDoc || sucursalActivaLabel || autoInfo.docPunto || '',
                         facturaDoc: item.facturaDoc,
                         estado: `🟢 Conciliado (${etiquetaDoc} ↔ ${ri.fecha.slice(0, 5)})`,
                         obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha}${obsPunto} (${ri.kg.toLocaleString()} Kg)${otroNombre}${ri.id ? ' [' + ri.id + ']' : ''}.`
@@ -4800,7 +5173,7 @@
                         delta_kg: deltaKg, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: sumaKg * precio,
                         delta_valor: deltaKg * precio,
-                        puntoDoc: item.puntoDoc || (r1 ? r1.PUNTO : '') || autoInfo.docPunto || '',
+                        puntoDoc: (r1 ? r1.PUNTO : '') || item.puntoDoc || sucursalActivaLabel || autoInfo.docPunto || '',
                         facturaDoc: item.facturaDoc || '',
                         estado: `🟢 Conciliado (Lote ↔ ${fechaRango})`,
                         obs: `${item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ suma de recolecciones ${r1.fecha.slice(0, 5)} (${r1.kg} Kg) + ${r2.fecha.slice(0, 5)} (${r2.kg} Kg) = ${sumaKg.toFixed(2)} Kg.`
@@ -4860,7 +5233,7 @@
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
                             delta_valor: deltaKg * precio,
-                            puntoDoc: item.puntoDoc,
+                            puntoDoc: ri.PUNTO || item.puntoDoc || sucursalActivaLabel || autoInfo.docPunto || '',
                             facturaDoc: item.facturaDoc,
                             estado: '🟢 Conciliado (Lote ↔ ' + ri.fecha.slice(0, 5) + ')',
                             obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} ${ri.kg.toLocaleString()} Kg.`
@@ -4872,7 +5245,7 @@
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: ri.kg * precio,
                             delta_valor: deltaKg * precio,
-                            puntoDoc: item.puntoDoc,
+                            puntoDoc: ri.PUNTO || item.puntoDoc || sucursalActivaLabel || autoInfo.docPunto || '',
                             facturaDoc: item.facturaDoc,
                             estado: '🟡 Desviación (Lote ↔ ' + ri.fecha.slice(0, 5) + ')',
                             obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" ${item.kg_proveedor.toLocaleString()} Kg ↔ recolección del ${ri.fecha} (${ri.kg.toLocaleString()} Kg, Δ ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(2)} Kg).`
@@ -4885,7 +5258,7 @@
                         delta_kg: -item.kg_proveedor, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: 0,
                         delta_valor: -valProv, estado: '🟠 Pendiente en Sistema',
-                        puntoDoc: item.puntoDoc,
+                        puntoDoc: item.puntoDoc || sucursalActivaLabel || autoInfo.docPunto || '',
                         facturaDoc: item.facturaDoc,
                         obs: `${item.rawEtiqueta || item.fecha}: "${rawLabel}" facturado sin fecha exacta; no se encontró recolección con ese peso.`
                     });
@@ -4915,7 +5288,7 @@
                                 delta_kg: 0, precio_unit: itemD.precio_unit,
                                 valor_proveedor: itemD.valor_proveedor, valor_recoleccion: itemD.valor_proveedor,
                                 delta_valor: 0,
-                                puntoDoc: itemD.puntoDoc || (recMeta[keySig] ? recMeta[keySig].punto : '') || autoInfo.docPunto || '',
+                                puntoDoc: itemD.puntoDoc || (recMeta[keySig] ? recMeta[keySig].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                                 facturaDoc: itemD.facturaDoc || '',
                                 estado: `🟢 Conciliado (Recogido el ${fechaSig.slice(0, 5)})`,
                                 obs: `Despacho acumulado y recolectado el ${fechaSig} junto con el viaje del día siguiente (${sumaEsperada.toLocaleString()} Kg totales).`
@@ -4927,7 +5300,7 @@
                                 delta_kg: deltaSig, precio_unit: despSig.precio_unit,
                                 valor_proveedor: despSig.valor_proveedor, valor_recoleccion: (despSig.kg_proveedor + deltaSig) * despSig.precio_unit,
                                 delta_valor: deltaSig * despSig.precio_unit,
-                                puntoDoc: despSig.puntoDoc || (recMeta[keySig] ? recMeta[keySig].punto : '') || autoInfo.docPunto || '',
+                                puntoDoc: despSig.puntoDoc || (recMeta[keySig] ? recMeta[keySig].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                                 facturaDoc: despSig.facturaDoc || '',
                                 estado: '🟢 Conciliado Exacto',
                                 obs: `Registro conjunto de ${kgRecSig.toLocaleString()} Kg en plataforma (incluye ${itemD.kg_proveedor.toLocaleString()} Kg del ${itemD.fecha.slice(0, 5)}).`
@@ -4945,7 +5318,7 @@
                                 delta_kg: delta, precio_unit: itemD.precio_unit,
                                 valor_proveedor: itemD.valor_proveedor, valor_recoleccion: kgRecSig * itemD.precio_unit,
                                 delta_valor: delta * itemD.precio_unit,
-                                puntoDoc: itemD.puntoDoc || (recMeta[keySig] ? recMeta[keySig].punto : '') || autoInfo.docPunto || '',
+                                puntoDoc: itemD.puntoDoc || (recMeta[keySig] ? recMeta[keySig].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                                 facturaDoc: itemD.facturaDoc || '',
                                 estado: `🟢 Conciliado (Recogido el ${fechaSig.slice(0, 5)})`,
                                 obs: `Despacho del ${itemD.fecha.slice(0, 5)} registrado en plataforma el día siguiente (${fechaSig}).`
@@ -4976,7 +5349,7 @@
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
                             delta_valor: deltaVal,
-                            puntoDoc: item.puntoDoc || (recMeta[key] ? recMeta[key].punto : '') || autoInfo.docPunto || '',
+                            puntoDoc: item.puntoDoc || (recMeta[key] ? recMeta[key].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                             facturaDoc: item.facturaDoc || '',
                             estado: '🟢 Conciliado Exacto',
                             obs: 'Cuadre exacto dentro de la tolerancia de báscula.'
@@ -4988,7 +5361,7 @@
                             delta_kg: deltaKg, precio_unit: precio,
                             valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
                             delta_valor: deltaVal,
-                            puntoDoc: item.puntoDoc || (recMeta[key] ? recMeta[key].punto : '') || autoInfo.docPunto || '',
+                            puntoDoc: item.puntoDoc || (recMeta[key] ? recMeta[key].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                             facturaDoc: item.facturaDoc || '',
                             estado: '🟡 Desviación de Peso',
                             obs: `Diferencia de ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(1)} Kg entre factura proveedor y recolección.`
@@ -5021,7 +5394,7 @@
                                 delta_kg: deltaKg, precio_unit: precio,
                                 valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
                                 delta_valor: deltaKg * precio,
-                                puntoDoc: item.puntoDoc || (recMeta[cand.rKey] ? recMeta[cand.rKey].punto : '') || autoInfo.docPunto || '',
+                                puntoDoc: item.puntoDoc || (recMeta[rKey] ? recMeta[rKey].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                                 facturaDoc: item.facturaDoc || '',
                                 estado: '🟢 Conciliado (🧠 Smart Match Peso)',
                                 obs: `🧠 Emparejado por peso idéntico (${kgRec.toLocaleString()} Kg): Excel "${rawLabel}" ↔ Sistema "${rProd}".`,
@@ -5058,7 +5431,7 @@
                                 delta_kg: deltaKg, precio_unit: precio,
                                 valor_proveedor: valProv, valor_recoleccion: kgRec * precio,
                                 delta_valor: deltaKg * precio,
-                                puntoDoc: item.puntoDoc || (recMeta[cand.rKey] ? recMeta[cand.rKey].punto : '') || autoInfo.docPunto || '',
+                                puntoDoc: item.puntoDoc || (recMeta[rKey] ? recMeta[rKey].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                                 facturaDoc: item.facturaDoc || '',
                                 estado: `🟢 Smart Match Peso (${fechaSig.slice(0, 5)})`,
                                 obs: `🧠 Recogido el día siguiente (${fechaSig}) con peso idéntico como "${rProd}" (${kgRec.toLocaleString()} Kg).`,
@@ -5103,7 +5476,7 @@
                         delta_kg: deltaKg, precio_unit: precio,
                         valor_proveedor: valProv, valor_recoleccion: cand.kgRec * precio,
                         delta_valor: deltaKg * precio,
-                        puntoDoc: item.puntoDoc || (cand && cand.rPunto) || (recMeta[cand.rKey] ? recMeta[cand.rKey].punto : '') || autoInfo.docPunto || '',
+                        puntoDoc: item.puntoDoc || (cand && cand.rPunto) || (recMeta[cand.rKey] ? recMeta[cand.rKey].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                         facturaDoc: item.facturaDoc || '',
                         estado: '🟡 Desviación (🧠 Smart Match Fecha)',
                         obs: `🧠 Emparejado en misma fecha: Excel "${rawLabel}" (${item.kg_proveedor.toLocaleString()} Kg) ↔ Sistema "${cand.rProd}" (${cand.kgRec.toLocaleString()} Kg).`,
@@ -5128,7 +5501,7 @@
                     delta_kg: -item.kg_proveedor, precio_unit: precio,
                     valor_proveedor: valProv, valor_recoleccion: 0,
                     delta_valor: -valProv, estado: '🟠 Pendiente en Sistema',
-                    puntoDoc: item.puntoDoc || autoInfo.docPunto || '',
+                    puntoDoc: item.puntoDoc || sucursalActivaLabel || autoInfo.docPunto || '',
                     facturaDoc: item.facturaDoc || '',
                     obs: `Facturado por ${nombreProveedorDisplay} (como "${item.rawProdLabel || item.producto}"), pendiente de registro en recolecciones de plataforma.`
                 });
@@ -5149,7 +5522,7 @@
                     delta_kg: kgRec, precio_unit: precio,
                     valor_proveedor: 0, valor_recoleccion: kgRec * precio,
                     delta_valor: kgRec * precio, estado: '🔵 Sobrante en Plataforma',
-                    puntoDoc: (recMeta[rKey] ? recMeta[rKey].punto : '') || autoInfo.docPunto || '',
+                    puntoDoc: (recMeta[rKey] ? recMeta[rKey].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                     facturaDoc: '',
                     obs: 'Registrado en recolecciones pero no aparece cobrado en el Excel del proveedor.'
                 });
@@ -5165,7 +5538,7 @@
                 todos: [...exactos, ...desviaciones, ...faltantes, ...sobrantes].sort((a, b) => a.sortKey - b.sortKey || a.producto.localeCompare(b.producto)),
                 proveedorTotales: { kg: totKgProv, valor: totValProv },
                 proveedorNombre: nombreProveedorDisplay,
-                puntoNombre: autoInfo.docPunto || '',
+                puntoNombre: sucursalActivaLabel || autoInfo.docPunto || '',
                 facturaNumero: autoInfo.docFac || '',
                 hojaNombre: targetSheet.name,
                 mesAnio: mesLabel,
