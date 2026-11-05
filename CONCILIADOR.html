@@ -3444,22 +3444,37 @@
             if (!provVal || provVal === 'AUTO') return '';
             if (provVal === 'BODEGA_SANTA_ELENA') return 'Bodega Santa Elena';
             const pNorm = normalizarTextoSucursal(provVal);
-            if (pNorm.includes('SEVILLANA')) return 'Sevillana';
+            if (pNorm.includes('SEVILLANA') || pNorm.includes('CARNES Y DERIVADOS') || pNorm.includes('CARNES & DERIVADOS') || pNorm.includes('DERIVADOS DE OCC')) return 'Sevillana';
             if (pNorm.includes('CANAVERAL') && !pNorm.includes('FRIGORIVALLE') && !pNorm.includes('OLIMPICA')) return 'Supertienda Cañaveral';
             if (pNorm.includes('CARIBE')) return 'Caribe';
-            if (pNorm.includes('MIGAN')) return 'Migan Capital';
+            if (pNorm.includes('MIGAN') || pNorm.includes('LA MONTANA') || pNorm.includes('AGROMILENIO')) return 'Migan Capital';
             if (pNorm.includes('BELALCAZAR')) return 'Belalcazar';
             if (pNorm.includes('CIUDAD DEL CAMPO')) return 'Ciudad del Campo';
             return provVal;
         }
 
-        function poblarSelectorSucursalesConciliacion(mantenerSeleccion = true, sucursalForzada = null) {
+        function inferirProveedorPorSucursal(sucVal) {
+            if (!sucVal || sucVal === 'ALL' || sucVal === '__CUSTOM__') return '';
+            if (sucVal === 'CAVASA_Y_SANTA_ELENA' || sucVal === '__GRUPO_CAVASA_SANTA_ELENA__') return 'Sevillana';
+            const sNorm = normalizarTextoSucursal(sucVal);
+            for (const [provKey, sucs] of Object.entries(CATALOGO_SUCURSALES_POR_PROVEEDOR)) {
+                if (sucs.some(s => normalizarTextoSucursal(s) === sNorm)) {
+                    return provKey;
+                }
+            }
+            return '';
+        }
+
+        function poblarSelectorSucursalesConciliacion(mantenerSeleccion = true, sucursalForzada = null, mesOverride = null, anioOverride = null) {
             const selSuc = document.getElementById('concSelectSucursal');
             const selProv = document.getElementById('concSelectProveedor');
             const inpFiltro = document.getElementById('concInputFiltroProv');
             if (!selSuc) return;
 
-            const valorPrevio = sucursalForzada !== null ? sucursalForzada : (mantenerSeleccion ? (selSuc.value || 'ALL') : 'ALL');
+            const tieneForzada = sucursalForzada !== null && sucursalForzada !== undefined && String(sucursalForzada).trim() !== '';
+            let valorPrevio = tieneForzada ? String(sucursalForzada).trim() : (mantenerSeleccion ? (selSuc.value || 'ALL') : 'ALL');
+            if (valorPrevio === '__GRUPO_CAVASA_SANTA_ELENA__') valorPrevio = 'CAVASA_Y_SANTA_ELENA';
+
             const provSelVal = selProv ? (selProv.value || 'AUTO') : 'AUTO';
 
             let provActivo = '';
@@ -3478,10 +3493,18 @@
                 filtroProvBase = provActivo;
             }
 
+            if ((!provActivo || !CATALOGO_SUCURSALES_POR_PROVEEDOR[provActivo]) && valorPrevio && valorPrevio !== 'ALL' && valorPrevio !== '__CUSTOM__') {
+                const provInf = inferirProveedorPorSucursal(valorPrevio);
+                if (provInf) {
+                    provActivo = provInf;
+                    if (!filtroProvBase) filtroProvBase = provInf;
+                }
+            }
+
             const selMesVal = document.getElementById('concSelectMes')?.value || 'AUTO';
             const selAnioVal = document.getElementById('concSelectAnio')?.value || '2026';
-            const mesFiltro = (selMesVal !== 'AUTO' && selMesVal !== 'ALL') ? Number(selMesVal) : null;
-            const anioFiltro = Number(selAnioVal) || 2026;
+            const mesFiltro = mesOverride !== null ? mesOverride : ((selMesVal !== 'AUTO' && selMesVal !== 'ALL') ? Number(selMesVal) : null);
+            const anioFiltro = anioOverride !== null ? anioOverride : (Number(selAnioVal) || 2026);
 
             const conteoPorSucursal = {};
             let totalRegistrosProv = 0;
@@ -3505,6 +3528,39 @@
                         conteoPorSucursal[sHom] = (conteoPorSucursal[sHom] || 0) + 1;
                     }
                 });
+
+                // Si con AUTO y un nombre genérico de archivo no se encontró ninguna sucursal en plataforma,
+                // mostrar todas las sucursales disponibles para nunca dejar el selector bloqueado ni vacío
+                if (sucursalesSet.size === 0 && provSelVal === 'AUTO') {
+                    rawData.forEach(r => {
+                        if (mesFiltro) {
+                            const dInfo = parsearFechaCeldaUniversal(r.FECHA, mesFiltro, anioFiltro);
+                            if (!dInfo || dInfo.mes !== mesFiltro || dInfo.anio !== anioFiltro) return;
+                        }
+                        const sHom = homologarSucursalConciliador(r.PUNTO, r.PROVEEDOR);
+                        if (sHom) {
+                            sucursalesSet.add(sHom);
+                            conteoPorSucursal[sHom] = (conteoPorSucursal[sHom] || 0) + 1;
+                        }
+                    });
+                }
+            }
+
+            // Si había una sucursal forzada o seleccionada previamente, homologarla para que calce con las opciones
+            if (valorPrevio && valorPrevio !== 'ALL' && valorPrevio !== '__CUSTOM__' && valorPrevio !== 'CAVASA_Y_SANTA_ELENA') {
+                if (!sucursalesSet.has(valorPrevio)) {
+                    const homForzada = homologarSucursalConciliador(valorPrevio, provActivo || currentProveedorDisplayName);
+                    if (homForzada && sucursalesSet.has(homForzada)) {
+                        valorPrevio = homForzada;
+                    } else {
+                        const matchNorm = [...sucursalesSet].find(s => normalizarTextoSucursal(s) === normalizarTextoSucursal(valorPrevio) || normalizarTextoSucursal(s).includes(normalizarTextoSucursal(valorPrevio)));
+                        if (matchNorm) {
+                            valorPrevio = matchNorm;
+                        } else if (mantenerSeleccion && !tieneForzada) {
+                            sucursalesSet.add(valorPrevio);
+                        }
+                    }
+                }
             }
 
             const listaSucursales = [...sucursalesSet].filter(Boolean).sort((a, b) => {
@@ -3517,7 +3573,7 @@
             const sufijoTotal = (provActivo && totalRegistrosProv > 0) ? ` (${totalRegistrosProv} reg.)` : '';
             let html = `<option value="ALL">✨ Todas las sucursales${sufijoTotal}</option>`;
 
-            if (provActivo === 'Sevillana') {
+            if (provActivo === 'Sevillana' || valorPrevio === 'CAVASA_Y_SANTA_ELENA') {
                 const cntComb = (conteoPorSucursal['Cavasa'] || 0) + (conteoPorSucursal['Sevillana Santa Elena'] || 0);
                 const lblComb = cntComb > 0 ? ` (${cntComb} reg.)` : '';
                 html += `<option value="CAVASA_Y_SANTA_ELENA">🔗 Cavasa + Sevillana Santa Elena${lblComb}</option>`;
@@ -4183,7 +4239,7 @@
                 });
             }
 
-            ejecutarConciliacionUniversal();
+            ejecutarConciliacionUniversal(true);
         }
 
         async function manejarArchivoSeleccionado(files) {
@@ -4212,7 +4268,7 @@
                         });
                     }
 
-                    ejecutarConciliacionUniversal();
+                    ejecutarConciliacionUniversal(true);
                 }
             } catch (err) {
                 console.error('Error al cargar archivo:', err);
@@ -4414,7 +4470,7 @@
             });
         }
 
-        function ejecutarConciliacionUniversal() {
+        function ejecutarConciliacionUniversal(esCargaInicialArchivo = false) {
             if (!currentConcWorkbook) return;
             const wb = currentConcWorkbook;
 
@@ -4460,28 +4516,48 @@
                 nombreProveedorDisplay = selProvVal;
                 if (!filtroProvActivo) filtroProvActivo = obtenerProveedorFamiliaBase(selProvVal);
             } else {
+                const provPorSuc = (selSucVal && selSucVal !== 'ALL' && selSucVal !== '__CUSTOM__') ? inferirProveedorPorSucursal(selSucVal) : '';
                 if (selectedProveedores && selectedProveedores.size > 0 && !autoInfo.filtroStr) {
                     const arrSel = [...selectedProveedores];
                     nombreProveedorDisplay = arrSel.join(' / ');
                     if (!filtroProvActivo) filtroProvActivo = arrSel.join(', ');
                 } else if (autoInfo.filtroStr && !filtroProvActivo) {
-                    filtroProvActivo = autoInfo.filtroStr;
-                    filtroPuntoActivo = autoInfo.filtroPunto || '';
-                    if (inpFiltroEl) inpFiltroEl.placeholder = `Auto: ${autoInfo.filtroStr}`;
+                    const famAuto = obtenerProveedorFamiliaBase(autoInfo.provNombre);
+                    if (CATALOGO_SUCURSALES_POR_PROVEEDOR[famAuto]) {
+                        nombreProveedorDisplay = famAuto;
+                        filtroProvActivo = famAuto;
+                    } else if (provPorSuc) {
+                        nombreProveedorDisplay = provPorSuc;
+                        filtroProvActivo = provPorSuc;
+                    } else {
+                        filtroProvActivo = autoInfo.filtroStr;
+                    }
+                    if (inpFiltroEl) inpFiltroEl.placeholder = `Auto: ${filtroProvActivo}`;
+                } else if (provPorSuc && !filtroProvActivo) {
+                    nombreProveedorDisplay = provPorSuc;
+                    filtroProvActivo = provPorSuc;
                 }
             }
 
             currentProveedorDisplayName = nombreProveedorDisplay;
 
-            // Sincronizar opciones del selector de sucursales para el proveedor activo (manteniendo la elección del usuario)
+            const selMesVal = document.getElementById('concSelectMes')?.value || 'AUTO';
+            const selAnioVal = document.getElementById('concSelectAnio')?.value || String(autoInfo.anio);
+            const mesObjetivo = selMesVal === 'AUTO' ? autoInfo.mes : (selMesVal === 'ALL' ? null : Number(selMesVal));
+            const anioObjetivo = Number(selAnioVal) || 2026;
+
+            // Sincronizar opciones del selector de sucursales para el proveedor activo (manteniendo 100% la elección del usuario)
             if (typeof poblarSelectorSucursalesConciliacion === 'function') {
-                poblarSelectorSucursalesConciliacion(true, (!selSucVal || selSucVal === 'ALL') ? (autoInfo.docPunto || autoInfo.filtroPunto || '') : '');
+                const sucAutoInicial = (esCargaInicialArchivo && (!selSucVal || selSucVal === 'ALL'))
+                    ? (autoInfo.docPunto || autoInfo.filtroPunto || null)
+                    : null;
+                poblarSelectorSucursalesConciliacion(true, sucAutoInicial, mesObjetivo, anioObjetivo);
                 selSucVal = selSucEl ? selSucEl.value : 'ALL';
             }
 
             if (selSucVal && selSucVal !== 'ALL' && selSucVal !== '__CUSTOM__') {
                 filtroPuntoActivo = selSucVal;
-                sucursalActivaLabel = selSucVal === '__GRUPO_CAVASA_SANTA_ELENA__'
+                sucursalActivaLabel = (selSucVal === 'CAVASA_Y_SANTA_ELENA' || selSucVal === '__GRUPO_CAVASA_SANTA_ELENA__')
                     ? 'Cavasa + Sevillana Santa Elena'
                     : selSucVal;
             } else if (selSucVal === '__CUSTOM__' && inpFiltroEl && inpFiltroEl.value.trim()) {
@@ -4495,6 +4571,10 @@
                 } else {
                     filtroProvActivo = customVal;
                 }
+            } else {
+                // Cuando está en 'ALL' ("Todas las sucursales"), no restringir por punto
+                filtroPuntoActivo = '';
+                sucursalActivaLabel = '';
             }
 
             const pasaFiltroPunto = (r) => {
@@ -4504,11 +4584,6 @@
 
             currentProveedorMemoriaKey = obtenerClaveMemoriaProveedor(nombreProveedorDisplay, filtroProvActivo);
             const memProveedorActual = mapaMemoriaProveedores[currentProveedorMemoriaKey] || {};
-
-            const selMesVal = document.getElementById('concSelectMes')?.value || 'AUTO';
-            const selAnioVal = document.getElementById('concSelectAnio')?.value || String(autoInfo.anio);
-            const mesObjetivo = selMesVal === 'AUTO' ? autoInfo.mes : (selMesVal === 'ALL' ? null : Number(selMesVal));
-            const anioObjetivo = Number(selAnioVal) || 2026;
 
             const tolStr = document.getElementById('concSelectTolerancia')?.value || '2|0.01';
             const [tolKgMax, tolPctMax] = tolStr.split('|').map(Number);

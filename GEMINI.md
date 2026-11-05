@@ -545,6 +545,9 @@ i.fecha), consolidándose directamente en la fila de ese día.
   3. *Alineación Automática de Matrices PDF sin Encabezado `FECHA` (`procesarArchivoPDF` Rama C):*
      - Cuando una tabla PDF contiene 2 o más encabezados de materias conocidas pero carece de la etiqueta `FECHA` en su primera celda, el parser antepone `'FECHA'` a la fila de encabezados y `''` a las filas numéricas de lotes, alineándolas columna a columna con las filas de `Cantidad`, `Precios` y `Facturar`.
      - Corrige simultáneamente las referencias `recMeta[rKey]` en las pasadas `3A` y `3B` del motor Smart Match.
+  4. *Blindaje de Persistencia del Selector de Sucursal Antes y Después de Cargar Archivo:*
+     - Se corrigió la condición en `ejecutarConciliacionUniversal(esCargaInicialArchivo)` y `poblarSelectorSucursalesConciliacion(mantenerSeleccion, sucursalForzada, mesOverride, anioOverride)` donde el paso de `''` (en lugar de `null`) evaluaba `'' !== null` como `true`, reseteando `selSuc.value` a `'ALL'` al cargar un archivo o al intentar cambiar de sucursal después de cargado.
+     - Se incorporó `inferirProveedorPorSucursal(sucVal)` y fallback de sucursales en modo `'AUTO'` para que las opciones del selector nunca se vacíen ni pierdan la selección activa del usuario.
 
 ---
 
