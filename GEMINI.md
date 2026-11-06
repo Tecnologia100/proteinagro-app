@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Noviembre 2026 (Versión 1.9.1)  
+> **Última Actualización:** Noviembre 2026 (Versión 1.9.3)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -590,6 +590,20 @@ i.fecha), consolidándose directamente en la fila de ese día.
 - **Contenedor `.table-scroll-pro`:** `max-height: 70vh` con scroll interno (la barra inferior siempre visible), `thead th` sticky, columna **Fecha** sticky a la izquierda y **Acciones** sticky a la derecha (`background: inherit` respeta el fondo `#fffdfa` de filas Novedad; celdas `td[colspan]` excluidas).
 - **JS:** `inicializarScrollHorizontalSuperior(containerId, topScrollId, toolbarId)` al final de `app.js`, reutilizable; recalcula ancho con `ResizeObserver` + `MutationObserver` sobre el `tbody` (re-render en vivo de Firestore).
 - **Versión PWA:** `sw.js` cache `proteinagro-v1.9.2`, query strings `?v=1.9.2` en `index.html` y `app.js`. Commit `f267949`.
+
+### 35. Blindaje Anti-Sobrescritura de Proveedor en Puntos Compartidos y Homologación Ruta 1 Cavasa (`v1.9.3`)
+- **Diagnóstico y Causa Raíz:**
+  - Al seleccionar Ruta 1 (`Ruta 1: Santa Elena / Cavasa`), elegir proveedor `Sevillana` y seleccionar la sucursal `Cavasa`, el sistema cambiaba automáticamente el proveedor a `La Reserva`.
+  - *Causa 1 (Sobrescritura Incondicional en Evento Change):* El listener `sucursalSelect.addEventListener('change')` contenía un autocompletado inverso legacy que evaluaba `PUNTO_TO_PROVEEDOR_MAP[selectedPunto]`. Al ser un mapa plano 1 a 1, cada sucursal que albergaba múltiples proveedores (como `Cavasa`, donde operan 9 proveedores: Bárbara Gómez, Los Lagos, Belalcázar, Caribe, Sevillana, Migan Capital, Freddy Hernández, Edinson Aguirre y La Reserva) quedaba sobrescrita con el último proveedor procesado (`La Reserva`). Al dispararse el change de sucursal, el listener cambiaba forzosamente `proveedorSelect.selectedIndex` a `La Reserva`, corrompiendo el registro.
+  - *Causa 2 (Inversión en Catálogo Embebido):* En `CATALOGO_PUNTOS_RUTAS_DEFAULT`, las filas de Cavasa tenían erróneamente `proveedor: "Cavasa"` y `punto: "<NombreProveedor>"`, en lugar de `proveedor: "<NombreProveedor>"` y `punto: "Cavasa"`.
+  - *Causa 3 (Filtros en Google Sheets y Sobrescritura en GViz):* Si un usuario aplicaba un filtro manual en Google Sheets en la hoja `Puntos_Rutas`, la consulta GViz CSV retornaba únicamente las filas visibles (ej. 2 filas). Al sincronizar, `refrescarPuntosRutasDesdeSheets()` borraba los 126+ puntos legítimos y los reemplazaba con las 2 filas filtradas.
+- **Arquitectura de Solución Implementada (`v1.9.3`):**
+  1. *Blindaje Estricto de Selección en Formulario:* Se modificó `sucursalSelect.addEventListener('change')` para comprobar si el usuario ya cuenta con un proveedor válido (`tieneProvValido`). Si el proveedor ya fue seleccionado (flujo estándar: Ruta ➔ Proveedor ➔ Sucursal), **NUNCA** se sobrescribe el proveedor y se oculta el badge de autocompletado.
+  2. *Soporte Multi-Proveedor (`PUNTO_TO_PROVEEDORES_SET`):* Se incorporó el mapa `PUNTO_TO_PROVEEDORES_SET[punto]` que almacena la lista completa de proveedores asociados a cada punto. En el fallback de búsqueda de sucursales, todos los proveedores de Cavasa resuelven correctamente a `Cavasa`.
+  3. *Homologación de Catálogo Base y Rutas por Defecto:* Se corrigió `CATALOGO_PUNTOS_RUTAS_DEFAULT` y `DEFAULT_RUTAS_DATA` para `Ruta 1: Santa Elena / Cavasa`, registrando a cada proveedor (`Sevillana`, `Bárbara Gómez`, `Los Lagos`, `Caribe`, `Migan Capital`, `Freddy Hernández`, `Edinson Aguirre`, `La Reserva`, `Belalcázar`) con su punto correspondiente `Cavasa` (y `Sevillana Santa Elena`).
+  4. *Umbral de Seguridad Anti-Filtros en GViz:* `refrescarPuntosRutasDesdeSheets()` ahora valida que GViz retorne al menos 20 registros antes de reemplazar la matriz. Si retorna menos por filtros en hoja, preserva el catálogo base y solo fusiona novedades.
+  5. *Petición Webhook con `format=json`:* `cargarCatalogosDinamicos()` solicita explícitamente `format=json&t=...` para garantizar que el endpoint de Apps Script responda siempre con el JSON completo (134 puntos) en lugar de la vista HTML.
+  6. *Bumping de Versión PWA:* Caché actualizada a `proteinagro-v1.9.3` en `sw.js`, `index.html` y `app.js`.
 
 ---
 

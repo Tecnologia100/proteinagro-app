@@ -1,7 +1,7 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.9.1`  
-> **Última Actualización:** Octubre 2026  
+> **Versión Actual:** `v=1.9.3`  
+> **Última Actualización:** Noviembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
 
@@ -987,3 +987,14 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - Barra de desplazamiento horizontal superior sincronizada + botones de navegacion rapida.
 - Tabla con alto maximo 70vh, encabezado fijo y columnas Fecha (izquierda) y Acciones (derecha) fijas.
 - Funcion reutilizable `inicializarScrollHorizontalSuperior` en app.js. Cache PWA proteinagro-v1.9.2.
+
+## v1.9.3 - Blindaje Anti-Sobrescritura de Proveedor en Puntos Compartidos y Homologación Ruta 1 Cavasa (6/11/2026)
+- **Diagnóstico y Causa Raíz:** Al seleccionar Ruta 1 -> Proveedor "Sevillana" -> Sucursal "Cavasa", el proveedor cambiaba automáticamente a "La Reserva". La causa era un listener legacy en `sucursalSelect` que utilizaba un mapeo plano 1-a-1 (`PUNTO_TO_PROVEEDOR_MAP['Cavasa']`), el cual era sobreescrito por el último proveedor cargado para esa sede compartida (donde operan 9 proveedores: Barbara Gomez, Los Lagos, Belalcazar, Caribe, Sevillana, Migan Capital, Freddy Hernandez, Edinson Aguirre, La Reserva).
+- **Blindaje en `app.js`:**
+  - Se condicionó el auto-llenado de proveedor al cambiar sucursal: si el usuario ya tiene un proveedor válido seleccionado (`tieneProvValido`), el sistema **NUNCA** sobreescribe la selección del conductor.
+  - Implementación de `PUNTO_TO_PROVEEDORES_SET` para rastrear sedes compartidas multi-proveedor.
+  - Inclusión oficial de `Sevillana` en `DEFAULT_RUTAS_DATA["RUTA 1: Santa Elena / Cavasa"]`.
+  - Corrección de `CATALOGO_PUNTOS_RUTAS_DEFAULT` para Ruta 1 Cavasa con `proveedor: "<Proveedor>"` y `punto: "Cavasa"`.
+  - Umbral de seguridad en `refrescarPuntosRutasDesdeSheets()` (`length >= 20`) para evitar que respuestas filtradas de GViz borren el catálogo completo en memoria.
+  - Cache-busting dinámico con `format=json&` en la carga de catálogos.
+- **Actualización PWA:** Actualización de Service Worker `sw.js` a `proteinagro-v1.9.3`, e incremento de versiones en `index.html` y `GEMINI.md`.
