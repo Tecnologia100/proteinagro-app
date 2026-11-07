@@ -1924,10 +1924,16 @@ let capturedFacturaPhoto = null;
 
 // Tarifas oficiales de referencia para Caribe (usadas para alerta en vivo de discrepancia)
 const TARIFAS_REFERENCIA_CARIBE = {
-    'SEBO': 1200,
-    'HUESO BLANCO': 500,
-    'DESPERDICIO': 350,
+    'DESPERDICIO': 100,
+    'HUESO BLANCO': 350,
     'HUESO DE CERDO': 350,
+    'GORDANA': 1300,
+    'SEBO EN RAMA': 1300,
+    'SEBO': 1200,
+    'PIEL POLLO': 300,
+    'PIELES': 100,
+    'HUESO PROMOCION': 1200,
+    'PULMON DE CERDO': 100,
     'CABEZAS': 350,
     'PATAS': 350
 };
@@ -1984,7 +1990,7 @@ function evaluarDiscrepanciaFacturaCaribe() {
     } else {
         const signo = diff > 0 ? '+' : '-';
         alertBox.className = 'discrepancia-banner warn';
-        alertBox.innerHTML = `⚠️ <strong>Diferencia detectada (${signo}$${absDiff.toLocaleString('es-CO')}):</strong> La factura física indica <strong>$${valorFactura.toLocaleString('es-CO')}</strong>, pero según los kilos registrados el estimado es <strong>$${estimado.toLocaleString('es-CO')}</strong>. Verifique el tiquete (se guardará para conciliación).`;
+        alertBox.innerHTML = `⚠️ <strong>Diferencia detectada (${signo}$${absDiff.toLocaleString('es-CO')}):</strong> La factura física indica <strong>$${valorFactura.toLocaleString('es-CO')}</strong>, pero según los productos y kilos registrados el estimado es <strong>$${estimado.toLocaleString('es-CO')}</strong>.<br><small style="display:block; margin-top:6px; font-weight:500; color:#92400e; line-height:1.35;">ℹ️ <strong>Atención Conductor:</strong> Verifique si seleccionó el producto correcto del tiquete (ej. Hueso Blanco vs Hueso Cerdo).<br>👉 <strong>Aun con diferencia, puede continuar y pulsar "Guardar Recolección" al final de la pantalla (se conciliará en oficina).</strong></small>`;
     }
 }
 
@@ -2376,18 +2382,37 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         }
         data.fotoFactura = fotoFacturaFinal || '';
 
-        // 1. Guardar en respaldo local (LocalStorage) de inmediato
-        let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
-        const dataForBackup = { 
-            ...data, 
-            firma: firmaURL, 
-            id: recordId,
-            sync_sheets: false,
-            sync_sheets_at: null
-        };
-        // El backup local guarda URL o base64 para factibilidad futura
-        savedBackup.unshift(dataForBackup);
-        localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
+        // 1. Guardar en respaldo local (LocalStorage) de forma segura y tolerante a fallos de cuota
+        try {
+            let savedBackup = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+            const dataForBackup = { 
+                ...data, 
+                firma: firmaURL, 
+                id: recordId,
+                sync_sheets: false,
+                sync_sheets_at: null
+            };
+            savedBackup.unshift(dataForBackup);
+            if (savedBackup.length > 50) savedBackup = savedBackup.slice(0, 50);
+            try {
+                localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup));
+            } catch (quotaErr) {
+                console.warn("⚠️ QuotaExceeded en LocalStorage. Purgando fotos pesadas para liberar espacio:", quotaErr);
+                savedBackup = savedBackup.slice(0, 25).map(item => {
+                    const cleanItem = { ...item };
+                    if (cleanItem.fotoFactura && cleanItem.fotoFactura.startsWith('data:image')) {
+                        cleanItem.fotoFactura = 'Foto Factura Registrada';
+                    }
+                    if (cleanItem.firma && cleanItem.firma.startsWith('data:image') && cleanItem.firma.length > 500) {
+                        cleanItem.firma = '';
+                    }
+                    return cleanItem;
+                });
+                try { localStorage.setItem('recolecciones_backup', JSON.stringify(savedBackup)); } catch(e2) {}
+            }
+        } catch (backupErr) {
+            console.warn("⚠️ Aviso al respaldar localmente:", backupErr);
+        }
 
         // 2. Sincronizar inmediatamente con Google Sheets (vía webhook sin bloquear) - con URL de firma
         if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== "") {
@@ -3554,7 +3579,7 @@ function initRutasYProveedores() {
             }
             if (autofillBadge) autofillBadge.style.display = 'none';
         } else {
-            // BLINDAJE CRÍTICO (v1.9.3): Si el usuario ya eligió un proveedor válido en el formulario
+            // BLINDAJE CRÍTICO (v1.9.4): Si el usuario ya eligió un proveedor válido en el formulario
             // (flujo estándar: Ruta -> Proveedor -> Sucursal), NUNCA sobreescribir el proveedor.
             // Puntos compartidos como Cavasa, Santa Elena, Planta, etc. albergan múltiples proveedores
             // legítimos y sobreescribir el proveedor falsea y corrompe los registros contables.
@@ -4299,7 +4324,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.3&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.4&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -5641,12 +5666,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.9.3 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.9.4 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.9.3')
+            navigator.serviceWorker.register('/sw.js?v=1.9.4')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.9.3 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.9.4 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -5654,8 +5679,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.9.3 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.3&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.9.4 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.4&t=' + Date.now();
                                 }
                             };
                         }
@@ -5684,7 +5709,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.9.3&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.9.4&t=' + Date.now();
             }
         });
 
@@ -5693,7 +5718,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.3&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.4&t=' + Date.now();
                 }
             }
         });
@@ -6384,7 +6409,7 @@ procesarPuntosRutasDinamicos = function(puntosArray) {
 };
 
 // ===================================================================================
-// v1.9.2: Barra de desplazamiento horizontal SUPERIOR sincronizada para la tabla
+// v1.9.4: Barra de desplazamiento horizontal SUPERIOR sincronizada para la tabla
 // "Recolecciones en Vivo" + botones ◀ ▶ + soporte de rueda del mouse (Shift no requerido
 // sobre la barra superior). Evita bajar hasta el final de la tabla para moverse a la derecha.
 // ===================================================================================

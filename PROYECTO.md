@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.9.3`  
+> **Versión Actual:** `v=1.9.4`  
 > **Última Actualización:** Noviembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -998,3 +998,8 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - Umbral de seguridad en `refrescarPuntosRutasDesdeSheets()` (`length >= 20`) para evitar que respuestas filtradas de GViz borren el catálogo completo en memoria.
   - Cache-busting dinámico con `format=json&` en la carga de catálogos.
 - **Actualización PWA:** Actualización de Service Worker `sw.js` a `proteinagro-v1.9.3`, e incremento de versiones en `index.html` y `GEMINI.md`.
+
+## v1.9.4 - Correccion de Tarifas de Referencia Caribe, Alerta Reaseguradora y Blindaje LocalStorage (7/11/2026)
+- Actualizacion de tarifas de referencia para Supermercados Caribe: Desperdicio a $100 y Hueso Blanco a $350 (alineado 100% con facturas fisicas en sitio).
+- Alerta dinamica con texto orientativo: confirma que aun con diferencias el conductor puede pulsar "Guardar Recoleccion".
+- Eliminacion de atributo required en input oculto producto-seleccionado y blindaje contra QuotaExceeded en LocalStorage. Cache PWA proteinagro-v1.9.4.

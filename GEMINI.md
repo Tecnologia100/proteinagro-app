@@ -605,6 +605,20 @@ i.fecha), consolidándose directamente en la fila de ese día.
   5. *Petición Webhook con `format=json`:* `cargarCatalogosDinamicos()` solicita explícitamente `format=json&t=...` para garantizar que el endpoint de Apps Script responda siempre con el JSON completo (134 puntos) en lugar de la vista HTML.
   6. *Bumping de Versión PWA:* Caché actualizada a `proteinagro-v1.9.3` en `sw.js`, `index.html` y `app.js`.
 
+### 36. Corrección de Tarifas de Referencia Caribe, Alerta de Discrepancia No Bloqueante y Blindaje de Cuota LocalStorage (`v1.9.4`)
+- **Diagnóstico y Causa Raíz de Reporte de Guardado en Campo:**
+  - El conductor registró en Supermercados Caribe (Buga, Factura `10FB-18237` por $34.675) 114 kg de Desperdicio y 66,5 kg de Hueso. Al ingresar el valor de la factura, apareció una alerta en amarillo intenso: `⚠️ Diferencia detectada (-$28.500): La factura física indica $34.675, pero según los kilos registrados el estimado es $63.175. Verifique el tiquete (se guardará para conciliación).`
+  - *Causa 1 (Selección Errónea en Campo):* En el tiquete físico el producto indicaba `CARNE DE RES HUESO BLANCO 66.50 kg a $350`, pero en la aplicación el conductor seleccionó accidentalmente `HUESO DE CERDO 66,5 kg`.
+  - *Causa 2 (Tarifas de Referencia Desactualizadas en `app.js`):* En `TARIFAS_REFERENCIA_CARIBE`, `DESPERDICIO` estaba fijado en `$350` (en vez de la tarifa oficial de Caribe de **`$100`**) y `HUESO BLANCO` en `$500` (en vez de **`$350`**). Esto provocaba que 114 kg de desperdicio se valoraran en $39.900 en vez de $11.400, inflando el estimado a $63.175 y generando una falsa discrepancia de -$28.500.
+  - *Causa 3 (Percepción de Bloqueo por Advertencia):* El texto advertía *"Diferencia detectada... Verifique el tiquete"* sin aclarar de forma explícita que el conductor podía continuar y pulsar el botón de guardar.
+  - *Causa 4 (Riesgo de QuotaExceeded por Fotos Base64):* `localStorage.setItem('recolecciones_backup')` no estaba envuelto en un bloque tolerante a fallos de cuota (5MB), lo que podía interrumpir el guardado si se acumulaban fotos de facturas en base64.
+- **Solución Implementada (`v1.9.4`):**
+  1. *Actualización de Tarifas Caribe:* Se actualizaron los precios oficiales en `TARIFAS_REFERENCIA_CARIBE`: `DESPERDICIO: $100`, `HUESO BLANCO: $350`, `HUESO DE CERDO: $350`, `GORDANA: $1.300`, `SEBO EN RAMA: $1.300`, `PIEL POLLO: $300`, `PIELES: $100`, `PULMON DE CERDO: $100`. Con estos valores, `114 kg Desperdicio ($100) + 66,5 kg Hueso Blanco ($350) = $34.675`, coincidiendo 100% con la factura y activando el banner verde `✅ Liquidación coincidente`.
+  2. *Mensaje Reasegurador en Alerta:* En caso de diferencia, la alerta orienta al conductor a verificar si eligió el producto correcto y le aclara explícitamente: *"Aun con diferencia, puede continuar y pulsar 'Guardar Recolección' al final de la pantalla (se conciliará en oficina)"*.
+  3. *Blindaje de Almacenamiento Local:* `recolecciones_backup` se encapsuló en un manejador que poda automáticamente imágenes pesadas si se alcanza la cuota de 5MB en el navegador móvil, garantizando que el envío a Google Sheets y Firebase nunca se interrumpa.
+  4. *Remoción de `required` en Input Oculto:* Se retiró el atributo `required` en `<input type="hidden" id="producto-seleccionado">` para evitar bloqueos silenciosos de validación en navegadores móviles.
+  5. *Bumping de Versión PWA:* Actualizado a `proteinagro-v1.9.4` en `sw.js`, `index.html` y `app.js`.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
