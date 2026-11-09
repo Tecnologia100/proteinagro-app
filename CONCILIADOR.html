@@ -5420,7 +5420,11 @@
                         }
                     }
                     if (!encontrado) {
-                        const recExistente = rawData.find(r => r.FECHA === nov.fecha && productosCoinciden(r.MATERIA, nov.producto));
+                        const dNov = parsearFechaCeldaUniversal(nov.fecha);
+                        const recExistente = rawData.find(r => {
+                            const dR = parsearFechaCeldaUniversal(r.FECHA);
+                            return dR && dNov && dR.dia === dNov.dia && dR.mes === dNov.mes && dR.anio === dNov.anio && productosCoinciden(r.MATERIA, nov.producto);
+                        });
                         if (recExistente) {
                             recExistente.KG = kgTarget;
                             if (recExistente.PRECIO > 0) recExistente.VALOR = kgTarget * recExistente.PRECIO;
