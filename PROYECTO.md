@@ -1015,3 +1015,11 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - Escritura quirurgica exclusiva en columnas K y L (`Precio` y `Valor`) preservando al 100% las formulas de `ID_Clave` (M), `Alerta` (N) y Tablero Duplicados (R+).
 - Revalidacion de hoja `Tarifas` y liquidacion ejecutada en vivo sobre Google Sheets: **144 registros liquidados** (incluyendo los 19 registros homologados del Grupo A y las 14 filas de Caribe Hueso de Pollo / Hueso de Cerdo), 53 visitas fallidas (0 Kg) intactas y solo 17 filas (14 combinaciones del Grupo B) pendientes por definir tarifa.
 - Boton 1-clic en el menu `📊 Conciliador > 💰 Liquidar Precios Vacíos en Recolecciones` de Google Sheets y en el Panel Administrativo de la PWA (`💰 Liquidar Precios Vacíos`).
+
+## v1.9.5 (Blindaje Fechas Conciliación) - Erradicación de Año 2027 y Saneamiento de Duplicados (9/11/2026)
+- **Blindaje Total contra Año 2027:**
+  - Acotada la detección de año en `detectarAnioDeTexto` a `/\b(202[4-6])\b/`, eliminando falsos positivos provocados por números de remisión, pesos o facturas con valor `2027`.
+  - Normalización en `parsearFechaCeldaUniversal`: En todos los formatos (`Date`, números, `DD-mmm`, `partsSlash`, `partsDash`), cualquier año menor a 2024 o mayor a 2026 se fuerza inmediatamente a `anioBase` (2026).
+  - Sanitización atómica en `crearObjetoNovedad`: Forzado el año del objeto novedad estrictamente a `2026` antes de renderizar el modal de confirmación y enviar al webhook.
+  - Salvaguarda en Servidor (`Code.gs` / `aplicarNovedadesConciliacionSheet`): Sanitización de `fechaStr` garantizando que todo faltante insertado se registre con año `2026 12:00:00`.
+- **Saneamiento de Duplicados:** Eliminadas de Google Sheets las 6 filas redundantes de pruebas de Orlando Martínez del 25/10/2026 (`REC-1794256287019-5453`, `REC-1794256294008-6375`, `REC-1794256299856-7666`, `REC-1794258697343-9686`, `REC-1794258704553-6317`, `REC-1794258711775-9675`), conservando intacto el único triplete original legítimo (84 Kg Desperdicio, 119 Kg Hueso Blanco, 68 Kg Sebo en Rama).

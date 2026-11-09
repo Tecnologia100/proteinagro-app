@@ -644,6 +644,18 @@ i.fecha), consolidándose directamente en la fila de ese día.
   4. *Homologación Aprobada Grupo A (`buscarHomologadoGrupoA_`):* Liquida automáticamente las variantes aprobadas (`Supertienda Cañaveral SEBO` ➔ \$1.200, `Cañaveral Hueso Cerdo` ➔ \$150, `Alberto Millán SEBO` ➔ \$1.400, `Bárbara Gómez Sebo` ➔ \$1.200, `Belalcázar Carnes y Derivados` Hueso Blanco ➔ \$200 / Sebo en Rama ➔ \$1.200, `Belalcázar Rozo Hueso de Cerdo` ➔ \$100, `Sevillana Frigorivalle Hueso Promoción` ➔ \$1.200, `Ciudad del Campo Empella` ➔ \$2.000, `Olímpica / Cañaveral Desperdicio` ➔ \$100).
   5. *Acceso 1-Clic en Menú de Sheets y Panel Admin PWA:* Opción `💰 Liquidar Precios Vacíos en Recolecciones` integrada en el menú `📊 Conciliador` de Google Sheets y botón `💰 Liquidar Precios Vacíos` (`liquidarPreciosVaciosSheetsAdmin`) en el panel administrativo de la PWA (`index.html` / `app.js`).
 
+### 35. Blindaje de Fechas en Conciliación contra Año 2027 y Saneamiento de Triplete Duplicado (`v1.9.5`)
+- **Diagnóstico y Causas Raíz del Año 2027:**
+  1. *Detección de Año sin Acotar en `detectarAnioDeTexto`:* La expresión regular `/\b(202[4-9])\b/` capturaba números de remisión, facturas, tiquetes o pesos en los primeros 12 renglones del archivo cuyo valor numérico coincidía con `2027`, fijando `autoInfo.anio = 2027` y propagándose como `anioObjetivo = 2027`.
+  2. *Falta de Acotamiento en `parsearFechaCeldaUniversal`:* Al procesar fechas con año de 2 dígitos (ej. `27` como día o año invertido `26/10/27` o `27/10/26`), `y < 100` sumaba 2000 resultando en `2027`.
+  3. *Ausencia de Clamping en `crearObjetoNovedad` y Webhook `Code.gs`:* Las novedades enviadas no validaban que el año final fuera estrictamente el año contable auditado (`2026`).
+- **Solución y Blindaje en 5 Capas:**
+  1. *`detectarAnioDeTexto`:* Acotado estrictamente a `/\b(202[4-6])\b/`, descartando cualquier valor espurio de 2027+.
+  2. *`parsearFechaCeldaUniversal`:* En todos los casos (`Date`, números, `DD-mmm`, `partsSlash`, `partsDash`), cualquier año menor a 2024 o mayor a 2026 se fuerza inmediatamente a `anioBase` (2026). Soporta indistintamente formatos `DD/MM/YYYY`, `YYYY/MM/DD`, `DD-MM-YYYY` y `YYYY-MM-DD`.
+  3. *`crearObjetoNovedad`:* Sanitización atómica obligatoria de `fechaSanitizada`: extrae día, mes y año con regex y garantiza que el año persistido sea siempre el período activo (`2026`).
+  4. *`Code.gs` (`aplicarNovedadesConciliacionSheet`):* Sanitización de `fechaStr`: si el año de la novedad es mayor a 2026 o menor a 2024, se fuerza a `2026` con hora `12:00:00`.
+  5. *Saneamiento Quirúrgico de Duplicados de Orlando Martínez (25/10/2026):* Eliminación de las 6 filas redundantes de pruebas de faltantes (`REC-1794256287019-5453`, `REC-1794256294008-6375`, `REC-1794256299856-7666`, `REC-1794258697343-9686`, `REC-1794258704553-6317`, `REC-1794258711775-9675`), conservando intacto el triplete original legítimo (Desperdicio 84 Kg, Hueso Blanco 119 Kg, Sebo en Rama 68 Kg).
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
