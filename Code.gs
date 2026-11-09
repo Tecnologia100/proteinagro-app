@@ -997,9 +997,21 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
       } else {
         // INSERTAR_FALTANTE (o por defecto)
         var newId = 'REC-' + new Date().getTime() + '-' + Math.floor(1000 + Math.random() * 9000);
-        var fechaStr = nov.fechaHora || nov.fecha || new Date().toLocaleString();
-        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(fechaStr).trim())) {
-          fechaStr = String(fechaStr).trim() + ' 12:00:00';
+        var fechaStr = String(nov.fechaHora || nov.fecha || '').trim();
+        if (!fechaStr) {
+          fechaStr = Utilities.formatDate(new Date(), "America/Bogota", "dd/MM/yyyy HH:mm:ss");
+        } else {
+          var mF = fechaStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}:\d{1,2}(?::\d{1,2})?))?$/);
+          if (mF) {
+            var d = ('0' + mF[1]).slice(-2);
+            var m = ('0' + mF[2]).slice(-2);
+            var y = Number(mF[3]);
+            if (y < 100) y += 2000;
+            if (y < 2024 || y > 2026) y = 2026;
+            var hora = mF[4] || '12:00:00';
+            if (hora.split(':').length === 2) hora += ':00';
+            fechaStr = d + '/' + m + '/' + y + ' ' + hora;
+          }
         }
 
         var precioItem = '';

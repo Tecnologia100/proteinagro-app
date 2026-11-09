@@ -4028,16 +4028,24 @@
 
         function detectarAnioDeTexto(texto) {
             if (!texto) return null;
-            const m = String(texto).match(/\b(202[4-9])\b/);
+            // Solo detectar años contables válidos (2024 a 2026)
+            const m = String(texto).match(/\b(202[4-6])\b/);
             return m ? Number(m[1]) : null;
         }
 
         function parsearFechaCeldaUniversal(val, mesDefault, anioDefault) {
             if (val === null || val === undefined || val === '') return null;
+            const anioBase = (anioDefault && Number(anioDefault) >= 2024 && Number(anioDefault) <= 2026) ? Number(anioDefault) : 2026;
             if (val instanceof Date && !isNaN(val.getTime())) {
-                const dia = val.getUTCDate();
-                const mes = val.getUTCMonth() + 1;
-                const anio = val.getUTCFullYear();
+                let dia = val.getUTCDate();
+                let mes = val.getUTCMonth() + 1;
+                let anio = val.getUTCFullYear();
+                if (val.getUTCHours() !== 0 || val.getUTCMinutes() !== 0) {
+                    dia = val.getDate();
+                    mes = val.getMonth() + 1;
+                    anio = val.getFullYear();
+                }
+                if (anio < 2024 || anio > 2026) anio = anioBase;
                 return {
                     dia, mes, anio,
                     fechaStr: `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${anio}`,
@@ -4049,7 +4057,7 @@
                 const d = Math.round(val);
                 if (d >= 1 && d <= 31) {
                     const m = mesDefault || 9;
-                    const y = anioDefault || 2026;
+                    const y = anioBase;
                     return {
                         dia: d, mes: m, anio: y,
                         fechaStr: `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`,
@@ -4064,7 +4072,7 @@
                 const d = Number(s);
                 if (d >= 1 && d <= 31) {
                     const m = mesDefault || 9;
-                    const y = anioDefault || 2026;
+                    const y = anioBase;
                     return {
                         dia: d, mes: m, anio: y,
                         fechaStr: `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`,
@@ -4073,14 +4081,15 @@
                     };
                 }
             }
-            // Formato DD-mmm o DD-mmm-YYYY (ej. "31-ago", "01-sep", "15-sep-2026")
-            const mText = s.match(/^(\d{1,2})[-/\s.]([A-Za-z]{3,10})(?:[-/\s.](\d{2,4}))?$/);
+            // Formato DD-mmm o DD-mmm-YYYY o DD-mmm-YY (ej. "31-ago", "01-sep", "15-sep-2026", "07-oct-26")
+            const mText = s.match(/^(\d{1,2})[-/\s.]([A-Za-z]{3,10})(?:[-/\s.](\d{1,4}))?$/);
             if (mText) {
                 const d = Number(mText[1]);
                 const m = detectarMesDeTexto(mText[2]);
-                let y = mText[3] ? Number(mText[3]) : (anioDefault || 2026);
+                let y = mText[3] ? Number(mText[3]) : anioBase;
                 if (y < 100) y += 2000;
-                else if (y >= 200 && y < 1000) y = anioDefault || 2026;
+                else if (y >= 200 && y < 1000) y = anioBase;
+                if (y < 2024 || y > 2026) y = anioBase;
                 if (m && d >= 1 && d <= 31) {
                     return {
                         dia: d, mes: m, anio: y,
@@ -4090,13 +4099,25 @@
                     };
                 }
             }
-            // Formato DD/MM/YYYY o YYYY-MM-DD
+            // Formato DD/MM/YYYY o YYYY/MM/DD o YY/MM/DD
             const partsSlash = s.split('/');
             if (partsSlash.length === 3) {
-                const d = Number(partsSlash[0]);
-                const m = Number(partsSlash[1]);
-                let y = Number(partsSlash[2]);
-                if (y < 100) y += 2000;
+                let p0 = Number(partsSlash[0]);
+                let p1 = Number(partsSlash[1]);
+                let p2 = Number(partsSlash[2]);
+                let d, m, y;
+                if (p0 > 1900 || (p0 >= 24 && p0 <= 30 && p2 <= 31 && p1 <= 12)) {
+                    y = p0 < 100 ? p0 + 2000 : p0;
+                    m = p1;
+                    d = p2;
+                } else {
+                    d = p0;
+                    m = p1;
+                    y = p2;
+                    if (y < 100) y += 2000;
+                    else if (y >= 200 && y < 1000) y = anioBase;
+                }
+                if (y < 2024 || y > 2026) y = anioBase;
                 if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
                     return {
                         dia: d, mes: m, anio: y,
@@ -4106,12 +4127,25 @@
                     };
                 }
             }
+            // Formato DD-MM-YYYY o YYYY-MM-DD o YY-MM-DD
             const partsDash = s.split('-');
             if (partsDash.length === 3) {
-                let y = Number(partsDash[0]);
-                let m = Number(partsDash[1]);
-                let d = Number(partsDash[2]);
-                if (y <= 31 && d > 1900) { const tmp = y; y = d; d = tmp; }
+                let p0 = Number(partsDash[0]);
+                let p1 = Number(partsDash[1]);
+                let p2 = Number(partsDash[2]);
+                let d, m, y;
+                if (p0 > 1900 || (p0 >= 24 && p0 <= 30 && p2 <= 31 && p1 <= 12)) {
+                    y = p0 < 100 ? p0 + 2000 : p0;
+                    m = p1;
+                    d = p2;
+                } else {
+                    d = p0;
+                    m = p1;
+                    y = p2;
+                    if (y < 100) y += 2000;
+                    else if (y >= 200 && y < 1000) y = anioBase;
+                }
+                if (y < 2024 || y > 2026) y = anioBase;
                 if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
                     return {
                         dia: d, mes: m, anio: y,
@@ -4790,12 +4824,26 @@
 
         function crearObjetoNovedad(tipo, datos) {
             const uid = 'nov_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+            let fechaSanitizada = String(datos.fecha || '').trim();
+            const mFecha = fechaSanitizada.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+            if (mFecha) {
+                const diaStr = mFecha[1].padStart(2, '0');
+                const mesStr = mFecha[2].padStart(2, '0');
+                let anioNum = Number(mFecha[3]);
+                if (anioNum < 100) anioNum += 2000;
+                if (anioNum < 2024 || anioNum > 2026) {
+                    const selAnioVal = document.getElementById('concSelectAnio')?.value;
+                    anioNum = Number(selAnioVal) || 2026;
+                }
+                fechaSanitizada = `${diaStr}/${mesStr}/${anioNum}`;
+            }
+
             const nov = {
                 _uid: uid,
                 tipoNovedad: tipo, // 'FALTANTE' | 'DESVIACION'
                 dia: datos.dia,
                 sortKey: datos.sortKey,
-                fecha: datos.fecha,
+                fecha: fechaSanitizada,
                 producto: datos.producto,
                 kg_proveedor: datos.kg_proveedor,
                 kg_recoleccion: datos.kg_recoleccion || 0,
