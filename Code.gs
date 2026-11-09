@@ -1655,9 +1655,9 @@ function buscarHomologadoGrupoA_(provClean, puntoClean, prodClean) {
   if (provClean === 'supertiendacanaveral' && prodClean === 'huesocerdo') {
     return { precio: 150, fuente: 'Tarifas Homologada (Hueso de Cerdo Cañaveral)' };
   }
-  // 4. Alberto Millan -> SEBO = $1.200
+  // 4. Alberto Millan -> SEBO = $1.400
   if (provClean === 'albertomillan' && prodClean === 'sebo') {
-    return { precio: 1200, fuente: 'Tarifas Homologada (Sebo en Rama Alberto Millán)' };
+    return { precio: 1400, fuente: 'Tarifas Homologada (Sebo en Rama Alberto Millán)' };
   }
   // 5. Barbara Gomez -> Sebo = $1.200
   if (provClean === 'barbaragomez' && prodClean === 'sebo') {
@@ -1737,7 +1737,7 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
 
   var headers = sheetRec.getRange(1, 1, 1, lastCol).getValues()[0];
   var colIdx = { id: 0, prov: 4, punto: 5, prod: 6, kg: 7, precio: 10, valor: 11 };
-  for (var c = 0; c < headers.length; c++) {
+  for (var c = 0; c < Math.min(headers.length, 12); c++) {
     var h = normalizarTexto(headers[c]);
     if (h.indexOf('id') !== -1 && c === 0) colIdx.id = c;
     else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;

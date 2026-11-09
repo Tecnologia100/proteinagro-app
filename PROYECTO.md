@@ -1011,7 +1011,7 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Indicadores 100% Intactos:** Kilos totales (`TOTAL GENERAL`), precios unitarios (`PRECIO`), valores en pesos (`VALOR`), KPIs del Conciliador y gráficos por proveedor permanecen inalterados. Cache PWA `proteinagro-v1.9.5`.
 
 ## v1.9.5 (Complemento) - Liquidacion Segura y Atomica de Precios Vacios en Recolecciones (9/11/2026)
-- Respaldo previo automatico (`Recolecciones_Backup_PreLiquidacion_YYYYMMDD`) antes de escribir cambios y copia local en `backups/Recolecciones_Backup_PreLiquidacion_20261109.csv`.
+- Respaldo previo automatico (`Recolecciones_Backup_PreLiquidacion_YYYYMMDD`) antes de escribir cambios y copia local sin filtros en `backups/Recolecciones_Backup_PreLiquidacion_20261109.csv`.
 - Escritura quirurgica exclusiva en columnas K y L (`Precio` y `Valor`) preservando al 100% las formulas de `ID_Clave` (M), `Alerta` (N) y Tablero Duplicados (R+).
-- Homologacion aprobada del Grupo A (129 registros liquidados por $103.341.185 COP) y exclusion de 53 visitas fallidas (0 Kg).
+- Revalidacion de hoja `Tarifas` y liquidacion ejecutada en vivo sobre Google Sheets: **144 registros liquidados** (incluyendo los 19 registros homologados del Grupo A y las 14 filas de Caribe Hueso de Pollo / Hueso de Cerdo), 53 visitas fallidas (0 Kg) intactas y solo 17 filas (14 combinaciones del Grupo B) pendientes por definir tarifa.
 - Boton 1-clic en el menu `📊 Conciliador > 💰 Liquidar Precios Vacíos en Recolecciones` de Google Sheets y en el Panel Administrativo de la PWA (`💰 Liquidar Precios Vacíos`).
