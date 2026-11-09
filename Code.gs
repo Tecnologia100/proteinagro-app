@@ -886,6 +886,19 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
       var prodNombre = String(nov.producto || nov.materia || '').trim();
       var kgTarget = parseKilosNumero(nov.kilos !== undefined ? nov.kilos : (nov.kilosProveedor !== undefined ? nov.kilosProveedor : (nov.kg || 0)));
       var prov = removerEmojisDecorativos(nov.proveedor || '');
+      if (prov.indexOf('/') !== -1) {
+        var provParts = prov.split('/').map(function(p) { return p.trim(); }).filter(Boolean);
+        if (provParts.length > 0) {
+          var mejorProv = provParts[0];
+          for (var pp = 0; pp < provParts.length; pp++) {
+            if (buscarPrecioEnCatalogoTarifas(catalogoTarifas, provParts[pp], punto, prodNombre) > 0) {
+              mejorProv = provParts[pp];
+              break;
+            }
+          }
+          prov = mejorProv;
+        }
+      }
       var punto = nov.punto || nov.sucursal || '';
       var ruta = nov.ruta || '';
       var cond = nov.conductor || '';

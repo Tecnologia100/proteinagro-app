@@ -644,7 +644,7 @@ i.fecha), consolidándose directamente en la fila de ese día.
   4. *Homologación Aprobada Grupo A (`buscarHomologadoGrupoA_`):* Liquida automáticamente las variantes aprobadas (`Supertienda Cañaveral SEBO` ➔ \$1.200, `Cañaveral Hueso Cerdo` ➔ \$150, `Alberto Millán SEBO` ➔ \$1.400, `Bárbara Gómez Sebo` ➔ \$1.200, `Belalcázar Carnes y Derivados` Hueso Blanco ➔ \$200 / Sebo en Rama ➔ \$1.200, `Belalcázar Rozo Hueso de Cerdo` ➔ \$100, `Sevillana Frigorivalle Hueso Promoción` ➔ \$1.200, `Ciudad del Campo Empella` ➔ \$2.000, `Olímpica / Cañaveral Desperdicio` ➔ \$100).
   5. *Acceso 1-Clic en Menú de Sheets y Panel Admin PWA:* Opción `💰 Liquidar Precios Vacíos en Recolecciones` integrada en el menú `📊 Conciliador` de Google Sheets y botón `💰 Liquidar Precios Vacíos` (`liquidarPreciosVaciosSheetsAdmin`) en el panel administrativo de la PWA (`index.html` / `app.js`).
 
-### 35. Blindaje de Fechas en Conciliación contra Año 2027 y Saneamiento de Triplete Duplicado (`v1.9.5`)
+### 39. Blindaje de Fechas en Conciliación contra Año 2027 y Saneamiento de Triplete Duplicado (`v1.9.5`)
 - **Diagnóstico y Causas Raíz del Año 2027:**
   1. *Detección de Año sin Acotar en `detectarAnioDeTexto`:* La expresión regular `/\b(202[4-9])\b/` capturaba números de remisión, facturas, tiquetes o pesos en los primeros 12 renglones del archivo cuyo valor numérico coincidía con `2027`, fijando `autoInfo.anio = 2027` y propagándose como `anioObjetivo = 2027`.
   2. *Falta de Acotamiento en `parsearFechaCeldaUniversal`:* Al procesar fechas con año de 2 dígitos (ej. `27` como día o año invertido `26/10/27` o `27/10/26`), `y < 100` sumaba 2000 resultando en `2027`.
@@ -655,6 +655,31 @@ i.fecha), consolidándose directamente en la fila de ese día.
   3. *`crearObjetoNovedad`:* Sanitización atómica obligatoria de `fechaSanitizada`: extrae día, mes y año con regex y garantiza que el año persistido sea siempre el período activo (`2026`).
   4. *`Code.gs` (`aplicarNovedadesConciliacionSheet`):* Sanitización de `fechaStr`: si el año de la novedad es mayor a 2026 o menor a 2024, se fuerza a `2026` con hora `12:00:00`.
   5. *Saneamiento Quirúrgico de Duplicados de Orlando Martínez (25/10/2026):* Eliminación de las 6 filas redundantes de pruebas de faltantes (`REC-1794256287019-5453`, `REC-1794256294008-6375`, `REC-1794256299856-7666`, `REC-1794258697343-9686`, `REC-1794258704553-6317`, `REC-1794258711775-9675`), conservando intacto el triplete original legítimo (Desperdicio 84 Kg, Hueso Blanco 119 Kg, Sebo en Rama 68 Kg).
+
+### 40. Selector Múltiple y Buscador en Tiempo Real de Proveedores en Conciliador Universal (`v1.9.6`)
+- **Problema / Necesidad Operativa:**
+  - En la ventana modal de conciliación (`CONCILIADOR.html`), el filtro de proveedor `#concSelectProveedor` era un selector `<select>` nativo que solo admitía un proveedor a la vez o auto-detección (`AUTO`).
+  - Esto impedía auditar conjuntamente planillas o facturas combinadas de proveedores hermanos o cuentas agrupadas (ej. `Bárbara Gómez` + `La Reserva`, `Bodega Santa Elena` + `Alejandro Garay`, o múltiples proveedores de Cavasa) en una única corrida forense.
+- **Arquitectura de Solución Implementada (`v1.9.6`):**
+  1. *Componente Visual Multi-Select Reactivo:*
+     - Botón principal `#concProvMultiselectBtn` con texto dinámico `#concProvMultiselectLabel` y badge contador azul `#concProvMultipleBadge` cuando hay 2 o más proveedores seleccionados.
+     - Panel desplegable flotante `#concProvMultiselectDropdown` con buscador en vivo `#concProvSearchInput` (búsqueda diacrítica insensible a tildes y mayúsculas/minúsculas).
+     - Botonera rápida de acción: `✨ Auto-detectar` (limpia y restablece detección automática) y `Limpiar` (desmarca todos).
+     - Lista scrollable de casillas de verificación interactiva (`#concProvCheckboxesList` con `.conc-prov-opt` y clase reactiva `.selected`).
+     - Cierre automático al hacer clic fuera del componente o pulsar tecla `Escape`.
+  2. *Compatibilidad Retroactiva Bidireccional Total:*
+     - Se mantiene el `<select id="concSelectProveedor">` oculto en el DOM sincronizado con `AUTO`, `__MULTI__` o el ID individual elegido.
+     - Si algún proceso o función externa cambia `concSelectProveedor.value`, el evento `onchange` actualiza de inmediato las casillas y el label del multiselect.
+  3. *Motor Forense Multi-Proveedor en Tiempo Real:*
+     - Al seleccionar múltiples proveedores (`concSelectedProveedores.size > 1`), `sincronizarFiltroProveedorConciliacion` y `ejecutarConciliacionUniversal` generan un filtro compuesto separado por comas (ej. `"BARBARA GOMEZ, LA RESERVA"`).
+     - Dado que la función `coincideProveedorConFiltro(r.PROVEEDOR, filtroRaw)` procesa tokens separados por comas, evalúa y extrae automáticamente en vivo todas las recolecciones de cualquiera de los proveedores seleccionados sin alterar tolerancias ni reglas contables.
+  4. *Agregación Inteligente de Sucursales:*
+     - `poblarSelectorSucursalesConciliacion` fue actualizado para iterar sobre todos los proveedores en `concSelectedProveedores`, recopilando y deduplicando el conjunto completo de sucursales oficiales de cada proveedor seleccionado tanto del catálogo maestro como de la base histórica de recolecciones.
+  5. *Preservación Contable en Resoluciones y Google Sheets:*
+     - En `crearObjetoNovedad`, cada desviación toma el proveedor original registrado en la fila de Google Sheets (`recMeta[key].proveedor`), y cada faltante infiere el proveedor específico por sucursal o toma el primero seleccionado, evitando enviar nombres compuestos como `"Bárbara Gómez / La Reserva"` a la base de datos oficial.
+     - En `Code.gs` (`aplicarNovedadesConciliacionSheet`), se añadió blindaje para que, si un nombre compuesto con `/` llegara al servidor, busque y aplique la tarifa del proveedor exacto que coincida con el producto y punto en la pestaña `Tarifas`.
+  6. *Sincronización con Plantillas y Módulos de Exportación:*
+     - `descargarPlantillaEstandarProveedor` reconoce la selección múltiple y plasma los nombres seleccionados en el archivo Excel generado.
 
 ---
 

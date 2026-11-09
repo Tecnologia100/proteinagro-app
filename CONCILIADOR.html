@@ -186,6 +186,34 @@
             cursor: pointer;
         }
 
+        /* Multiselect Proveedor en Conciliador Universal */
+        .conc-prov-opt {
+            padding: 7px 10px;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            cursor: pointer;
+            font-size: 0.88em;
+            color: #1e293b;
+            border-radius: 5px;
+            transition: background 0.15s ease;
+            user-select: none;
+        }
+        .conc-prov-opt:hover {
+            background-color: #f1f5f9;
+        }
+        .conc-prov-opt.selected {
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            font-weight: 600;
+        }
+        .conc-prov-opt input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #2563eb;
+            transform: scale(1.1);
+            margin: 0;
+        }
+
         /* Botones */
         .btn-group {
             display: flex;
@@ -555,11 +583,35 @@
             <div class="modal-body">
                 <!-- Barra de Parámetros Universales -->
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
-                    <div style="flex: 1.5; min-width: 210px;">
-                        <label style="display: block; font-size: 0.78em; font-weight: 700; color: #475569; margin-bottom: 4px; text-transform: uppercase;">🏢 Proveedor en Plataforma</label>
-                        <select id="concSelectProveedor" onchange="onCambioProveedorConciliacion()" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9em; background: #fff;">
-                            <option value="AUTO">✨ Auto-detectar del archivo / filtro actual</option>
-                        </select>
+                    <div style="flex: 1.5; min-width: 220px; position: relative;" id="concProvFieldContainer">
+                        <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78em; font-weight: 700; color: #475569; margin-bottom: 4px; text-transform: uppercase;">
+                            <span>🏢 Proveedor en Plataforma</span>
+                            <span id="concProvMultipleBadge" style="display: none; background: #3b82f6; color: #fff; font-size: 0.82em; font-weight: 800; padding: 1px 7px; border-radius: 999px;">0</span>
+                        </label>
+                        <div id="concProvMultiselectWrapper" style="position: relative; width: 100%;">
+                            <button type="button" id="concProvMultiselectBtn" onclick="toggleConcProvDropdown(event)" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9em; background: #fff; display: flex; align-items: center; justify-content: space-between; cursor: pointer; text-align: left; height: 38px; box-sizing: border-box; transition: border-color 0.15s, box-shadow 0.15s;">
+                                <span id="concProvMultiselectLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: #0f172a; flex: 1; margin-right: 6px;">✨ Auto-detectar del archivo / filtro actual</span>
+                                <span style="font-size: 0.7em; color: #64748b; margin-left: 4px;">▼</span>
+                            </button>
+                            <!-- Panel desplegable con buscador y selección múltiple -->
+                            <div id="concProvMultiselectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 320px; max-width: 420px; width: 100%; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.25), 0 8px 10px -6px rgba(0,0,0,0.1); z-index: 10000; padding: 10px; box-sizing: border-box;">
+                                <div style="position: relative; margin-bottom: 8px;">
+                                    <input type="text" id="concProvSearchInput" placeholder="🔍 Buscar proveedor por nombre..." oninput="filtrarOpcionesProveedorConciliacion(this.value)" style="width: 100%; padding: 6px 10px 6px 26px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85em; box-sizing: border-box; outline: none;">
+                                    <span style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 0.78em; color: #94a3b8; pointer-events: none;">🔍</span>
+                                </div>
+                                <div style="display: flex; gap: 6px; margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
+                                    <button type="button" onclick="seleccionarAutoProveedorConciliacion()" style="flex: 1; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-radius: 4px; padding: 4px 6px; font-size: 0.78em; font-weight: 700; cursor: pointer;">✨ Auto-detectar</button>
+                                    <button type="button" onclick="deseleccionarTodosProveedoresConciliacion()" style="background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; border-radius: 4px; padding: 4px 8px; font-size: 0.78em; font-weight: 600; cursor: pointer;">Limpiar</button>
+                                </div>
+                                <div id="concProvCheckboxesList" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+                                    <!-- Opciones inyectadas dinámicamente -->
+                                </div>
+                            </div>
+                            <!-- Select oculto para compatibilidad programática -->
+                            <select id="concSelectProveedor" onchange="onCambioProveedorConciliacion()" style="display: none;">
+                                <option value="AUTO">✨ Auto-detectar del archivo / filtro actual</option>
+                            </select>
+                        </div>
                     </div>
                     <div style="flex: 1.2; min-width: 180px;">
                         <label style="display: block; font-size: 0.78em; font-weight: 700; color: #475569; margin-bottom: 4px; text-transform: uppercase;" title="Elige una sucursal específica del proveedor, todas las sucursales o un filtro personalizado">📍 Sucursal / Punto</label>
@@ -1211,11 +1263,25 @@
                 }
             }
 
-            // Depuración en MÓDULO 2 («Auditoría y Conciliación Universal de Proveedores» #concSelectProveedor)
+            // Depuración en MÓDULO 2 («Auditoría y Conciliación Universal de Proveedores» #concSelectProveedor y multiselect)
+            if (typeof concSelectedProveedores !== 'undefined' && concSelectedProveedores && concSelectedProveedores.size > 0) {
+                const invalidosConc = [];
+                concSelectedProveedores.forEach(p => {
+                    if (p !== 'BODEGA_SANTA_ELENA' && !proveedoresActivosSet.has(p)) {
+                        invalidosConc.push(p);
+                    }
+                });
+                if (invalidosConc.length > 0) {
+                    invalidosConc.forEach(p => concSelectedProveedores.delete(p));
+                    if (typeof actualizarLabelProveedoresConciliacion === 'function') {
+                        actualizarLabelProveedoresConciliacion();
+                    }
+                }
+            }
             const selConc = document.getElementById('concSelectProveedor');
             if (selConc) {
                 const valActual = selConc.value;
-                if (valActual && valActual !== 'AUTO' && valActual !== 'BODEGA_SANTA_ELENA' && !proveedoresActivosSet.has(valActual)) {
+                if (valActual && valActual !== 'AUTO' && valActual !== '__MULTI__' && valActual !== 'BODEGA_SANTA_ELENA' && !proveedoresActivosSet.has(valActual)) {
                     selConc.value = 'AUTO';
                     const inpFiltro = document.getElementById('concInputFiltroProv');
                     if (inpFiltro) inpFiltro.value = '';
@@ -1760,8 +1826,20 @@
         window.addEventListener('click', function(e) {
             const dropdown = document.getElementById('multiselectList');
             const btn = document.getElementById('multiselectBtn');
-            if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+            if (dropdown && btn && !dropdown.contains(e.target) && !btn.contains(e.target)) {
                 dropdown.classList.remove('show');
+            }
+            const concProvDropdown = document.getElementById('concProvMultiselectDropdown');
+            const concProvWrapper = document.getElementById('concProvMultiselectWrapper');
+            if (concProvDropdown && concProvWrapper && !concProvWrapper.contains(e.target)) {
+                concProvDropdown.style.display = 'none';
+            }
+        });
+
+        window.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const concProvDropdown = document.getElementById('concProvMultiselectDropdown');
+                if (concProvDropdown) concProvDropdown.style.display = 'none';
             }
         });
 
@@ -2988,6 +3066,7 @@
         let currentProveedorMemoriaKey = 'GENERAL';
         let currentProveedorDisplayName = 'Proveedor';
         let ultimoAnalisisMapeo = [];
+        let concSelectedProveedores = new Set();
 
         let conciliacionData = {
             exactos: [],
@@ -3711,10 +3790,25 @@
 
             let provActivo = '';
             let filtroProvBase = '';
-            if (provSelVal === 'BODEGA_SANTA_ELENA') {
+            if (concSelectedProveedores && concSelectedProveedores.size > 1) {
+                provActivo = [...concSelectedProveedores].map(p => p === 'BODEGA_SANTA_ELENA' ? 'Bodega Santa Elena' : p).join(' / ');
+                filtroProvBase = [...concSelectedProveedores].map(p => {
+                    if (p === 'BODEGA_SANTA_ELENA') return 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
+                    return obtenerProveedorFamiliaBase(p) || p;
+                }).join(', ');
+            } else if (concSelectedProveedores && concSelectedProveedores.size === 1) {
+                const unico = [...concSelectedProveedores][0];
+                if (unico === 'BODEGA_SANTA_ELENA') {
+                    provActivo = 'Bodega Santa Elena';
+                    filtroProvBase = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
+                } else {
+                    provActivo = obtenerProveedorFamiliaBase(unico);
+                    filtroProvBase = provActivo;
+                }
+            } else if (provSelVal === 'BODEGA_SANTA_ELENA') {
                 provActivo = 'Bodega Santa Elena';
                 filtroProvBase = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
-            } else if (provSelVal !== 'AUTO') {
+            } else if (provSelVal !== 'AUTO' && provSelVal !== '__MULTI__') {
                 provActivo = obtenerProveedorFamiliaBase(provSelVal);
                 filtroProvBase = provActivo;
             } else if (currentProveedorDisplayName && currentProveedorDisplayName !== 'Proveedor') {
@@ -3723,6 +3817,9 @@
             } else if (selectedProveedores && selectedProveedores.size === 1) {
                 provActivo = obtenerProveedorFamiliaBase([...selectedProveedores][0]);
                 filtroProvBase = provActivo;
+            } else if (selectedProveedores && selectedProveedores.size > 1) {
+                provActivo = [...selectedProveedores].join(' / ');
+                filtroProvBase = [...selectedProveedores].map(p => obtenerProveedorFamiliaBase(p) || p).join(', ');
             }
 
             if ((!provActivo || !CATALOGO_SUCURSALES_POR_PROVEEDOR[provActivo]) && valorPrevio && valorPrevio !== 'ALL' && valorPrevio !== '__CUSTOM__') {
@@ -3742,7 +3839,14 @@
             let totalRegistrosProv = 0;
             const sucursalesSet = new Set();
 
-            if (provActivo && CATALOGO_SUCURSALES_POR_PROVEEDOR[provActivo]) {
+            if (concSelectedProveedores && concSelectedProveedores.size > 1) {
+                concSelectedProveedores.forEach(p => {
+                    const pFam = (p === 'BODEGA_SANTA_ELENA') ? 'Bodega Santa Elena' : (obtenerProveedorFamiliaBase(p) || p);
+                    if (pFam && CATALOGO_SUCURSALES_POR_PROVEEDOR[pFam]) {
+                        CATALOGO_SUCURSALES_POR_PROVEEDOR[pFam].forEach(s => sucursalesSet.add(s));
+                    }
+                });
+            } else if (provActivo && CATALOGO_SUCURSALES_POR_PROVEEDOR[provActivo]) {
                 CATALOGO_SUCURSALES_POR_PROVEEDOR[provActivo].forEach(s => sucursalesSet.add(s));
             }
 
@@ -3858,60 +3962,238 @@
             recalcularSiHayArchivo();
         }
 
+        function toggleConcProvDropdown(e) {
+            if (e) {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+            const dropdown = document.getElementById('concProvMultiselectDropdown');
+            if (!dropdown) return;
+            const estaAbierto = dropdown.style.display === 'block';
+            if (estaAbierto) {
+                dropdown.style.display = 'none';
+            } else {
+                dropdown.style.display = 'block';
+                const searchInp = document.getElementById('concProvSearchInput');
+                if (searchInp) {
+                    searchInp.value = '';
+                    filtrarOpcionesProveedorConciliacion('');
+                    setTimeout(() => searchInp.focus(), 60);
+                }
+            }
+        }
+
+        function filtrarOpcionesProveedorConciliacion(term) {
+            const clean = (term || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+            const items = document.querySelectorAll('#concProvCheckboxesList .conc-prov-opt');
+            items.forEach(el => {
+                const nombre = el.getAttribute('data-nombre') || el.innerText.toLowerCase();
+                const norm = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                el.style.display = (!clean || norm.includes(clean)) ? 'flex' : 'none';
+            });
+        }
+
+        function onCheckboxProveedorConciliacion(cb) {
+            if (!cb) return;
+            const val = cb.value;
+            if (cb.checked) {
+                concSelectedProveedores.add(val);
+                cb.closest('.conc-prov-opt')?.classList.add('selected');
+            } else {
+                concSelectedProveedores.delete(val);
+                cb.closest('.conc-prov-opt')?.classList.remove('selected');
+            }
+            actualizarLabelProveedoresConciliacion();
+            sincronizarFiltroProveedorConciliacion();
+        }
+
+        function seleccionarAutoProveedorConciliacion() {
+            concSelectedProveedores.clear();
+            const cbs = document.querySelectorAll('#concProvCheckboxesList input[type="checkbox"]');
+            cbs.forEach(cb => {
+                cb.checked = false;
+                cb.closest('.conc-prov-opt')?.classList.remove('selected');
+            });
+            actualizarLabelProveedoresConciliacion();
+            sincronizarFiltroProveedorConciliacion();
+            const dropdown = document.getElementById('concProvMultiselectDropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        }
+
+        function deseleccionarTodosProveedoresConciliacion() {
+            concSelectedProveedores.clear();
+            const cbs = document.querySelectorAll('#concProvCheckboxesList input[type="checkbox"]');
+            cbs.forEach(cb => {
+                cb.checked = false;
+                cb.closest('.conc-prov-opt')?.classList.remove('selected');
+            });
+            actualizarLabelProveedoresConciliacion();
+            sincronizarFiltroProveedorConciliacion();
+        }
+
+        function actualizarLabelProveedoresConciliacion() {
+            const labelEl = document.getElementById('concProvMultiselectLabel');
+            const badgeEl = document.getElementById('concProvMultipleBadge');
+            const size = concSelectedProveedores.size;
+
+            if (size === 0) {
+                if (labelEl) labelEl.textContent = '✨ Auto-detectar del archivo / filtro actual';
+                if (badgeEl) badgeEl.style.display = 'none';
+            } else if (size === 1) {
+                const unico = [...concSelectedProveedores][0];
+                const display = (unico === 'BODEGA_SANTA_ELENA') ? '🏢 Bodega Santa Elena (Excl. Sevillana)' : unico;
+                if (labelEl) labelEl.textContent = display;
+                if (badgeEl) badgeEl.style.display = 'none';
+            } else {
+                const nombres = [...concSelectedProveedores].map(p => (p === 'BODEGA_SANTA_ELENA') ? 'Bodega Santa Elena' : p);
+                if (labelEl) labelEl.textContent = nombres.join(', ');
+                if (badgeEl) {
+                    badgeEl.textContent = String(size);
+                    badgeEl.style.display = 'inline-block';
+                }
+            }
+        }
+
+        function sincronizarFiltroProveedorConciliacion() {
+            const sel = document.getElementById('concSelectProveedor');
+            const inp = document.getElementById('concInputFiltroProv');
+            let sucPreseleccionada = 'ALL';
+
+            if (concSelectedProveedores.size === 0) {
+                if (sel) sel.value = 'AUTO';
+                if (inp) inp.value = '';
+                currentProveedorDisplayName = 'Proveedor';
+            } else if (concSelectedProveedores.size === 1) {
+                const unico = [...concSelectedProveedores][0];
+                if (sel) sel.value = unico;
+                if (unico === 'BODEGA_SANTA_ELENA') {
+                    if (inp) inp.value = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
+                    currentProveedorDisplayName = 'Bodega Santa Elena';
+                } else {
+                    const famBase = obtenerProveedorFamiliaBase(unico);
+                    if (inp) inp.value = famBase || unico;
+                    currentProveedorDisplayName = unico;
+                    if (famBase === 'Sevillana' && normalizarTextoSucursal(unico) !== 'SEVILLANA') {
+                        const sucDet = homologarSucursalConciliador('', unico);
+                        if (sucDet) sucPreseleccionada = sucDet;
+                    }
+                }
+            } else {
+                if (sel) {
+                    if (![...sel.options].some(o => o.value === '__MULTI__')) {
+                        const optM = document.createElement('option');
+                        optM.value = '__MULTI__';
+                        optM.textContent = '👥 Selección múltiple';
+                        sel.appendChild(optM);
+                    }
+                    sel.value = '__MULTI__';
+                }
+                const filtros = [...concSelectedProveedores].map(p => {
+                    if (p === 'BODEGA_SANTA_ELENA') return 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
+                    return obtenerProveedorFamiliaBase(p) || p;
+                });
+                if (inp) inp.value = filtros.join(', ');
+                currentProveedorDisplayName = [...concSelectedProveedores].map(p => p === 'BODEGA_SANTA_ELENA' ? 'Bodega Santa Elena' : p).join(' / ');
+            }
+
+            currentProveedorMemoriaKey = obtenerClaveMemoriaProveedor(currentProveedorDisplayName, inp ? inp.value : '');
+            poblarSelectorSucursalesConciliacion(false, sucPreseleccionada);
+            recalcularSiHayArchivo();
+        }
+
         function poblarSelectorProveedoresConciliacion() {
             const sel = document.getElementById('concSelectProveedor');
+            const listContainer = document.getElementById('concProvCheckboxesList');
             if (!sel) return;
-            const valorActual = sel.value || 'AUTO';
+
+            // Conservar selección previa o heredar de selectedProveedores si está vacío
+            if (concSelectedProveedores.size === 0 && selectedProveedores && selectedProveedores.size > 0) {
+                selectedProveedores.forEach(p => {
+                    if (p) concSelectedProveedores.add(p);
+                });
+            }
+
+            // 1. Llenar el select oculto de compatibilidad
             sel.innerHTML = `<option value="AUTO">✨ Auto-detectar del archivo / filtro actual</option>`;
+            sel.innerHTML += `<option value="__MULTI__">👥 Selección múltiple</option>`;
             
-            // Solo agregar opción destacada si Bodega Santa Elena está en los proveedores activos
             if (allProveedores.includes('Bodega Santa Elena')) {
                 sel.innerHTML += `<option value="BODEGA_SANTA_ELENA">🏢 Bodega Santa Elena (Excl. Sevillana)</option>`;
             }
 
             const lista = Array.isArray(allProveedores) ? allProveedores : [];
             lista.forEach(p => {
-                if (p === 'Bodega Santa Elena') return; // Evitar duplicar con la opción destacada
+                if (p === 'Bodega Santa Elena') return;
                 const opt = document.createElement('option');
                 opt.value = p;
                 opt.textContent = p;
                 sel.appendChild(opt);
             });
 
-            if ([...sel.options].some(o => o.value === valorActual)) {
-                sel.value = valorActual;
-            } else if (selectedProveedores && selectedProveedores.size === 1) {
-                const unico = [...selectedProveedores][0];
+            // 2. Llenar la lista de checkboxes interactivos del dropdown
+            if (listContainer) {
+                listContainer.innerHTML = '';
+
+                // Opción destacada Bodega Santa Elena
+                if (allProveedores.includes('Bodega Santa Elena')) {
+                    const isCheckedBSE = concSelectedProveedores.has('BODEGA_SANTA_ELENA') || concSelectedProveedores.has('Bodega Santa Elena');
+                    const optBSE = document.createElement('label');
+                    optBSE.className = `conc-prov-opt ${isCheckedBSE ? 'selected' : ''}`;
+                    optBSE.setAttribute('data-nombre', 'bodega santa elena excl sevillana');
+                    optBSE.style.background = '#f8fafc';
+                    optBSE.style.fontWeight = '600';
+                    optBSE.innerHTML = `
+                        <input type="checkbox" value="BODEGA_SANTA_ELENA" ${isCheckedBSE ? 'checked' : ''} onchange="onCheckboxProveedorConciliacion(this)">
+                        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🏢 Bodega Santa Elena (Excl. Sevillana)</span>
+                    `;
+                    listContainer.appendChild(optBSE);
+                }
+
+                // Resto de proveedores ordenados
+                lista.forEach(p => {
+                    if (p === 'Bodega Santa Elena') return;
+                    const isChecked = concSelectedProveedores.has(p);
+                    const opt = document.createElement('label');
+                    opt.className = `conc-prov-opt ${isChecked ? 'selected' : ''}`;
+                    opt.setAttribute('data-nombre', p.toLowerCase());
+                    opt.innerHTML = `
+                        <input type="checkbox" value="${p.replace(/"/g, '&quot;')}" ${isChecked ? 'checked' : ''} onchange="onCheckboxProveedorConciliacion(this)">
+                        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${p}</span>
+                    `;
+                    listContainer.appendChild(opt);
+                });
+            }
+
+            actualizarLabelProveedoresConciliacion();
+
+            // Sincronizar select oculto
+            if (concSelectedProveedores.size === 0) {
+                sel.value = 'AUTO';
+            } else if (concSelectedProveedores.size === 1) {
+                const unico = [...concSelectedProveedores][0];
                 if ([...sel.options].some(o => o.value === unico)) sel.value = unico;
                 else sel.value = 'AUTO';
             } else {
-                sel.value = 'AUTO';
+                sel.value = '__MULTI__';
             }
         }
 
         function onCambioProveedorConciliacion() {
             const sel = document.getElementById('concSelectProveedor');
-            const inp = document.getElementById('concInputFiltroProv');
-            let sucPreseleccionada = 'ALL';
-            if (sel && inp) {
-                if (sel.value === 'BODEGA_SANTA_ELENA') {
-                    inp.value = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
-                    currentProveedorDisplayName = 'Bodega Santa Elena';
-                } else if (sel.value === 'AUTO') {
-                    inp.value = '';
-                } else {
-                    const famBase = obtenerProveedorFamiliaBase(sel.value);
-                    inp.value = famBase || sel.value;
-                    currentProveedorDisplayName = sel.value;
-                    if (famBase === 'Sevillana' && normalizarTextoSucursal(sel.value) !== 'SEVILLANA') {
-                        const sucDet = homologarSucursalConciliador('', sel.value);
-                        if (sucDet) sucPreseleccionada = sucDet;
-                    }
+            if (sel) {
+                concSelectedProveedores.clear();
+                if (sel.value && sel.value !== 'AUTO' && sel.value !== '__MULTI__') {
+                    concSelectedProveedores.add(sel.value);
                 }
-                currentProveedorMemoriaKey = obtenerClaveMemoriaProveedor(currentProveedorDisplayName, inp.value);
+                const cbs = document.querySelectorAll('#concProvCheckboxesList input[type="checkbox"]');
+                cbs.forEach(cb => {
+                    cb.checked = concSelectedProveedores.has(cb.value);
+                    if (cb.checked) cb.closest('.conc-prov-opt')?.classList.add('selected');
+                    else cb.closest('.conc-prov-opt')?.classList.remove('selected');
+                });
+                actualizarLabelProveedoresConciliacion();
             }
-            poblarSelectorSucursalesConciliacion(false, sucPreseleccionada);
-            recalcularSiHayArchivo();
+            sincronizarFiltroProveedorConciliacion();
         }
 
         function recalcularSiHayArchivo() {
@@ -3930,6 +4212,8 @@
 
         function cerrarModalConciliacion() {
             document.getElementById('modalConciliacion').classList.remove('active');
+            const dropdown = document.getElementById('concProvMultiselectDropdown');
+            if (dropdown) dropdown.style.display = 'none';
         }
 
         function reiniciarConciliacion() {
@@ -3942,6 +4226,8 @@
             const selHoja = document.getElementById('concSelectHoja');
             if (selHoja) selHoja.innerHTML = `<option value="AUTO">✨ Auto-seleccionar</option>`;
             renderizarPanelMapeoProductos([], []);
+            const dropdown = document.getElementById('concProvMultiselectDropdown');
+            if (dropdown) dropdown.style.display = 'none';
         }
 
         function inicializarDropzone() {
@@ -5184,8 +5470,12 @@
             const selProvEl = document.getElementById('concSelectProveedor');
             const selSucEl = document.getElementById('concSelectSucursal');
             if (esCargaInicialArchivo && autoInfo.filtroStr) {
-                if (selProvEl && selProvEl.value !== 'AUTO') selProvEl.value = 'AUTO';
-                if (selSucEl && selSucEl.value !== 'ALL') selSucEl.value = 'ALL';
+                if (concSelectedProveedores && concSelectedProveedores.size > 0) {
+                    // Mantener selección manual de proveedores si el usuario la fijó
+                } else {
+                    if (selProvEl && selProvEl.value !== 'AUTO') selProvEl.value = 'AUTO';
+                    if (selSucEl && selSucEl.value !== 'ALL') selSucEl.value = 'ALL';
+                }
             }
             const selProvVal = selProvEl?.value || 'AUTO';
             let selSucVal = selSucEl ? selSucEl.value : 'ALL';
@@ -5196,10 +5486,35 @@
             let filtroPuntoActivo = '';
             let sucursalActivaLabel = '';
 
-            if (selProvVal === 'BODEGA_SANTA_ELENA') {
+            if (concSelectedProveedores && concSelectedProveedores.size > 1) {
+                nombreProveedorDisplay = [...concSelectedProveedores].map(p => p === 'BODEGA_SANTA_ELENA' ? 'Bodega Santa Elena' : p).join(' / ');
+                if (!filtroProvActivo) {
+                    filtroProvActivo = [...concSelectedProveedores].map(p => {
+                        if (p === 'BODEGA_SANTA_ELENA') return 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
+                        return obtenerProveedorFamiliaBase(p) || p;
+                    }).join(', ');
+                }
+            } else if (concSelectedProveedores && concSelectedProveedores.size === 1) {
+                const unico = [...concSelectedProveedores][0];
+                if (unico === 'BODEGA_SANTA_ELENA') {
+                    nombreProveedorDisplay = 'Bodega Santa Elena';
+                    if (!filtroProvActivo) filtroProvActivo = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
+                } else {
+                    nombreProveedorDisplay = unico;
+                    if (!filtroProvActivo) {
+                        const selNorm = unico.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        if ((selNorm.includes('BARBARA GOMEZ') || selNorm.includes('LA RESERVA')) &&
+                            autoInfo.filtroStr && autoInfo.filtroStr.toUpperCase().includes('BARBARA') && autoInfo.filtroStr.toUpperCase().includes('RESERVA')) {
+                            filtroProvActivo = 'BARBARA GOMEZ, LA RESERVA';
+                        } else {
+                            filtroProvActivo = obtenerProveedorFamiliaBase(unico);
+                        }
+                    }
+                }
+            } else if (selProvVal === 'BODEGA_SANTA_ELENA') {
                 nombreProveedorDisplay = 'Bodega Santa Elena';
                 if (!filtroProvActivo) filtroProvActivo = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
-            } else if (selProvVal !== 'AUTO') {
+            } else if (selProvVal !== 'AUTO' && selProvVal !== '__MULTI__') {
                 nombreProveedorDisplay = selProvVal;
                 if (!filtroProvActivo) {
                     const selNorm = selProvVal.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -5840,11 +6155,11 @@
 
                 const key = `${dInfo.fechaStr}||${prodHom}`;
                 recAgrupado[key] = (recAgrupado[key] || 0) + kg;
-                recIndividuales.push({ key, kg, fecha: dInfo.fechaStr, prod: prodHom, mes: dInfo.mes, sortKey: dInfo.sortKey, id: r.ID || '', PUNTO: r.PUNTO || '', ruta: r.RUTA || '', conductor: r.CONDUCTOR || '' });
+                recIndividuales.push({ key, kg, fecha: dInfo.fechaStr, prod: prodHom, mes: dInfo.mes, sortKey: dInfo.sortKey, id: r.ID || '', PUNTO: r.PUNTO || '', ruta: r.RUTA || '', conductor: r.CONDUCTOR || '', proveedor: r.PROVEEDOR || '' });
                 let pDia = Number(r.PRECIO) || 0;
                 if (pDia > 0 && pDia < 20) pDia = Math.round(pDia * 1000);
                 if (pDia > 0) recPreciosDia[key] = pDia;
-                recMeta[key] = { ...dInfo, punto: r.PUNTO || '', id: r.ID || '', ruta: r.RUTA || '', conductor: r.CONDUCTOR || '' };
+                recMeta[key] = { ...dInfo, punto: r.PUNTO || '', id: r.ID || '', ruta: r.RUTA || '', conductor: r.CONDUCTOR || '', proveedor: r.PROVEEDOR || '' };
             });
 
             // 6. Motor Forense Universal + Opción 2 (Smart Match por Peso y Fecha)
@@ -7283,8 +7598,13 @@
                 const selAnioVal = document.getElementById('concSelectAnio')?.value || '2026';
 
                 let provNombre = 'NOMBRE DEL PROVEEDOR (EJ: FRIGORIVALLE)';
-                if (selProvVal === 'BODEGA_SANTA_ELENA') provNombre = 'Bodega Santa Elena';
-                else if (selProvVal !== 'AUTO') provNombre = selProvVal;
+                if (concSelectedProveedores && concSelectedProveedores.size > 1) {
+                    provNombre = [...concSelectedProveedores].map(p => p === 'BODEGA_SANTA_ELENA' ? 'Bodega Santa Elena' : p).join(' - ');
+                } else if (concSelectedProveedores && concSelectedProveedores.size === 1) {
+                    const unico = [...concSelectedProveedores][0];
+                    provNombre = (unico === 'BODEGA_SANTA_ELENA') ? 'Bodega Santa Elena' : unico;
+                } else if (selProvVal === 'BODEGA_SANTA_ELENA') provNombre = 'Bodega Santa Elena';
+                else if (selProvVal !== 'AUTO' && selProvVal !== '__MULTI__') provNombre = selProvVal;
                 else if (selectedProveedores && selectedProveedores.size === 1) provNombre = [...selectedProveedores][0];
 
                 const mesNum = (selMesVal !== 'AUTO' && selMesVal !== 'ALL') ? Number(selMesVal) : 9;
