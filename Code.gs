@@ -196,7 +196,7 @@ function doGet(e) {
 
     // Fallbacks de seguridad si las pestañas aún están vacías
     if (productos.length === 0) {
-      productos = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HARINA CARNE", "HUESO BLANCO", "HUESO CERDO", "HUESO SECO", "MANTECA", "MARGARINA", "PIEL POLLO", "SEBO", "SEBO EN RAMA"];
+      productos = ["ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA", "HUESO BLANCO", "HUESO DE CERDO", "HUESO SECO", "HUESO DE POLLO", "MANTECA", "MARGARINA", "MANTEQUILLA", "PIEL POLLO", "SEBO EN RAMA", "OREJAS DE CERDO", "PULMON DE CERDO", "CALAMBOMBO DE CERDO", "CALAMBOMBO DE RES", "TRAQUEAS", "HUESO PROMOCION", "PIELES", "LEÑA"];
     }
     if (conductores.length === 0) {
       conductores = ["Ricardo Sepulveda", "Hernando Prado", "Emer Rodriguez", "Jairo Peña", "Carolina Becerra", "Luz Elena Lopez", "Francisco Larrahondo", "Daniela Marquez"];
@@ -2306,10 +2306,24 @@ function getDashboardDataRaw() {
       return a.localeCompare(b, 'es', { sensitivity: 'base' });
     });
 
+    var productosOficiales = [];
+    var sheetProd = ss.getSheetByName("Productos");
+    if (sheetProd && sheetProd.getLastRow() > 1) {
+      var pData = sheetProd.getRange(2, 1, sheetProd.getLastRow() - 1, 2).getValues();
+      for (var pi = 0; pi < pData.length; pi++) {
+        var pNom = String(pData[pi][0] || '').trim().toUpperCase();
+        var pEst = String(pData[pi][1] || 'Activo').trim().toLowerCase();
+        if (pNom !== '' && pEst !== 'inactivo') {
+          productosOficiales.push(pNom);
+        }
+      }
+    }
+
     return {
       success: true,
       data: data,
-      proveedores: provList
+      proveedores: provList,
+      productos: productosOficiales
     };
   } catch (err) {
     Logger.log("Error en getDashboardDataRaw: " + err.toString());

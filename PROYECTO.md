@@ -1,6 +1,6 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.9.4`  
+> **Versión Actual:** `v=1.9.5`  
 > **Última Actualización:** Noviembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
@@ -1003,3 +1003,9 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - Actualizacion de tarifas de referencia para Supermercados Caribe: Desperdicio a $100 y Hueso Blanco a $350 (alineado 100% con facturas fisicas en sitio).
 - Alerta dinamica con texto orientativo: confirma que aun con diferencias el conductor puede pulsar "Guardar Recoleccion".
 - Eliminacion de atributo required en input oculto producto-seleccionado y blindaje contra QuotaExceeded en LocalStorage. Cache PWA proteinagro-v1.9.4.
+
+## v1.9.5 - Homologación de Productos en Informe de Materia Prima contra Pestaña "Productos" y Supresión de Ceros (9/11/2026)
+- **Sincronización con Pestaña `Productos`:** Homologación estricta en `CONCILIADOR.html`, `Code.gs`, `app.js` y `actualizar_informe_materia_prima.py` contra los 22 productos activos de la pestaña `Productos` de Google Sheets.
+- **Eliminación de Productos No Oficiales y Columnas en Cero:** Retirados del Informe de Materia Prima los encabezados inexistentes (`HUESO CALCINADO`, `HUESO PICADO`, `SEBO DERRETIDO`, `SEBO BOVINO`, `CABEZA DE CERDO`, `PIEL DE POLLO`) y ocultadas dinámicamente todas las columnas y filas con cantidad `0`.
+- **Reasignación Exacta de Productos Oficiales:** `SEBO` homologado a `SEBO EN RAMA`, preservando en sus propias columnas oficiales a `HUESO PROMOCION`, `CALAMBOMBO DE CERDO`, `CALAMBOMBO DE RES`, `PIELES`, `PIEL POLLO`, `OREJAS DE CERDO`, `PULMON DE CERDO`, `HUESO DE POLLO` y `LEÑA`.
+- **Indicadores 100% Intactos:** Kilos totales (`TOTAL GENERAL`), precios unitarios (`PRECIO`), valores en pesos (`VALOR`), KPIs del Conciliador y gráficos por proveedor permanecen inalterados. Cache PWA `proteinagro-v1.9.5`.

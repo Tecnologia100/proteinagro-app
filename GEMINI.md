@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Noviembre 2026 (Versión 1.9.3)  
+> **Última Actualización:** Noviembre 2026 (Versión 1.9.5)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -618,6 +618,18 @@ i.fecha), consolidándose directamente en la fila de ese día.
   3. *Blindaje de Almacenamiento Local:* `recolecciones_backup` se encapsuló en un manejador que poda automáticamente imágenes pesadas si se alcanza la cuota de 5MB en el navegador móvil, garantizando que el envío a Google Sheets y Firebase nunca se interrumpa.
   4. *Remoción de `required` en Input Oculto:* Se retiró el atributo `required` en `<input type="hidden" id="producto-seleccionado">` para evitar bloqueos silenciosos de validación en navegadores móviles.
   5. *Bumping de Versión PWA:* Actualizado a `proteinagro-v1.9.4` en `sw.js`, `index.html` y `app.js`.
+
+### 37. Homologación Estricta de Productos en Informe de Materia Prima contra Pestaña "Productos" y Eliminación de Columnas en Cero (`v1.9.5`)
+- **Diagnóstico y Causa Raíz:**
+  - En el Informe de Materia Prima (`exportarInformeAnualMateriaPrima` en `CONCILIADOR.html` y `actualizar_informe_materia_prima.py`), la lista de columnas `baseMaterials` tenía quemados 5 nombres obsoletos que no existen en la pestaña `Productos` (`HUESO CALCINADO`, `HUESO PICADO`, `SEBO DERRETIDO`, `SEBO BOVINO`, `CABEZA DE CERDO`), los cuales aparecían siempre con cantidad `0.0`.
+  - Además, `PIEL DE POLLO` aparecía con `DE` en lugar del nombre oficial `PIEL POLLO`, y el alias histórico `SEBO` (59.759,3 Kg entre agosto y noviembre) junto con `OREJAS DE CERDO`, `CALAMBOMBO DE RES`, `HUESO DE POLLO` y `LEÑA` no estaban en `baseMaterials`, por lo que el fallback `if (!targetColIdx) targetColIdx = colMap['HUESO BLANCO'];` los sumaba silenciosamente dentro de `HUESO BLANCO` en vez de su columna oficial.
+  - En los meses históricos (`ENERO` a `JULIO`), productos oficiales como `HUESO PROMOCION` (21.564,6 Kg), `CALAMBOMBO DE CERDO` y `PIELES` eran re-etiquetados como `HUESO BLANCO` o `PIEL DE POLLO`, perdiendo su trazabilidad individual.
+- **Solución Implementada (`v1.9.5`):**
+  1. *Sincronización en Vivo con Pestaña `Productos`:* `cargarCatalogoProductosPestana()` en `CONCILIADOR.html` consulta en vivo `sheet=Productos` vía GViz CSV (y `Code.gs` expone `productos` en `getDashboardDataRaw`), manteniendo como catálogo oficial los 22 productos activos: `ACEITE`, `CABEZAS`, `DESPERDICIO`, `EMPELLA`, `GORDANA`, `HUESO BLANCO`, `HUESO DE CERDO`, `HUESO SECO`, `HUESO DE POLLO`, `MANTECA`, `MARGARINA`, `MANTEQUILLA`, `PIEL POLLO`, `SEBO EN RAMA`, `OREJAS DE CERDO`, `PULMON DE CERDO`, `CALAMBOMBO DE CERDO`, `CALAMBOMBO DE RES`, `TRAQUEAS`, `HUESO PROMOCION`, `PIELES`, `LEÑA`.
+  2. *Homologación Canónica Sin Pérdida:* `homologarProductoAPestanaProductos()` mapea cualquier variante histórica (`SEBO` ➔ `SEBO EN RAMA`, `PIEL DE POLLO` ➔ `PIEL POLLO`, `CABEZA DE CERDO` ➔ `CABEZAS`, `HUESO CARNUDO` ➔ `HUESO PROMOCION`, `HUESO PICADO` ➔ `HUESO BLANCO`, etc.) exclusivamente a los 22 productos de la pestaña `Productos`.
+  3. *Supresión de Columnas y Filas en Cero:* En cada pestaña mensual del informe (`ENERO` a `DICIEMBRE`), solo se generan columnas para los productos de la pestaña `Productos` que tengan cantidad estrictamente `> 0` en ese mes (`activeMaterials`), y se omiten registros con `kg <= 0` (`Visita Fallida`), eliminando el 100% de columnas fantasma en cero.
+  4. *Preservación Intacta de Todos los Indicadores:* Se verificó matemáticamente en los 11 meses que la suma de `TOTAL GENERAL` (Kilos), `PRECIO` promedio ponderado y `VALOR ($)` por proveedor y por mes permanece 100% idéntica al centavo y al gramo, sin alterar ningún otro KPI ni gráfico (`kilosPorProveedor`) de la PWA o del Conciliador.
+  5. *Gráfico de Productos en PWA (`app.js`):* `renderCharts` homologa las etiquetas del gráfico `Kilos por Producto` contra la pestaña `Productos` y excluye ítems con cantidad `0`.
 
 ---
 

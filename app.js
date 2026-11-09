@@ -1067,10 +1067,9 @@ const DEFAULT_PRODUCTOS = [
     "DESPERDICIO",
     "EMPELLA",
     "GORDANA",
-    "HARINA CARNE",
-    "HARINA DE HUESO VAPORIZADA",
     "HUESO BLANCO",
     "HUESO DE CERDO",
+    "HUESO DE POLLO",
     "HUESO PROMOCION",
     "HUESO SECO",
     "LEÑA",
@@ -1081,10 +1080,100 @@ const DEFAULT_PRODUCTOS = [
     "PIEL POLLO",
     "PIELES",
     "PULMON DE CERDO",
-    "SEBO",
     "SEBO EN RAMA",
     "TRAQUEAS"
 ];
+let productosOficialesSheets = [...DEFAULT_PRODUCTOS];
+
+const MAPA_HOMOLOGACION_PRODUCTOS_PESTANA = {
+    "ACEITE": "ACEITE",
+    "ACEITE USADO": "ACEITE",
+    "ACEITE PALMA": "ACEITE",
+    "ACEITE SOLLA": "ACEITE",
+    "CABEZAS": "CABEZAS",
+    "CABEZA": "CABEZAS",
+    "CABEZA DE CERDO": "CABEZAS",
+    "CABEZAS DE CERDO": "CABEZAS",
+    "DESPERDICIO": "DESPERDICIO",
+    "DESPERDICIOS": "DESPERDICIO",
+    "DESPERDICIO DE RES": "DESPERDICIO",
+    "DESPERDICIO DE POLLO": "DESPERDICIO",
+    "HARINA CARNE": "DESPERDICIO",
+    "HARINA/CARNE": "DESPERDICIO",
+    "HARINA DE CARNE": "DESPERDICIO",
+    "HARINA DE SANGRE": "DESPERDICIO",
+    "CERDO": "DESPERDICIO",
+    "GARRA": "DESPERDICIO",
+    "REBANADO": "DESPERDICIO",
+    "EMPELLA": "EMPELLA",
+    "GORDANA": "GORDANA",
+    "HUESO BLANCO": "HUESO BLANCO",
+    "HUESO": "HUESO BLANCO",
+    "HUESOS": "HUESO BLANCO",
+    "HUESO DE RES": "HUESO BLANCO",
+    "HUESO CARNUDO": "HUESO BLANCO",
+    "HUESO FEMUR": "HUESO BLANCO",
+    "HUESO FERMUR": "HUESO BLANCO",
+    "HUESO PICADO": "HUESO BLANCO",
+    "HUESO CALCINADO": "HUESO BLANCO",
+    "HUESO VAPORIZADO": "HUESO BLANCO",
+    "HARINA DE HUESO VAPORIZADA": "HUESO BLANCO",
+    "HUESO DE CERDO": "HUESO DE CERDO",
+    "HUESO CERDO": "HUESO DE CERDO",
+    "HUESOS DE CERDO": "HUESO DE CERDO",
+    "HUESO PORCINO": "HUESO DE CERDO",
+    "HUESO DE POLLO": "HUESO DE POLLO",
+    "HUESO POLLO": "HUESO DE POLLO",
+    "HUESO PROMOCION": "HUESO PROMOCION",
+    "HUESO EN PROMOCION": "HUESO PROMOCION",
+    "HUESO PROMO": "HUESO PROMOCION",
+    "HUESO SECO": "HUESO SECO",
+    "HUESOS SECOS": "HUESO SECO",
+    "LENA": "LEÑA",
+    "LEÑA": "LEÑA",
+    "MANTECA": "MANTECA",
+    "GRASA": "MANTECA",
+    "GRASA DE POLLO": "MANTECA",
+    "MANTEQUILLA": "MANTEQUILLA",
+    "MARGARINA": "MARGARINA",
+    "OREJAS DE CERDO": "OREJAS DE CERDO",
+    "OREJA DE CERDO": "OREJAS DE CERDO",
+    "PIEL POLLO": "PIEL POLLO",
+    "PIEL DE POLLO": "PIEL POLLO",
+    "PIELE DE POLLO": "PIEL POLLO",
+    "PIELES": "PIELES",
+    "PIEL": "PIELES",
+    "CUERO": "PIELES",
+    "PULMON DE CERDO": "PULMON DE CERDO",
+    "PULMON CERDO": "PULMON DE CERDO",
+    "CALAMBOMBO DE CERDO": "CALAMBOMBO DE CERDO",
+    "CALAMBOMBO CERDO": "CALAMBOMBO DE CERDO",
+    "CALAMBOMBO DE RES": "CALAMBOMBO DE RES",
+    "CALAMBOMBO RES": "CALAMBOMBO DE RES",
+    "SEBO EN RAMA": "SEBO EN RAMA",
+    "SEBO": "SEBO EN RAMA",
+    "SEB0": "SEBO EN RAMA",
+    "SEBO RAMA": "SEBO EN RAMA",
+    "SEBO DE RES": "SEBO EN RAMA",
+    "SEBO BOVINO": "SEBO EN RAMA",
+    "SEBO DERRETIDO": "SEBO EN RAMA",
+    "SEBO SALADO": "SEBO EN RAMA",
+    "TRAQUEAS": "TRAQUEAS",
+    "TRAQUEA": "TRAQUEAS"
+};
+
+function homologarProductoPestana(nombre) {
+    if (!nombre) return "";
+    const raw = String(nombre).trim();
+    if (!raw || /visita\s*fallida|novedad|servicio\s*cancelado|sin\s*materia/i.test(raw)) return "";
+    const upper = raw.toUpperCase().replace(/\s+/g, " ").trim();
+    if (MAPA_HOMOLOGACION_PRODUCTOS_PESTANA[upper]) return MAPA_HOMOLOGACION_PRODUCTOS_PESTANA[upper];
+    const sinTildes = upper.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (MAPA_HOMOLOGACION_PRODUCTOS_PESTANA[sinTildes]) return MAPA_HOMOLOGACION_PRODUCTOS_PESTANA[sinTildes];
+    const catalogo = (Array.isArray(productosOficialesSheets) && productosOficialesSheets.length > 0) ? productosOficialesSheets : DEFAULT_PRODUCTOS;
+    const matchOficial = catalogo.find(p => p.toUpperCase() === upper || p.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === sinTildes);
+    return matchOficial ? matchOficial.toUpperCase() : "";
+}
 const DEFAULT_CONDUCTORES = [
     "Ricardo Sepulveda",
     "Hernando Prado",
@@ -1226,6 +1315,9 @@ function validarPuntoObligatorio(mostrarAlerta = true) {
 }
 
 function renderDynamicProducts(prods) {
+    if (Array.isArray(prods) && prods.length > 0) {
+        productosOficialesSheets = prods.map(p => String(p || '').trim().toUpperCase()).filter(Boolean);
+    }
     const grid = document.getElementById('product-grid');
     if (!grid) return;
     grid.innerHTML = '';
@@ -2498,15 +2590,19 @@ function renderCharts(records) {
         const calcs = calcularTotalesRecoleccion(r.productos, r.totalKilos, r.producto);
         kilosPorProveedor[prov] = Math.round(((kilosPorProveedor[prov] || 0) + calcs.totalKilos) * 100) / 100;
 
-        // Agrupar por producto identificando claramente si es Atados
-        if (r.productos && Array.isArray(r.productos)) {
-            r.productos.forEach(p => {
-                const rawName = p.producto || p.nombre || 'Otros';
-                const isAtado = esProductoAtado(rawName);
-                const prodName = isAtado ? `${rawName} (Atados)` : rawName;
-                kilosPorProducto[prodName] = Math.round(((kilosPorProducto[prodName] || 0) + (Number(p.kilos) || 0)) * 100) / 100;
-            });
-        }
+        // Agrupar por producto homologado con la pestaña "Productos", excluyendo productos ajenos o en cero
+        const listaProds = (r.productos && Array.isArray(r.productos) && r.productos.length > 0)
+            ? r.productos
+            : (r.producto ? [{ producto: r.producto, kilos: r.totalKilos }] : []);
+        listaProds.forEach(p => {
+            const cant = Number(p.kilos) || 0;
+            if (cant <= 0) return;
+            const prodHomologado = homologarProductoPestana(p.producto || p.nombre || '');
+            if (!prodHomologado) return;
+            const isAtado = esProductoAtado(prodHomologado);
+            const prodName = isAtado ? `${prodHomologado} (Atados)` : prodHomologado;
+            kilosPorProducto[prodName] = Math.round(((kilosPorProducto[prodName] || 0) + cant) * 100) / 100;
+        });
     });
 
     const provLabels = Object.keys(kilosPorProveedor);
@@ -3579,7 +3675,7 @@ function initRutasYProveedores() {
             }
             if (autofillBadge) autofillBadge.style.display = 'none';
         } else {
-            // BLINDAJE CRÍTICO (v1.9.4): Si el usuario ya eligió un proveedor válido en el formulario
+            // BLINDAJE CRÍTICO (v1.9.5): Si el usuario ya eligió un proveedor válido en el formulario
             // (flujo estándar: Ruta -> Proveedor -> Sucursal), NUNCA sobreescribir el proveedor.
             // Puntos compartidos como Cavasa, Santa Elena, Planta, etc. albergan múltiples proveedores
             // legítimos y sobreescribir el proveedor falsea y corrompe los registros contables.
@@ -4324,7 +4420,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.4&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.5&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -5666,12 +5762,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.9.4 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.9.5 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.9.4')
+            navigator.serviceWorker.register('/sw.js?v=1.9.5')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.9.4 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.9.5 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -5679,8 +5775,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.9.4 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.4&t=' + Date.now();
+                                    console.log('🔄 Nueva versión v1.9.5 disponible, recargando...');
+                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.5&t=' + Date.now();
                                 }
                             };
                         }
@@ -5709,7 +5805,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refreshing) {
                 refreshing = true;
                 console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.9.4&t=' + Date.now();
+                window.location.href = window.location.origin + window.location.pathname + '?v=1.9.5&t=' + Date.now();
             }
         });
 
@@ -5718,7 +5814,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!refreshing) {
                     refreshing = true;
                     console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.4&t=' + Date.now();
+                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.5&t=' + Date.now();
                 }
             }
         });
@@ -6409,7 +6505,7 @@ procesarPuntosRutasDinamicos = function(puntosArray) {
 };
 
 // ===================================================================================
-// v1.9.4: Barra de desplazamiento horizontal SUPERIOR sincronizada para la tabla
+// v1.9.5: Barra de desplazamiento horizontal SUPERIOR sincronizada para la tabla
 // "Recolecciones en Vivo" + botones ◀ ▶ + soporte de rueda del mouse (Shift no requerido
 // sobre la barra superior). Evita bajar hasta el final de la tabla para moverse a la derecha.
 // ===================================================================================

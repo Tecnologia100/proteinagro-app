@@ -895,7 +895,45 @@
             return items.filter((_, idx) => !ghostMap[idx]);
         }
 
-        const MAPA_PRODUCTOS_CLIENTE = {"ACEITE": "ACEITE", "CABEZAS": "CABEZAS", "DESPERDICIO": "DESPERDICIO", "DESPERDICIO DE POLLO": "DESPERDICIO", "DESPERDICIOS DE POLLO": "DESPERDICIO", "DESPERDICIO POLLO": "DESPERDICIO", "DESPERDICIO DE RES": "DESPERDICIO", "DESPERDICIOS DE RES": "DESPERDICIO", "DESPERDICIO RES": "DESPERDICIO", "DESPERDICIOS RES": "DESPERDICIO", "EMPELLA": "EMPELLA", "GORDANA": "GORDANA", "HARINA CARNE": "HARINA CARNE", "HARINA DE HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO BLANCO": "HUESO BLANCO", "HUESO DE CERDO": "HUESO DE CERDO", "HUESO SECO": "HUESO SECO", "HUESO DE POLLO": "HUESO DE POLLO", "MANTECA": "MANTECA", "MARGARINA": "MARGARINA", "MANTEQUILLA": "MANTEQUILLA", "PIEL POLLO": "PIEL POLLO", "SEBO": "SEBO", "SEBO EN RAMA": "SEBO EN RAMA", "SEBO DE RES": "SEBO EN RAMA", "SEBO RES": "SEBO EN RAMA", "SEBOS DE RES": "SEBO EN RAMA", "SEBOS": "SEBO EN RAMA", "OREJAS DE CERDO": "OREJAS DE CERDO", "PULMON DE CERDO": "PULMON DE CERDO", "CALAMBOMBO DE CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO DE RES": "CALAMBOMBO DE RES", "TRAQUEAS": "TRAQUEAS", "HUESO PROMOCION": "HUESO PROMOCION", "LENA": "LEÑA", "PIELES": "PIELES", "ACEITE PALMA": "ACEITE PALMA", "ACEITE SOLLA": "ACEITE SOLLA", "CABEZA": "CABEZAS", "CABEZA DE CERDO": "CABEZAS", "CABEZAS DE CERDO": "CABEZAS", "DESPERDICIOS": "DESPERDICIO", "HARINA/CARNE": "HARINA CARNE", "HARINA DE CARNE": "HARINA CARNE", "HARINA SANGRE": "HARINA DE SANGRE", "HARINA DE SANGRE": "HARINA DE SANGRE", "HARINA HUESO VAPORIZADA": "HARINA DE HUESO VAPORIZADA", "HUESO VAPORIZADO": "HARINA DE HUESO VAPORIZADA", "HUESO": "HUESO BLANCO", "HUESOS": "HUESO BLANCO", "HUESO DE RES": "HUESO BLANCO", "HUESOS DE RES": "HUESO BLANCO", "HUESO RES": "HUESO BLANCO", "HUESOS RES": "HUESO BLANCO", "HUESO CARNUDO": "HUESO BLANCO", "HUESOS BLANCOS": "HUESO BLANCO", "HUESO FEMUR": "HUESO BLANCO", "HUESO FERMUR": "HUESO BLANCO", "HUESO PICADO": "HUESO PICADO", "HUESO CALCINADO": "HUESO CALCINADO", "HUESO CERDO": "HUESO DE CERDO", "HUESOS DE CERDO": "HUESO DE CERDO", "HUESO PORCINO": "HUESO DE CERDO", "HUESO POLLO": "HUESO DE POLLO", "HUESOS DE POLLO": "HUESO DE POLLO", "HUESOS SECOS": "HUESO SECO", "HUESO EN PROMOCION": "HUESO PROMOCION", "PIEL DE POLLO": "PIEL POLLO", "PIELE DE POLLO": "PIEL POLLO", "PIELES DE POLLO": "PIEL POLLO", "OREJA DE CERDO": "OREJAS DE CERDO", "OREJAS CERDO": "OREJAS DE CERDO", "PULMON CERDO": "PULMON DE CERDO", "CALAMBOMBO CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO RES": "CALAMBOMBO DE RES", "TRAQUEA": "TRAQUEAS", "SEBO RAMA": "SEBO EN RAMA", "SEBO BOVINO": "SEBO BOVINO", "SEBO DERRETIDO": "SEBO DERRETIDO", "SEBO SALADO": "SEBO SALADO", "PIEL": "PIELES"};
+        // Catálogo oficial sincronizado con la pestaña "Productos" de Google Sheets
+        const PRODUCTOS_PESTANA_DEFAULT = [
+            "ACEITE", "CABEZAS", "DESPERDICIO", "EMPELLA", "GORDANA",
+            "HUESO BLANCO", "HUESO DE CERDO", "HUESO SECO", "HUESO DE POLLO",
+            "MANTECA", "MARGARINA", "MANTEQUILLA", "PIEL POLLO", "SEBO EN RAMA",
+            "OREJAS DE CERDO", "PULMON DE CERDO", "CALAMBOMBO DE CERDO",
+            "CALAMBOMBO DE RES", "TRAQUEAS", "HUESO PROMOCION", "PIELES", "LEÑA"
+        ];
+        let productosPestanaOficial = [...PRODUCTOS_PESTANA_DEFAULT];
+
+        const MAPA_PRODUCTOS_CLIENTE = {"ACEITE": "ACEITE", "ACEITE USADO": "ACEITE", "ACEITE PALMA": "ACEITE", "ACEITE SOLLA": "ACEITE", "CABEZAS": "CABEZAS", "CABEZA": "CABEZAS", "CABEZA DE CERDO": "CABEZAS", "CABEZAS DE CERDO": "CABEZAS", "CABEZAS DE RES SIN PATAS": "CABEZAS", "DESPERDICIO": "DESPERDICIO", "DESPERDICIOS": "DESPERDICIO", "DESPERDICIO DE POLLO": "DESPERDICIO", "DESPERDICIOS DE POLLO": "DESPERDICIO", "DESPERDICIO POLLO": "DESPERDICIO", "DESPERDICIOS POLLO": "DESPERDICIO", "DESPERDICIO DE RES": "DESPERDICIO", "DESPERDICIOS DE RES": "DESPERDICIO", "DESPERDICIO RES": "DESPERDICIO", "DESPERDICIOS RES": "DESPERDICIO", "CERDO": "DESPERDICIO", "GARRA": "DESPERDICIO", "REBANADO": "DESPERDICIO", "HARINA CARNE": "DESPERDICIO", "HARINA/CARNE": "DESPERDICIO", "HARINA DE CARNE": "DESPERDICIO", "HARINA SANGRE": "DESPERDICIO", "HARINA DE SANGRE": "DESPERDICIO", "EMPELLA": "EMPELLA", "EMPELLA CERDO": "EMPELLA", "GORDANA": "GORDANA", "HUESO BLANCO": "HUESO BLANCO", "HUESO": "HUESO BLANCO", "HUESOS": "HUESO BLANCO", "HUESO DE RES": "HUESO BLANCO", "HUESOS DE RES": "HUESO BLANCO", "HUESO RES": "HUESO BLANCO", "HUESOS RES": "HUESO BLANCO", "HUESO CARNUDO": "HUESO BLANCO", "HUESOS BLANCOS": "HUESO BLANCO", "HUESO FEMUR": "HUESO BLANCO", "HUESO FERMUR": "HUESO BLANCO", "HUESO PICADO": "HUESO BLANCO", "HUESO CALCINADO": "HUESO BLANCO", "HUESO VAPORIZADO": "HUESO BLANCO", "HARINA DE HUESO VAPORIZADA": "HUESO BLANCO", "HARINA HUESO VAPORIZADA": "HUESO BLANCO", "HUESO DE CERDO": "HUESO DE CERDO", "HUESO CERDO": "HUESO DE CERDO", "HUESOS DE CERDO": "HUESO DE CERDO", "HUESO PORCINO": "HUESO DE CERDO", "HUESO SECO": "HUESO SECO", "HUESOS SECOS": "HUESO SECO", "HUESO DE POLLO": "HUESO DE POLLO", "HUESO POLLO": "HUESO DE POLLO", "HUESOS DE POLLO": "HUESO DE POLLO", "MANTECA": "MANTECA", "GRASA": "MANTECA", "GRASA CERDO": "MANTECA", "GRASA DE POLLO": "MANTECA", "MARGARINA": "MARGARINA", "MANTEQUILLA": "MANTEQUILLA", "PIEL POLLO": "PIEL POLLO", "PIEL DE POLLO": "PIEL POLLO", "PIELE DE POLLO": "PIEL POLLO", "PIELES DE POLLO": "PIEL POLLO", "SEBO": "SEBO EN RAMA", "SEB0": "SEBO EN RAMA", "SEBO EN RAMA": "SEBO EN RAMA", "SEBO RAMA": "SEBO EN RAMA", "SEBO DE RES": "SEBO EN RAMA", "SEBO RES": "SEBO EN RAMA", "SEBOS DE RES": "SEBO EN RAMA", "SEBOS": "SEBO EN RAMA", "SEBO LIMPIO": "SEBO EN RAMA", "SEBO BOVINO": "SEBO EN RAMA", "SEBO DERRETIDO": "SEBO EN RAMA", "SEBO SALADO": "SEBO EN RAMA", "OREJAS DE CERDO": "OREJAS DE CERDO", "OREJA DE CERDO": "OREJAS DE CERDO", "OREJAS CERDO": "OREJAS DE CERDO", "PULMON DE CERDO": "PULMON DE CERDO", "PULMON CERDO": "PULMON DE CERDO", "CALAMBOMBO DE CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO CERDO": "CALAMBOMBO DE CERDO", "CALAMBOMBO DE RES": "CALAMBOMBO DE RES", "CALAMBOMBO RES": "CALAMBOMBO DE RES", "TRAQUEAS": "TRAQUEAS", "TRAQUEA": "TRAQUEAS", "HUESO PROMOCION": "HUESO PROMOCION", "HUESO EN PROMOCION": "HUESO PROMOCION", "HUESO PROMO": "HUESO PROMOCION", "LENA": "LEÑA", "LEÑA": "LEÑA", "PIELES": "PIELES", "PIEL": "PIELES", "PIELES KILOS": "PIELES", "PIEL KILOS": "PIELES", "PIELES KG": "PIELES", "PIEL KG": "PIELES", "CUERO": "PIELES"};
+
+        async function cargarCatalogoProductosPestana() {
+            try {
+                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Productos&t=${Date.now()}`;
+                const resp = await fetch(url, { cache: "no-store" });
+                if (!resp.ok) return;
+                const csvText = await resp.text();
+                const rows = parseCSV(csvText);
+                if (!rows || rows.length <= 1) return;
+                const activos = [];
+                const vistos = new Set();
+                for (let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if (!r || !r.length) continue;
+                    const nombre = String(r[0] || "").trim().toUpperCase();
+                    const estado = String(r[1] || "Activo").trim().toLowerCase();
+                    if (nombre && estado !== "inactivo" && !vistos.has(nombre)) {
+                        vistos.add(nombre);
+                        activos.push(nombre);
+                    }
+                }
+                if (activos.length > 0) {
+                    productosPestanaOficial = activos;
+                }
+            } catch (e) {
+                console.warn("Usando catálogo local de respaldo para pestaña Productos:", e);
+            }
+        }
 
         function homologarMateriaCliente(mat) {
             if (!mat) return "";
@@ -1552,8 +1590,9 @@
             
             updateStatus('Conectando directamente con Google Sheets...', 'normal');
 
-            // 0. Sincronizar en paralelo el catálogo maestro desde Puntos_Rutas (independiente de filtros)
+            // 0. Sincronizar en paralelo el catálogo maestro desde Puntos_Rutas y pestaña Productos
             cargarCatalogoMaestroPuntosRutas();
+            cargarCatalogoProductosPestana();
 
             // 1. Iniciar de inmediato la conexión directa ultrarrápida a Google Sheets (0.5s - 1.2s)
             fetchDataDirecto(btn);
@@ -1563,6 +1602,9 @@
                 google.script.run
                     .withSuccessHandler(function(result) {
                         if (!result || !result.success) return;
+                        if (Array.isArray(result.productos) && result.productos.length > 0) {
+                            productosPestanaOficial = result.productos.map(p => String(p || "").trim().toUpperCase()).filter(Boolean);
+                        }
 
                         // 1. Si la conexión directa ya cargó datos y el backend no aporta más filas, no duplicar trabajo.
                         if (cargaDatosCompletada && Array.isArray(result.data) && result.data.length <= rawData.length) {
@@ -2584,32 +2626,73 @@
                 wb.creator = 'PROTEINAGRO - Sistema de Conciliación';
                 wb.created = new Date();
 
-                const baseMaterials = [
-                    'HUESO BLANCO', 'HUESO CALCINADO', 'HUESO SECO', 'MANTECA',
-                    'HUESO PICADO', 'CABEZAS', 'ACEITE', 'GORDANA', 'SEBO DERRETIDO',
-                    'SEBO BOVINO', 'SEBO EN RAMA', 'DESPERDICIO', 'HUESO DE CERDO',
-                    'CABEZA DE CERDO', 'PIEL DE POLLO', 'EMPELLA'
-                ];
-
-                const materialMapping = {
-                    'HUESO PROMOCION': 'HUESO BLANCO',
-                    'HUESO EN PROMOCION': 'HUESO BLANCO',
-                    'HUESO CARNUDO': 'HUESO BLANCO',
-                    'CALAMBOMBO DE CERDO': 'HUESO DE CERDO',
-                    'PIEL POLLO': 'PIEL DE POLLO',
-                    'PIELES': 'PIEL DE POLLO',
-                    'PULMON DE CERDO': 'DESPERDICIO'
-                };
+                // Asegurar sincronización con la pestaña oficial "Productos" de Google Sheets
+                await cargarCatalogoProductosPestana();
+                const catalogoProductosOficiales = (Array.isArray(productosPestanaOficial) && productosPestanaOficial.length > 0)
+                    ? productosPestanaOficial
+                    : PRODUCTOS_PESTANA_DEFAULT;
 
                 // Procesar cada mes seleccionado
                 for (const m of monthsToExport) {
                     const sheetTitle = monthNames[m] || ('MES_' + m);
 
-                    // Si es mes histórico (Enero a Julio) y existe en HISTORICAL_MONTHS
+                    // Si es mes histórico (Enero a Julio) y existe en HISTORICAL_MONTHS:
+                    // Homologar productos con la pestaña "Productos" y excluir columnas/filas en cero
                     if (m <= 7 && typeof HISTORICAL_MONTHS !== 'undefined' && HISTORICAL_MONTHS[sheetTitle]) {
                         const mData = HISTORICAL_MONTHS[sheetTitle];
+                        const rawHeaders = mData.headers || [];
+                        const startMatCol = (String(rawHeaders[0] || '').trim().toUpperCase() === 'FECHA') ? 2 : 1;
+                        const provColIdx = startMatCol - 1;
+                        const precioColIdx = rawHeaders.length - 2;
+                        const valorColIdx = rawHeaders.length - 1;
+
+                        const totalesPorProductoMes = {};
+                        const filasHomologadas = [];
+
+                        (mData.rows || []).forEach(r => {
+                            const firstCell = String(r[0] || '').trim().toUpperCase();
+                            const provCell = String(r[provColIdx] || '').trim();
+                            if (firstCell === 'TOTAL' || provCell.toUpperCase() === 'TOTAL') return;
+                            if (!provCell) return;
+
+                            const matsRow = {};
+                            let totalKgRow = 0;
+
+                            for (let c = startMatCol; c < precioColIdx; c++) {
+                                const valKg = Number(r[c]) || 0;
+                                if (valKg > 0) {
+                                    const rawH = String(rawHeaders[c] || '').trim().toUpperCase();
+                                    const matHom = homologarMateriaCliente(rawH || 'DESPERDICIO');
+                                    matsRow[matHom] = (matsRow[matHom] || 0) + valKg;
+                                    totalesPorProductoMes[matHom] = (totalesPorProductoMes[matHom] || 0) + valKg;
+                                    totalKgRow += valKg;
+                                }
+                            }
+
+                            if (totalKgRow <= 0) return;
+
+                            const precio = Number(r[precioColIdx]) || 0;
+                            const valorRaw = Number(r[valorColIdx]) || 0;
+                            const valor = valorRaw > 0 ? valorRaw : (precio > 0 ? Math.round(totalKgRow * precio) : 0);
+
+                            filasHomologadas.push({
+                                prov: provCell.toUpperCase(),
+                                mats: matsRow,
+                                precio: precio,
+                                val: valor
+                            });
+                        });
+
+                        const activeMaterials = catalogoProductosOficiales.filter(p => (totalesPorProductoMes[p] || 0) > 0);
+                        Object.keys(totalesPorProductoMes).forEach(p => {
+                            if (totalesPorProductoMes[p] > 0 && !activeMaterials.includes(p)) {
+                                activeMaterials.push(p);
+                            }
+                        });
+
                         const ws = wb.addWorksheet(sheetTitle, { views: [{ showGridLines: true }] });
-                        const hRow = ws.addRow(mData.headers);
+                        const headers = ['PROVEEDOR', ...activeMaterials, 'PRECIO', 'VALOR'];
+                        const hRow = ws.addRow(headers);
                         hRow.height = 26;
                         hRow.eachCell((cell) => {
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F497D' } };
@@ -2617,8 +2700,23 @@
                             cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                         });
 
-                        mData.rows.forEach(r => {
-                            const row = ws.addRow(r);
+                        const colMapHist = {};
+                        headers.forEach((h, idx) => { colMapHist[h] = idx + 1; });
+
+                        let currentRowHist = 2;
+                        filasHomologadas.forEach(item => {
+                            const rowVals = new Array(headers.length).fill('');
+                            rowVals[0] = item.prov;
+                            Object.keys(item.mats).forEach(matName => {
+                                const cIdx = colMapHist[matName];
+                                if (cIdx) {
+                                    rowVals[cIdx - 1] = Math.round(item.mats[matName] * 10) / 10;
+                                }
+                            });
+                            if (item.precio > 0) rowVals[colMapHist['PRECIO'] - 1] = item.precio;
+                            if (item.val > 0) rowVals[colMapHist['VALOR'] - 1] = Math.round(item.val);
+
+                            const row = ws.addRow(rowVals);
                             row.eachCell((cell, colNumber) => {
                                 cell.font = { name: 'Calibri', size: 10 };
                                 cell.border = {
@@ -2628,12 +2726,43 @@
                                     right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
                                 };
                                 if (typeof cell.value === 'number') {
-                                    if (colNumber === mData.headers.length) cell.numFmt = '$ #,##0';
-                                    else if (colNumber === mData.headers.length - 1) cell.numFmt = '$ #,##0';
+                                    if (colNumber === colMapHist['VALOR'] || colNumber === colMapHist['PRECIO']) cell.numFmt = '$ #,##0';
                                     else cell.numFmt = '#,##0.0';
                                 }
                             });
+                            currentRowHist++;
                         });
+
+                        if (currentRowHist > 2) {
+                            const totalRowVals = new Array(headers.length).fill('');
+                            totalRowVals[0] = 'TOTAL GENERAL';
+                            const totalRow = ws.addRow(totalRowVals);
+                            totalRow.height = 22;
+
+                            for (let c = 2; c <= headers.length; c++) {
+                                const colLetter = ws.getColumn(c).letter;
+                                const cell = totalRow.getCell(c);
+                                if (c === colMapHist['PRECIO']) {
+                                    cell.value = '';
+                                } else if (c === colMapHist['VALOR']) {
+                                    cell.value = { formula: `SUM(${colLetter}2:${colLetter}${currentRowHist - 1})` };
+                                    cell.numFmt = '$ #,##0';
+                                } else {
+                                    cell.value = { formula: `SUM(${colLetter}2:${colLetter}${currentRowHist - 1})` };
+                                    cell.numFmt = '#,##0.0';
+                                }
+                            }
+
+                            totalRow.eachCell((cell) => {
+                                cell.font = { name: 'Calibri', size: 10, bold: true };
+                                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F1' } };
+                                cell.border = {
+                                    top: { style: 'thin', color: { argb: 'FF000000' } },
+                                    bottom: { style: 'double', color: { argb: 'FF000000' } }
+                                };
+                            });
+                        }
+
                         ws.columns.forEach((col, idx) => {
                             col.width = idx === 0 ? 38 : 15;
                         });
@@ -2642,6 +2771,7 @@
 
                     // Mes dinámico desde rawData (Agosto en adelante)
                     const monthlyItems = {};
+                    const totalesPorProductoMes = {};
                     rawData.forEach(row => {
                         const fStr = String(row.FECHA || '').trim();
                         if (!fStr) return;
@@ -2653,9 +2783,10 @@
                         const prov = String(row.PROVEEDOR || '').trim().toUpperCase();
                         let mat = String(row.MATERIA || '').trim().toUpperCase();
                         if (!prov || !mat || mat.includes('VISITA FALLIDA')) return;
-                        mat = materialMapping[mat] || mat;
+                        mat = homologarMateriaCliente(mat);
 
                         const kg = Number(row.KG) || 0;
+                        if (kg <= 0) return;
                         const precio = Number(row.PRECIO) || 0;
                         const val = Number(row.VALOR) || (kg * precio);
 
@@ -2666,10 +2797,19 @@
                         monthlyItems[key].kg += kg;
                         monthlyItems[key].val += val;
                         if (precio > 0) monthlyItems[key].precio = precio;
+                        totalesPorProductoMes[mat] = (totalesPorProductoMes[mat] || 0) + kg;
+                    });
+
+                    // Incluir únicamente los productos de la pestaña "Productos" con cantidad > 0 en el mes
+                    const activeMaterials = catalogoProductosOficiales.filter(p => (totalesPorProductoMes[p] || 0) > 0);
+                    Object.keys(totalesPorProductoMes).forEach(p => {
+                        if (totalesPorProductoMes[p] > 0 && !activeMaterials.includes(p)) {
+                            activeMaterials.push(p);
+                        }
                     });
 
                     const ws = wb.addWorksheet(sheetTitle, { views: [{ showGridLines: true }] });
-                    const headers = ['PROVEEDOR', ...baseMaterials, 'PRECIO', 'VALOR'];
+                    const headers = ['PROVEEDOR', ...activeMaterials, 'PRECIO', 'VALOR'];
                     const headerRow = ws.addRow(headers);
                     headerRow.height = 26;
                     headerRow.eachCell((cell) => {
@@ -2685,11 +2825,12 @@
 
                     let currentRow = 2;
                     sortedItems.forEach(item => {
+                        if (item.kg <= 0) return;
+                        const targetColIdx = colMap[item.mat];
+                        if (!targetColIdx) return;
+
                         const rowVals = new Array(headers.length).fill('');
                         rowVals[0] = item.prov;
-
-                        let targetColIdx = colMap[item.mat];
-                        if (!targetColIdx) targetColIdx = colMap['HUESO BLANCO'];
 
                         rowVals[targetColIdx - 1] = Math.round(item.kg * 10) / 10;
                         if (item.precio > 0) rowVals[colMap['PRECIO'] - 1] = item.precio;
@@ -2832,27 +2973,27 @@
         ];
 
         const CATALOGO_PRODUCTOS_OFICIALES = [
-            'SEBO EN RAMA',
-            'HUESO BLANCO',
-            'GORDANA',
-            'HUESO DE CERDO',
-            'CABEZAS',
-            'MANTECA',
-            'EMPELLA',
-            'PIEL POLLO',
-            'PIELES',
-            'DESPERDICIO',
             'ACEITE',
+            'CABEZAS',
+            'DESPERDICIO',
+            'EMPELLA',
+            'GORDANA',
+            'HUESO BLANCO',
+            'HUESO DE CERDO',
             'HUESO SECO',
-            'HUESO PROMOCION',
-            'HARINA CARNE',
-            'HARINA DE HUESO VAPORIZADA',
-            'CALAMBOMBO DE CERDO',
-            'CALAMBOMBO DE RES',
+            'HUESO DE POLLO',
+            'MANTECA',
+            'MARGARINA',
+            'MANTEQUILLA',
+            'PIEL POLLO',
+            'SEBO EN RAMA',
             'OREJAS DE CERDO',
             'PULMON DE CERDO',
+            'CALAMBOMBO DE CERDO',
+            'CALAMBOMBO DE RES',
             'TRAQUEAS',
-            'HUESO DE POLLO',
+            'HUESO PROMOCION',
+            'PIELES',
             'LEÑA'
         ];
 
