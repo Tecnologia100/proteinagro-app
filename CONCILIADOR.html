@@ -857,6 +857,7 @@
         let filteredData = [];
         let allProveedores = [];
         let selectedProveedores = new Set();
+        let concSelectedProveedores = new Set();
         let isLoading = false;
         const GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbx4X0yiSS7Tisgyn2Xn2NuAlB9uWRwAP019Jurc4TvSyBseg3un47xA2d6o0rFs0Y5o9A/exec";
         let mapaNovedadesPorUid = {};
@@ -1264,7 +1265,7 @@
             }
 
             // Depuración en MÓDULO 2 («Auditoría y Conciliación Universal de Proveedores» #concSelectProveedor y multiselect)
-            if (typeof concSelectedProveedores !== 'undefined' && concSelectedProveedores && concSelectedProveedores.size > 0) {
+            if (concSelectedProveedores && concSelectedProveedores.size > 0) {
                 const invalidosConc = [];
                 concSelectedProveedores.forEach(p => {
                     if (p !== 'BODEGA_SANTA_ELENA' && !proveedoresActivosSet.has(p)) {
@@ -3066,7 +3067,6 @@
         let currentProveedorMemoriaKey = 'GENERAL';
         let currentProveedorDisplayName = 'Proveedor';
         let ultimoAnalisisMapeo = [];
-        let concSelectedProveedores = new Set();
 
         let conciliacionData = {
             exactos: [],
