@@ -4080,6 +4080,7 @@
                 const m = detectarMesDeTexto(mText[2]);
                 let y = mText[3] ? Number(mText[3]) : (anioDefault || 2026);
                 if (y < 100) y += 2000;
+                else if (y >= 200 && y < 1000) y = anioDefault || 2026;
                 if (m && d >= 1 && d <= 31) {
                     return {
                         dia: d, mes: m, anio: y,
@@ -4160,13 +4161,39 @@
                         if (Math.abs(existingY - y) <= 4) { foundY = existingY; break; }
                     }
                     if (foundY === null) { foundY = y; lineMap.set(foundY, []); }
-                    lineMap.get(foundY).push({ str: strClean, x: item.transform[4] });
+                    lineMap.get(foundY).push({ str: strClean, x: item.transform[4], width: item.width || 0 });
                 }
 
                 const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
                 const pageLines = [];
                 for (const y of sortedYs) {
-                    const lineItems = lineMap.get(y).sort((a, b) => a.x - b.x);
+                    const sortedRaw = lineMap.get(y).sort((a, b) => a.x - b.x);
+                    const lineItems = [];
+                    for (const curr of sortedRaw) {
+                        if (lineItems.length === 0) {
+                            lineItems.push({ ...curr });
+                            continue;
+                        }
+                        const prev = lineItems[lineItems.length - 1];
+                        const prevWidth = prev.width > 0 ? prev.width : (prev.str.length * 5.2);
+                        const prevEnd = prev.x + prevWidth;
+                        const gap = curr.x - prevEnd;
+                        const currWidth = curr.width > 0 ? curr.width : (curr.str.length * 5.2);
+
+                        // Unir fragmentos contiguos partidos por cambios de fuente PDF (ej. "07-oct-202" + "6" o "1" + "6" + "0")
+                        const esFechaIncompleta = /^\d{1,2}[-/][A-Za-z]{3,10}[-/]\d{1,3}$/.test(prev.str) && /^\d{1,3}$/.test(curr.str);
+                        const esContinuacionGuion = /[-/.,]$/.test(prev.str) || /^[-/.,]/.test(curr.str);
+                        if (gap <= 3.5 || esFechaIncompleta || (esContinuacionGuion && gap <= 8)) {
+                            prev.str += curr.str;
+                            prev.width = Math.max(prev.width || 0, (curr.x + currWidth) - prev.x);
+                        } else if (gap <= 10 && (!/^[\d.,]+$/.test(prev.str) || !/^[\d.,]+$/.test(curr.str))) {
+                            // Palabras de una misma celda o encabezado separadas por espacio normal (ej. "Cantidad" + "(Kg)")
+                            prev.str += ' ' + curr.str;
+                            prev.width = Math.max(prev.width || 0, (curr.x + currWidth) - prev.x);
+                        } else {
+                            lineItems.push({ ...curr });
+                        }
+                    }
                     pageLines.push(lineItems);
                     allLines.push(lineItems);
                     fullText += lineItems.map(it => it.str).join(' ') + '\n';
@@ -4633,20 +4660,25 @@
                 provNombre = 'Sevillana Carnes y Derivados de Occ.';
                 filtroStr = 'SEVILLANA';
                 filtroPunto = 'CAVASA';
+            } else if (normJoined.includes('BARBARA GOMEZ') && normJoined.includes('LA RESERVA')) {
+                provNombre = 'Bárbara Gómez / La Reserva';
+                filtroStr = 'BARBARA GOMEZ, LA RESERVA';
+                filtroPunto = 'CAVASA';
             } else {
-                // Buscar coincidencia contra allProveedores
-                let mejorMatch = '';
+                // Buscar coincidencia contra allProveedores (soportando encabezados múltiples como "PROVEEDOR A / PROVEEDOR B")
+                const matchesProv = [];
                 for (const p of (allProveedores || [])) {
                     const pNorm = p.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
                     if (pNorm.length >= 4 && normJoined.includes(pNorm)) {
-                        if (pNorm.length > mejorMatch.length) {
-                            mejorMatch = p;
-                        }
+                        matchesProv.push({ original: p, norm: pNorm });
                     }
                 }
-                if (mejorMatch) {
-                    provNombre = mejorMatch;
-                    filtroStr = mejorMatch;
+                const matchesUnicos = matchesProv.filter((m, idx) =>
+                    !matchesProv.some((other, oIdx) => oIdx !== idx && other.norm.length > m.norm.length && other.norm.includes(m.norm))
+                );
+                if (matchesUnicos.length > 0) {
+                    provNombre = matchesUnicos.map(m => m.original).join(' / ');
+                    filtroStr = matchesUnicos.map(m => m.original).join(', ');
                 } else {
                     // Intentar por palabras significativas del nombre de archivo o cabecera
                     const limpio = fileName.replace(/\.(xlsx?|pdf)$/i, '').replace(/202\d/g, '').replace(/\(\d+\)/g, '').replace(/\b(?:PLANTILLA|CONCILIACION|PROVEEDORES?|MATERIAL|DESPACHADO|DESDE|CUENTA|INFORME|SEPTIEMBRE|SEPT|OCTUBRE|OCT|NOVIEMBRE|NOV|DICIEMBRE|DIC|ENERO|ENE|FEBRERO|FEB|MARZO|MAR|ABRIL|ABR|MAYO|MAY|JUNIO|JUN|JULIO|JUL|AGOSTO|AGO|PROTEINAGRO|PROTEINA|AGRO)\b/gi, '').replace(/^[_-\s()0-9]+|[_-\s()0-9]+$/g, '').trim();
@@ -5101,8 +5133,13 @@
             // 2. Autodetectar o usar configuración del usuario
             const autoInfo = autodetectarProveedorYPeriodo(targetSheet, currentConcFileName);
 
-            const selProvVal = document.getElementById('concSelectProveedor')?.value || 'AUTO';
+            const selProvEl = document.getElementById('concSelectProveedor');
             const selSucEl = document.getElementById('concSelectSucursal');
+            if (esCargaInicialArchivo && autoInfo.filtroStr) {
+                if (selProvEl && selProvEl.value !== 'AUTO') selProvEl.value = 'AUTO';
+                if (selSucEl && selSucEl.value !== 'ALL') selSucEl.value = 'ALL';
+            }
+            const selProvVal = selProvEl?.value || 'AUTO';
             let selSucVal = selSucEl ? selSucEl.value : 'ALL';
             const inpFiltroEl = document.getElementById('concInputFiltroProv');
             let filtroProvActivo = (selSucVal === '__CUSTOM__' && inpFiltroEl) ? inpFiltroEl.value.trim() : '';
@@ -5116,7 +5153,15 @@
                 if (!filtroProvActivo) filtroProvActivo = 'SANTA ELENA, SANTA HELENA, !SEVILLANA';
             } else if (selProvVal !== 'AUTO') {
                 nombreProveedorDisplay = selProvVal;
-                if (!filtroProvActivo) filtroProvActivo = obtenerProveedorFamiliaBase(selProvVal);
+                if (!filtroProvActivo) {
+                    const selNorm = selProvVal.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    if ((selNorm.includes('BARBARA GOMEZ') || selNorm.includes('LA RESERVA')) &&
+                        autoInfo.filtroStr && autoInfo.filtroStr.toUpperCase().includes('BARBARA') && autoInfo.filtroStr.toUpperCase().includes('RESERVA')) {
+                        filtroProvActivo = 'BARBARA GOMEZ, LA RESERVA';
+                    } else {
+                        filtroProvActivo = obtenerProveedorFamiliaBase(selProvVal);
+                    }
+                }
             } else {
                 const provPorSuc = (selSucVal && selSucVal !== 'ALL' && selSucVal !== '__CUSTOM__') ? inferirProveedorPorSucursal(selSucVal) : '';
                 if (selectedProveedores && selectedProveedores.size > 0 && !autoInfo.filtroStr) {
@@ -5201,16 +5246,28 @@
             // 3. Pre-cargar precios históricos y materias del proveedor en la plataforma
             const preciosPlataforma = {};
             const materiasProveedorEnPlataforma = new Set();
+            const conteoMateriasProveedor = {};
             rawData.forEach(r => {
                 if (!coincideProveedorConFiltro(r.PROVEEDOR, filtroProvActivo) || !pasaFiltroPunto(r)) return;
                 const prodH = homologarProductoUniversal(r.MATERIA, '__BASE__');
-                if (prodH) materiasProveedorEnPlataforma.add(prodH);
+                if (prodH) {
+                    materiasProveedorEnPlataforma.add(prodH);
+                    conteoMateriasProveedor[prodH] = (conteoMateriasProveedor[prodH] || 0) + 1;
+                }
                 let p = Number(r.PRECIO) || 0;
                 if (p > 0 && p < 20) p = Math.round(p * 1000);
                 if (prodH && p > 0) {
                     preciosPlataforma[prodH] = p;
                 }
             });
+            let materiaPrincipalProveedor = null;
+            let maxFreqMat = 0;
+            for (const [mName, freq] of Object.entries(conteoMateriasProveedor)) {
+                if (freq > maxFreqMat) {
+                    maxFreqMat = freq;
+                    materiaPrincipalProveedor = mName;
+                }
+            }
 
             // 4. Parsear hoja del Excel extrayendo primero el nombre crudo (rawProd) de cada columna/fila
             const IGNORE_COL_HEADERS = new Set([
@@ -5573,7 +5630,8 @@
                     }
                 }
 
-                const enMemoria = memProveedorActual[rawP];
+                const esColumnaCantidadGenerica = /^(?:CANTIDAD|KILOS?|KG|PESO|PESO\s+NETO|TOTAL\s+KG)$/i.test(rawP);
+                const enMemoria = (esColumnaCantidadGenerica && memProveedorActual[rawP] === rawP) ? null : memProveedorActual[rawP];
                 const conocidoBase = esProductoConocidoEnDiccionarioBase(rawP);
                 const prodDiccionario = homologarProductoUniversal(rawP, '__BASE__');
                 const matchesDiccionario = matchesPorMateria[prodDiccionario] || 0;
@@ -5610,11 +5668,16 @@
                         }
                     }
                 } else {
-                    // Nombre completamente nuevo/particular del proveedor (ej. "CARNAZA", "SUBPRODUCTO", "RECORTES")
+                    // Nombre completamente nuevo/particular del proveedor (ej. "CARNAZA", "SUBPRODUCTO", "RECORTES", o columna genérica "CANTIDAD (KG)")
                     if (mejorMatPorPeso && maxDiasMatch >= 1) {
                         prodFinal = mejorMatPorPeso;
                         origen = 'SMART_AUTO';
                         coincidenciasPeso = maxDiasMatch;
+                        cantSmartMatchAutoColumnas++;
+                    } else if (esColumnaCantidadGenerica && (materiaPrincipalProveedor || materiasProveedorEnPlataforma.size >= 1)) {
+                        prodFinal = materiaPrincipalProveedor || [...materiasProveedorEnPlataforma][0];
+                        origen = 'SMART_AUTO';
+                        coincidenciasPeso = matchesPorMateria[prodFinal] || 0;
                         cantSmartMatchAutoColumnas++;
                     } else {
                         prodFinal = prodDiccionario || rawP;
