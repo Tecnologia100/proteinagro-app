@@ -1635,165 +1635,350 @@ function diagnosticoPreciosSheet(ss, testProv, testProd) {
 
 // ==============================================================================
 // LIQUIDADOR DE RECOLECCIONES PENDIENTES (PRECIO DESDE TARIFAS + VALOR = KG * PRECIO)
+// v1.9.5: Respaldo previo automático + Homologación Grupo A + Escritura exclusiva K:L
 // ==============================================================================
+function normalizarClaveAlfanumerica_(str) {
+  if (!str) return '';
+  var s = String(str).trim().toLowerCase();
+  try {
+    s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  } catch (e) {}
+  return s.replace(/[^a-z0-9]/g, '');
+}
+
+function buscarHomologadoGrupoA_(provClean, puntoClean, prodClean) {
+  // 1 y 2. Supertienda Cañaveral (Cañaveral Matadero / Cañaveral Buga) -> SEBO = $1.200
+  if (provClean === 'supertiendacanaveral' && (puntoClean === 'canaveralmatadero' || puntoClean === 'canaveralbuga') && prodClean === 'sebo') {
+    return { precio: 1200, fuente: 'Tarifas Homologada (Sebo en Rama Ruta 4)' };
+  }
+  // 3. Supertienda Cañaveral (Cañaveral Buga) -> Hueso Cerdo = $150
+  if (provClean === 'supertiendacanaveral' && prodClean === 'huesocerdo') {
+    return { precio: 150, fuente: 'Tarifas Homologada (Hueso de Cerdo Cañaveral)' };
+  }
+  // 4. Alberto Millan -> SEBO = $1.200
+  if (provClean === 'albertomillan' && prodClean === 'sebo') {
+    return { precio: 1200, fuente: 'Tarifas Homologada (Sebo en Rama Alberto Millán)' };
+  }
+  // 5. Barbara Gomez -> Sebo = $1.200
+  if (provClean === 'barbaragomez' && prodClean === 'sebo') {
+    return { precio: 1200, fuente: 'Tarifas Homologada (Sebo en Rama Bárbara Gómez)' };
+  }
+  // 6 y 7. Belalcázar Carnes y Derivados Occidente -> HUESO BLANCO ($200), SEBO EN RAMA ($1.200)
+  if (provClean.indexOf('belalcazar') === 0 && prodClean === 'huesoblanco') {
+    return { precio: 200, fuente: 'Tarifas Homologada (Hueso Blanco Belalcázar)' };
+  }
+  if (provClean.indexOf('belalcazar') === 0 && prodClean === 'seboenrama') {
+    return { precio: 1200, fuente: 'Tarifas Homologada (Sebo en Rama Belalcázar)' };
+  }
+  // 8. Belalcázar Rozo -> HUESO DE CERDO ($100)
+  if (provClean.indexOf('belalcazar') === 0 && (prodClean === 'huesodecerdo' || prodClean === 'huesocerdo')) {
+    return { precio: 100, fuente: 'Tarifas Homologada (Hueso de Cerdo Belalcázar)' };
+  }
+  // 9. Sevillana Frigorivalle -> HUESO PROMOCION ($1.200)
+  if (provClean.indexOf('sevillana') !== -1 && prodClean === 'huesopromocion') {
+    return { precio: 1200, fuente: 'Tarifas Homologada (Hueso Promoción Sevillana)' };
+  }
+  // 10. Ciudad del Campo -> EMPELLA ($2.000)
+  if ((provClean === 'ciudaddelcampo' || puntoClean.indexOf('ciudaddelcampo') !== -1) && prodClean === 'empella') {
+    return { precio: 2000, fuente: 'Tarifas Homologada (Empella Sevillana)' };
+  }
+  // 11. Olímpica / Cañaveral, Olímpica Guadalupe, Olímpica Los Lagos -> DESPERDICIO ($100)
+  if (provClean.indexOf('olimpica') === 0 && prodClean === 'desperdicio') {
+    return { precio: 100, fuente: 'Tarifas Homologada (Desperdicio Cañaveral)' };
+  }
+  return null;
+}
+
+function ejecutarLiquidacionPreciosVacios_(ss) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetRec = ss.getSheetByName("Recolecciones");
+  if (!sheetRec) throw new Error("No existe la pestaña Recolecciones");
+
+  var sheetTarifas = ss.getSheetByName("Tarifas");
+  var mapExacto = {};
+  var mapPuntoProd = {};
+  var mapProvProd = {};
+
+  // 1. Cargar catálogo de Tarifas vigentes (normalizado alfanumérico)
+  if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
+    var lastRowT = sheetTarifas.getLastRow();
+    var lastColT = sheetTarifas.getLastColumn();
+    var dataT = sheetTarifas.getRange(2, 1, lastRowT - 1, lastColT).getValues();
+
+    for (var t = 0; t < dataT.length; t++) {
+      var tProv = normalizarClaveAlfanumerica_(dataT[t][1]);
+      var tPunto = normalizarClaveAlfanumerica_(dataT[t][2]);
+      var tProd = normalizarClaveAlfanumerica_(dataT[t][3]);
+      var tPrecio = parsePrecioMoneda(dataT[t][4]);
+      var tEstado = normalizarClaveAlfanumerica_(dataT[t][5]);
+
+      if (tPrecio !== null && tPrecio > 0 && tEstado !== 'inactivo') {
+        if (tProv && tPunto && tProd) mapExacto[tProv + '|' + tPunto + '|' + tProd] = tPrecio;
+        if (tPunto && tProd && !mapPuntoProd[tPunto + '|' + tProd]) mapPuntoProd[tPunto + '|' + tProd] = tPrecio;
+        if (tProv && tProd && !mapProvProd[tProv + '|' + tProd]) mapProvProd[tProv + '|' + tProd] = tPrecio;
+      }
+    }
+  }
+
+  var lastRow = sheetRec.getLastRow();
+  var lastCol = sheetRec.getLastColumn();
+  if (lastRow <= 1) {
+    return {
+      result: "info",
+      message: "Hoja Recolecciones vacía",
+      totalFilas: 0,
+      totalLiquidadas: 0,
+      valorTotalCOP: 0,
+      totalVisitasFallidas0Kg: 0,
+      totalPendientesSinTarifa: 0,
+      backupSheetName: ""
+    };
+  }
+
+  var headers = sheetRec.getRange(1, 1, 1, lastCol).getValues()[0];
+  var colIdx = { id: 0, prov: 4, punto: 5, prod: 6, kg: 7, precio: 10, valor: 11 };
+  for (var c = 0; c < headers.length; c++) {
+    var h = normalizarTexto(headers[c]);
+    if (h.indexOf('id') !== -1 && c === 0) colIdx.id = c;
+    else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+    else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+    else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+    else if (h.indexOf('kg') !== -1 || h.indexOf('kilo') !== -1) colIdx.kg = c;
+    else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+    else if ((h.indexOf('valor') !== -1 || h.indexOf('total') !== -1) && h.indexOf('factura') === -1) colIdx.valor = c;
+  }
+
+  // Leer únicamente columnas de datos A:L (1..12) para velocidad y para no tocar fórmulas en M:N ni R+
+  var numColsToRead = Math.max(colIdx.valor + 1, 12);
+  var rawValues = sheetRec.getRange(2, 1, lastRow - 1, numColsToRead).getValues();
+  var filasReales = 0;
+  for (var rScan = rawValues.length - 1; rScan >= 0; rScan--) {
+    var hasId = String(rawValues[rScan][0] || '').trim() !== '';
+    var hasFecha = String(rawValues[rScan][1] || '').trim() !== '';
+    var hasProd = String(rawValues[rScan][colIdx.prod] || '').trim() !== '';
+    if (hasId || hasFecha || hasProd) {
+      filasReales = rScan + 1;
+      break;
+    }
+  }
+  var values = filasReales > 0 ? rawValues.slice(0, filasReales) : [];
+
+  // 2. Cargar histórico interno de Recolecciones para fallback inteligente
+  var histExacto = {};
+  var histPuntoProd = {};
+  var histProvProd = {};
+
+  for (var hIdx = 0; hIdx < values.length; hIdx++) {
+    var exPrecio = parsePrecioMoneda(values[hIdx][colIdx.precio]);
+    if (exPrecio !== null && exPrecio > 0) {
+      var exProv = normalizarClaveAlfanumerica_(values[hIdx][colIdx.prov]);
+      var exPunto = normalizarClaveAlfanumerica_(values[hIdx][colIdx.punto]);
+      var exProd = normalizarClaveAlfanumerica_(values[hIdx][colIdx.prod]);
+      if (exProv && exPunto && exProd && !histExacto[exProv + '|' + exPunto + '|' + exProd]) {
+        histExacto[exProv + '|' + exPunto + '|' + exProd] = exPrecio;
+      }
+      if (exPunto && exProd && !histPuntoProd[exPunto + '|' + exProd]) {
+        histPuntoProd[exPunto + '|' + exProd] = exPrecio;
+      }
+      if (exProv && exProd && !histProvProd[exProv + '|' + exProd]) {
+        histProvProd[exProv + '|' + exProd] = exPrecio;
+      }
+    }
+  }
+
+  // Matriz de 2 columnas (Precio y Valor) para escritura atómica exclusiva en K:L
+  var precioValorMatrix = [];
+  var actualizadas = [];
+  var sinTarifa = [];
+  var visitasFallidas0Kg = 0;
+  var valorTotalLiquidado = 0;
+
+  for (var i = 0; i < values.length; i++) {
+    var rawPrecio = values[i][colIdx.precio];
+    var rawValor = values[i][colIdx.valor];
+    var currPrecio = parsePrecioMoneda(rawPrecio);
+
+    // Si ya tiene precio válido, RESPETAR 100% Y NO TOCAR
+    if (currPrecio !== null && currPrecio > 0) {
+      var currValNum = parsePrecioMoneda(rawValor);
+      if ((currValNum === null || currValNum <= 0) && parseKilosNumero(values[i][colIdx.kg]) > 0) {
+        rawValor = Math.round(currPrecio * parseKilosNumero(values[i][colIdx.kg]) * 100) / 100;
+      }
+      precioValorMatrix.push([rawPrecio, rawValor]);
+      continue;
+    }
+
+    var rowIdStr = String(values[i][colIdx.id] || '').trim();
+    var rowProdRaw = String(values[i][colIdx.prod] || '').trim();
+    var rowProv = normalizarClaveAlfanumerica_(values[i][colIdx.prov]);
+    var rowPunto = normalizarClaveAlfanumerica_(values[i][colIdx.punto]);
+    var rowProd = normalizarClaveAlfanumerica_(rowProdRaw);
+    var rowKg = parseKilosNumero(values[i][colIdx.kg]);
+
+    if (!rowProd) {
+      precioValorMatrix.push([rawPrecio, rawValor]);
+      continue;
+    }
+
+    // Excluir Visitas Fallidas / Novedades con 0 Kg (no requieren precio)
+    if (rowKg <= 0 || rowProdRaw.toLowerCase().indexOf('visita fallida') !== -1 || rowIdStr.indexOf('NOV-') === 0) {
+      visitasFallidas0Kg++;
+      precioValorMatrix.push([rawPrecio, rawValor]);
+      continue;
+    }
+
+    // Cascada de búsqueda de precio:
+    // 1. Tarifas (Prov + Punto + Prod)
+    // 2. Tarifas (Punto + Prod)
+    // 3. Tarifas (Prov + Prod)
+    // 4. Histórico Recolecciones (Prov + Punto + Prod)
+    // 5. Histórico Recolecciones (Punto + Prod)
+    // 6. Histórico Recolecciones (Prov + Prod)
+    // 7. Homologación Aprobada Grupo A
+    var foundPrecio = null;
+    var origenTarifa = '';
+
+    if (rowProv && rowPunto && mapExacto[rowProv + '|' + rowPunto + '|' + rowProd]) {
+      foundPrecio = mapExacto[rowProv + '|' + rowPunto + '|' + rowProd];
+      origenTarifa = 'Tarifas (Exacta)';
+    } else if (rowPunto && mapPuntoProd[rowPunto + '|' + rowProd]) {
+      foundPrecio = mapPuntoProd[rowPunto + '|' + rowProd];
+      origenTarifa = 'Tarifas (Punto)';
+    } else if (rowProv && mapProvProd[rowProv + '|' + rowProd]) {
+      foundPrecio = mapProvProd[rowProv + '|' + rowProd];
+      origenTarifa = 'Tarifas (Proveedor)';
+    } else if (rowProv && rowPunto && histExacto[rowProv + '|' + rowPunto + '|' + rowProd]) {
+      foundPrecio = histExacto[rowProv + '|' + rowPunto + '|' + rowProd];
+      origenTarifa = 'Histórico Recolecciones (Exacta)';
+    } else if (rowPunto && histPuntoProd[rowPunto + '|' + rowProd]) {
+      foundPrecio = histPuntoProd[rowPunto + '|' + rowProd];
+      origenTarifa = 'Histórico Recolecciones (Punto)';
+    } else if (rowProv && histProvProd[rowProv + '|' + rowProd]) {
+      foundPrecio = histProvProd[rowProv + '|' + rowProd];
+      origenTarifa = 'Histórico Recolecciones (Proveedor)';
+    } else {
+      var homA = buscarHomologadoGrupoA_(rowProv, rowPunto, rowProd);
+      if (homA) {
+        foundPrecio = homA.precio;
+        origenTarifa = homA.fuente;
+      }
+    }
+
+    if (foundPrecio !== null && foundPrecio > 0) {
+      var nuevoValor = Math.round(foundPrecio * rowKg * 100) / 100;
+      precioValorMatrix.push([foundPrecio, nuevoValor]);
+      valorTotalLiquidado += nuevoValor;
+
+      actualizadas.push({
+        fila: i + 2,
+        id: rowIdStr,
+        proveedor: values[i][colIdx.prov],
+        punto: values[i][colIdx.punto],
+        producto: rowProdRaw,
+        kilos: rowKg,
+        precioAsignado: foundPrecio,
+        valorCalculado: nuevoValor,
+        fuente: origenTarifa
+      });
+    } else {
+      precioValorMatrix.push([rawPrecio, rawValor]);
+      sinTarifa.push({
+        fila: i + 2,
+        proveedor: values[i][colIdx.prov],
+        punto: values[i][colIdx.punto],
+        producto: rowProdRaw,
+        kilos: rowKg
+      });
+    }
+  }
+
+  var backupName = "";
+  if (actualizadas.length > 0) {
+    // Paso 0 de Seguridad: Crear pestaña de respaldo congelada antes de modificar celdas
+    try {
+      var hoy = new Date();
+      var yyyy = hoy.getFullYear();
+      var mm = String(hoy.getMonth() + 1);
+      if (mm.length < 2) mm = '0' + mm;
+      var dd = String(hoy.getDate());
+      if (dd.length < 2) dd = '0' + dd;
+      backupName = "Recolecciones_Backup_PreLiquidacion_" + yyyy + mm + dd;
+      if (!ss.getSheetByName(backupName)) {
+        var backupSheet = sheetRec.copyTo(ss);
+        backupSheet.setName(backupName);
+      }
+    } catch (eBak) {
+      Logger.log("Aviso creando pestaña de respaldo: " + eBak.toString());
+    }
+
+    // Escritura atómica EXCLUSIVA en las 2 columnas Precio (K) y Valor (L) sin tocar fórmulas M:N ni R+
+    if (colIdx.valor === colIdx.precio + 1) {
+      sheetRec.getRange(2, colIdx.precio + 1, precioValorMatrix.length, 2).setValues(precioValorMatrix);
+    } else {
+      var colPrecioArr = [];
+      var colValorArr = [];
+      for (var pIdx = 0; pIdx < precioValorMatrix.length; pIdx++) {
+        colPrecioArr.push([precioValorMatrix[pIdx][0]]);
+        colValorArr.push([precioValorMatrix[pIdx][1]]);
+      }
+      sheetRec.getRange(2, colIdx.precio + 1, colPrecioArr.length, 1).setValues(colPrecioArr);
+      sheetRec.getRange(2, colIdx.valor + 1, colValorArr.length, 1).setValues(colValorArr);
+    }
+  }
+
+  Logger.log("✅ Se liquidaron con éxito " + actualizadas.length + " recolecciones pendientes.");
+
+  return {
+    result: "success",
+    totalFilas: values.length,
+    totalLiquidadas: actualizadas.length,
+    valorTotalCOP: Math.round(valorTotalLiquidado),
+    totalVisitasFallidas0Kg: visitasFallidas0Kg,
+    totalPendientesSinTarifa: sinTarifa.length,
+    backupSheetName: backupName,
+    muestraLiquidadas: actualizadas.slice(0, 20),
+    pendientesSinTarifa: sinTarifa
+  };
+}
+
 function liquidarRecoleccionesPendientes(ss) {
   try {
-    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetRec = ss.getSheetByName("Recolecciones");
-    if (!sheetRec) throw new Error("No existe la pestaña Recolecciones");
-
-    var sheetTarifas = ss.getSheetByName("Tarifas");
-    var mapExacto = {};
-    var mapPuntoProd = {};
-    var mapProvProd = {};
-
-    // 1. Cargar catálogo de Tarifas vigentes
-    if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
-      var lastRowT = sheetTarifas.getLastRow();
-      var lastColT = sheetTarifas.getLastColumn();
-      var dataT = sheetTarifas.getRange(2, 1, lastRowT - 1, lastColT).getValues();
-
-      for (var t = 0; t < dataT.length; t++) {
-        var tProv = normalizarTexto(dataT[t][1]);
-        var tPunto = normalizarTexto(dataT[t][2]);
-        var tProd = normalizarTexto(dataT[t][3]);
-        var tPrecio = parsePrecioMoneda(dataT[t][4]);
-        var tEstado = normalizarTexto(dataT[t][5]);
-
-        if (tPrecio !== null && tPrecio > 0 && tEstado !== 'inactivo') {
-          if (tProv && tPunto && tProd) mapExacto[tProv + '|' + tPunto + '|' + tProd] = tPrecio;
-          if (tPunto && tProd) mapPuntoProd[tPunto + '|' + tProd] = tPrecio;
-          if (tProv && tProd) mapProvProd[tProv + '|' + tProd] = tPrecio;
-        }
-      }
-    }
-
-    var lastRow = sheetRec.getLastRow();
-    var lastCol = sheetRec.getLastColumn();
-    if (lastRow <= 1) {
-      return ContentService.createTextOutput(JSON.stringify({ result: "info", message: "Hoja Recolecciones vacía" }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var headers = sheetRec.getRange(1, 1, 1, lastCol).getValues()[0];
-    var colIdx = { id: 0, prov: 4, punto: 5, prod: 6, kg: 7, precio: 10, valor: 11 };
-    for (var c = 0; c < headers.length; c++) {
-      var h = normalizarTexto(headers[c]);
-      if (h.indexOf('id') !== -1) colIdx.id = c;
-      else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
-      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
-      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
-      else if (h.indexOf('kg') !== -1 || h.indexOf('kilo') !== -1) colIdx.kg = c;
-      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
-      else if (h.indexOf('valor') !== -1 || h.indexOf('total') !== -1) colIdx.valor = c;
-    }
-
-    // 2. Cargar histórico interno de Recolecciones para fallback inteligente
-    var histPuntoProd = {};
-    var histProvProd = {};
-    var range = sheetRec.getRange(2, 1, lastRow - 1, lastCol);
-    var values = range.getValues();
-
-    for (var h = 0; h < values.length; h++) {
-      var exPrecio = parsePrecioMoneda(values[h][colIdx.precio]);
-      if (exPrecio !== null && exPrecio > 0) {
-        var exProv = normalizarTexto(values[h][colIdx.prov]);
-        var exPunto = normalizarTexto(values[h][colIdx.punto]);
-        var exProd = normalizarTexto(values[h][colIdx.prod]);
-        if (exPunto && exProd && !histPuntoProd[exPunto + '|' + exProd]) histPuntoProd[exPunto + '|' + exProd] = exPrecio;
-        if (exProv && exProd && !histProvProd[exProv + '|' + exProd]) histProvProd[exProv + '|' + exProd] = exPrecio;
-      }
-    }
-
-    // 3. Procesar filas que tengan Precio vacío o 0
-    var actualizadas = [];
-    var sinTarifa = [];
-
-    for (var i = 0; i < values.length; i++) {
-      var currPrecio = parsePrecioMoneda(values[i][colIdx.precio]);
-      // Si ya tiene precio válido, RESPETAR 100% Y NO TOCAR
-      if (currPrecio !== null && currPrecio > 0) continue;
-
-      var rowProv = normalizarTexto(values[i][colIdx.prov]);
-      var rowPunto = normalizarTexto(values[i][colIdx.punto]);
-      var rowProd = normalizarTexto(values[i][colIdx.prod]);
-      var rowKg = parseKilosNumero(values[i][colIdx.kg]);
-
-      if (!rowProd) continue;
-
-      // Cascada de búsqueda de precio:
-      // 1. Tarifas (Prov + Punto + Prod)
-      // 2. Tarifas (Punto + Prod)
-      // 3. Tarifas (Prov + Prod)
-      // 4. Histórico Recolecciones (Punto + Prod)
-      // 5. Histórico Recolecciones (Prov + Prod)
-      var foundPrecio = null;
-      var origenTarifa = '';
-
-      if (rowProv && rowPunto && mapExacto[rowProv + '|' + rowPunto + '|' + rowProd]) {
-        foundPrecio = mapExacto[rowProv + '|' + rowPunto + '|' + rowProd];
-        origenTarifa = 'Tarifas (Exacta)';
-      } else if (rowPunto && mapPuntoProd[rowPunto + '|' + rowProd]) {
-        foundPrecio = mapPuntoProd[rowPunto + '|' + rowProd];
-        origenTarifa = 'Tarifas (Punto)';
-      } else if (rowProv && mapProvProd[rowProv + '|' + rowProd]) {
-        foundPrecio = mapProvProd[rowProv + '|' + rowProd];
-        origenTarifa = 'Tarifas (Proveedor)';
-      } else if (rowPunto && histPuntoProd[rowPunto + '|' + rowProd]) {
-        foundPrecio = histPuntoProd[rowPunto + '|' + rowProd];
-        origenTarifa = 'Histórico Recolecciones (Punto)';
-      } else if (rowProv && histProvProd[rowProv + '|' + rowProd]) {
-        foundPrecio = histProvProd[rowProv + '|' + rowProd];
-        origenTarifa = 'Histórico Recolecciones (Proveedor)';
-      }
-
-      if (foundPrecio !== null && foundPrecio > 0) {
-        var nuevoValor = Math.round(foundPrecio * rowKg * 100) / 100;
-        values[i][colIdx.precio] = foundPrecio;
-        values[i][colIdx.valor] = nuevoValor;
-
-        actualizadas.push({
-          fila: i + 2,
-          id: values[i][colIdx.id],
-          proveedor: values[i][colIdx.prov],
-          punto: values[i][colIdx.punto],
-          producto: values[i][colIdx.prod],
-          kilos: rowKg,
-          precioAsignado: foundPrecio,
-          valorCalculado: nuevoValor,
-          fuente: origenTarifa
-        });
-      } else {
-        sinTarifa.push({
-          fila: i + 2,
-          proveedor: values[i][colIdx.prov],
-          punto: values[i][colIdx.punto],
-          producto: values[i][colIdx.prod],
-          kilos: rowKg
-        });
-      }
-    }
-
-    // 4. Escribir cambios a la hoja
-    if (actualizadas.length > 0) {
-      range.setValues(values);
-    }
-
-    Logger.log("✅ Se liquidaron con éxito " + actualizadas.length + " recolecciones pendientes.");
-
-    return ContentService.createTextOutput(JSON.stringify({
-      result: "success",
-      totalFilas: values.length,
-      totalLiquidadas: actualizadas.length,
-      totalPendientesSinTarifa: sinTarifa.length,
-      muestraLiquidadas: actualizadas.slice(0, 15),
-      pendientesSinTarifa: sinTarifa.slice(0, 10)
-    }, null, 2)).setMimeType(ContentService.MimeType.JSON);
-
+    var resultado = ejecutarLiquidacionPreciosVacios_(ss);
+    return ContentService.createTextOutput(JSON.stringify(resultado, null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("Error liquidando recolecciones: " + err.toString());
     return ContentService.createTextOutput(JSON.stringify({ result: "error", error: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function menuLiquidarPreciosVacios() {
+  var ui = SpreadsheetApp.getUi();
+  var resp = ui.alert(
+    '💰 Liquidar Precios Vacíos en Recolecciones',
+    '¿Deseas liquidar automáticamente las recolecciones con precio pendiente usando la hoja Tarifas y las homologaciones aprobadas?\n\n' +
+    '🛡️ Seguridad:\n' +
+    '• Se creará primero una pestaña de respaldo automático.\n' +
+    '• Los registros que ya tienen precio NO se tocarán.\n' +
+    '• Solo se actualizarán las columnas Precio y Valor (K y L).',
+    ui.ButtonSet.YES_NO
+  );
+  if (resp !== ui.Button.YES) return;
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss.toast('Procesando liquidación y creando respaldo...', '💰 ProteinAgro', 10);
+    var res = ejecutarLiquidacionPreciosVacios_(ss);
+    var msg = '✅ Proceso completado con éxito:\n\n' +
+      '• Registros liquidados: ' + res.totalLiquidadas + '\n' +
+      '• Valor total liquidado: $' + Number(res.valorTotalCOP || 0).toLocaleString('es-CO') + ' COP\n' +
+      '• Visitas fallidas (0 Kg) omitidas: ' + res.totalVisitasFallidas0Kg + '\n' +
+      '• Pendientes por definir tarifa (Grupo B): ' + res.totalPendientesSinTarifa + '\n' +
+      (res.backupSheetName ? ('• Pestaña de respaldo: ' + res.backupSheetName) : '');
+    ui.alert('💰 Liquidación Completada', msg, ui.ButtonSet.OK);
+  } catch (e) {
+    ui.alert('❌ Error al liquidar', e.toString(), ui.ButtonSet.OK);
   }
 }
 
@@ -1980,6 +2165,8 @@ function onOpen() {
     ui.createMenu('📊 Conciliador')
       .addItem('🗔 Abrir aquí en Sheets (Ventana Flotante)', 'abrirConciliadorFlotante')
       .addItem('⚖️ Conciliar Proveedor con Excel (Directo)', 'abrirConciliacionDirectaFlotante')
+      .addSeparator()
+      .addItem('💰 Liquidar Precios Vacíos en Recolecciones', 'menuLiquidarPreciosVacios')
       .addSeparator()
       .addItem('🚀 Abrir Conciliador (Ventana Aparte)', 'abrirConciliadorNuevaVentana')
       .addItem('📋 Descargar Plantilla Oficial (.xlsx)', 'abrirDescargaPlantillaSheets')

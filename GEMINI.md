@@ -631,6 +631,16 @@ i.fecha), consolidándose directamente en la fila de ese día.
   4. *Preservación Intacta de Todos los Indicadores:* Se verificó matemáticamente en los 11 meses que la suma de `TOTAL GENERAL` (Kilos), `PRECIO` promedio ponderado y `VALOR ($)` por proveedor y por mes permanece 100% idéntica al centavo y al gramo, sin alterar ningún otro KPI ni gráfico (`kilosPorProveedor`) de la PWA o del Conciliador.
   5. *Gráfico de Productos en PWA (`app.js`):* `renderCharts` homologa las etiquetas del gráfico `Kilos por Producto` contra la pestaña `Productos` y excluye ítems con cantidad `0`.
 
+### 38. Liquidación Segura y Atómica de Precios Vacíos en Recolecciones con Respaldo Automático y Homologación Grupo A (`v1.9.5`)
+- **Diagnóstico sobre 3.392 filas de `Recolecciones`:**
+  - Se identificaron **214 filas** con la columna `Precio` vacía: **53** corresponden a *Visitas Fallidas / Novedades legítimas (0 Kg)* que no requieren precio, **129** corresponden a recolecciones con kilos liquidables automáticamente (**111** por cruce directo con `Tarifas`/histórico + **18** homologadas del Grupo A aprobado por gerencia, por un valor total de **\$103.341.185 COP**), y **32** quedan pendientes en el Grupo B esperando definición de tarifas específicas (ej. *Hueso de Pollo Caribe*, *Hueso Seco*, etc.).
+- **Arquitectura de Blindaje en `Code.gs` (`ejecutarLiquidacionPreciosVacios_` / `liquidarRecoleccionesPendientes` / `menuLiquidarPreciosVacios`):**
+  1. *Respaldo Previo Automático:* Antes de escribir cualquier cambio, duplica automáticamente la hoja `Recolecciones` en `Recolecciones_Backup_PreLiquidacion_YYYYMMDD` (y se guardó copia local en `backups/Recolecciones_Backup_PreLiquidacion_20261109.csv`).
+  2. *Escritura Quirúrgica Exclusiva en Columnas K y L (`Precio` y `Valor`):* Determina `filasReales` escaneando desde abajo hacia arriba y escribe **únicamente** en el rango de 2 columnas `K:L` (`sheetRec.getRange(2, colIdx.precio + 1, filasReales, 2).setValues(precioValorMatrix)`), garantizando **0% de interferencia** con las fórmulas `ARRAYFORMULA`/`COUNTIF` en `M:N` (`ID_Clave`, `Alerta`), `O:Q` (`Facturas`) y `R+` (` Tablero Duplicados`).
+  3. *Exclusión de Visitas Fallidas (0 Kg):* Omite registros con `Kg <= 0`, `Visita Fallida` o prefijo `NOV-`.
+  4. *Homologación Aprobada Grupo A (`buscarHomologadoGrupoA_`):* Liquida automáticamente las variantes aprobadas (`Supertienda Cañaveral SEBO` ➔ \$1.200, `Cañaveral Hueso Cerdo` ➔ \$150, `Alberto Millán SEBO` ➔ \$1.200, `Bárbara Gómez Sebo` ➔ \$1.200, `Belalcázar Carnes y Derivados` Hueso Blanco ➔ \$200 / Sebo en Rama ➔ \$1.200, `Belalcázar Rozo Hueso de Cerdo` ➔ \$100, `Sevillana Frigorivalle Hueso Promoción` ➔ \$1.200, `Ciudad del Campo Empella` ➔ \$2.000, `Olímpica / Cañaveral Desperdicio` ➔ \$100).
+  5. *Acceso 1-Clic en Menú de Sheets y Panel Admin PWA:* Opción `💰 Liquidar Precios Vacíos en Recolecciones` integrada en el menú `📊 Conciliador` de Google Sheets y botón `💰 Liquidar Precios Vacíos` (`liquidarPreciosVaciosSheetsAdmin`) en el panel administrativo de la PWA (`index.html` / `app.js`).
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue

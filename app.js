@@ -3330,6 +3330,60 @@ async function resincronizarTodoAGoogleSheets() {
 }
 window.resincronizarTodoAGoogleSheets = resincronizarTodoAGoogleSheets;
 
+async function liquidarPreciosVaciosSheetsAdmin() {
+    if (!GOOGLE_SHEETS_WEBHOOK_URL) {
+        alert("⚠️ No está configurada la URL de Google Sheets.");
+        return;
+    }
+
+    const confirmar = confirm(
+        "💰 LIQUIDAR PRECIOS VACÍOS EN GOOGLE SHEETS\n\n" +
+        "¿Deseas liquidar automáticamente las recolecciones con precio pendiente usando la hoja Tarifas y las homologaciones aprobadas?\n\n" +
+        "🛡️ Seguridad garantizada:\n" +
+        "• Se creará primero una pestaña de respaldo en Google Sheets.\n" +
+        "• Los registros que ya tienen precio NO se tocarán.\n" +
+        "• Se calculará automáticamente Valor = Kg × Precio."
+    );
+    if (!confirmar) return;
+
+    const btn = document.getElementById('btn-admin-liquidar-sheets');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Liquidando precios en Sheets...';
+    }
+
+    try {
+        const url = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=liquidarRecolecciones&t=${Date.now()}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.result === 'error') throw new Error(data.error || 'Error desconocido en Apps Script');
+
+        const totalLiq = data.totalLiquidadas || 0;
+        const valCOP = data.valorTotalCOP ? (`$${Number(data.valorTotalCOP).toLocaleString('es-CO')} COP`) : 'Calculado en hoja';
+        const pend = data.totalPendientesSinTarifa || 0;
+        const bak = data.backupSheetName ? `\n• Pestaña de respaldo: ${data.backupSheetName}` : '';
+
+        alert(
+            `✅ Liquidación completada con éxito en Google Sheets:\n\n` +
+            `• Registros liquidados: ${totalLiq}\n` +
+            `• Valor total liquidado: ${valCOP}\n` +
+            `• Pendientes por definir tarifa (Grupo B): ${pend}` +
+            bak
+        );
+    } catch (err) {
+        console.error("Error liquidando precios en Sheets:", err);
+        alert(`⚠️ No se pudo completar la liquidación automática: ${err.message}`);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText || '💰 Liquidar Precios Vacíos';
+        }
+    }
+}
+window.liquidarPreciosVaciosSheetsAdmin = liquidarPreciosVaciosSheetsAdmin;
+
 
 // === SISTEMA DE RUTAS Y PROVEEDORES DINÁMICOS ===
 const DEFAULT_RUTAS_DATA = {

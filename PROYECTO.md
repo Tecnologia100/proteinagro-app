@@ -1009,3 +1009,9 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Eliminación de Productos No Oficiales y Columnas en Cero:** Retirados del Informe de Materia Prima los encabezados inexistentes (`HUESO CALCINADO`, `HUESO PICADO`, `SEBO DERRETIDO`, `SEBO BOVINO`, `CABEZA DE CERDO`, `PIEL DE POLLO`) y ocultadas dinámicamente todas las columnas y filas con cantidad `0`.
 - **Reasignación Exacta de Productos Oficiales:** `SEBO` homologado a `SEBO EN RAMA`, preservando en sus propias columnas oficiales a `HUESO PROMOCION`, `CALAMBOMBO DE CERDO`, `CALAMBOMBO DE RES`, `PIELES`, `PIEL POLLO`, `OREJAS DE CERDO`, `PULMON DE CERDO`, `HUESO DE POLLO` y `LEÑA`.
 - **Indicadores 100% Intactos:** Kilos totales (`TOTAL GENERAL`), precios unitarios (`PRECIO`), valores en pesos (`VALOR`), KPIs del Conciliador y gráficos por proveedor permanecen inalterados. Cache PWA `proteinagro-v1.9.5`.
+
+## v1.9.5 (Complemento) - Liquidacion Segura y Atomica de Precios Vacios en Recolecciones (9/11/2026)
+- Respaldo previo automatico (`Recolecciones_Backup_PreLiquidacion_YYYYMMDD`) antes de escribir cambios y copia local en `backups/Recolecciones_Backup_PreLiquidacion_20261109.csv`.
+- Escritura quirurgica exclusiva en columnas K y L (`Precio` y `Valor`) preservando al 100% las formulas de `ID_Clave` (M), `Alerta` (N) y Tablero Duplicados (R+).
+- Homologacion aprobada del Grupo A (129 registros liquidados por $103.341.185 COP) y exclusion de 53 visitas fallidas (0 Kg).
+- Boton 1-clic en el menu `📊 Conciliador > 💰 Liquidar Precios Vacíos en Recolecciones` de Google Sheets y en el Panel Administrativo de la PWA (`💰 Liquidar Precios Vacíos`).
