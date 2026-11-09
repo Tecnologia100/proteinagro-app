@@ -486,7 +486,7 @@
                 <button class="btn" id="btnConciliarModal" style="background-color: #6366f1; color: white;" title="Conciliar factura del proveedor (Excel) contra recolecciones" onclick="abrirModalConciliacion()">
                     ⚡ Conciliar Proveedor
                 </button>
-                <button class="btn" id="btnRefresh" onclick="fetchData()">
+                <button class="btn" id="btnRefresh" onclick="fetchData(true)">
                     🔄 Actualizar
                 </button>
             </div>
@@ -536,7 +536,7 @@
                         <tr><td colspan="7" class="loading" id="tableLoadingCell">
                             <div class="spinner"></div>
                             <p style="margin-bottom: 8px;">Cargando datos desde Google Sheets...</p>
-                            <button class="btn" style="background:#0f172a;color:#fff;padding:6px 14px;font-size:12px;border:none;border-radius:6px;cursor:pointer;" onclick="fetchData()">
+                            <button class="btn" style="background:#0f172a;color:#fff;padding:6px 14px;font-size:12px;border:none;border-radius:6px;cursor:pointer;" onclick="fetchData(true)">
                                 ⚡ Cargar Registros Ahora
                             </button>
                         </td></tr>
@@ -909,24 +909,27 @@
 
         async function cargarCatalogoProductosPestana() {
             try {
-                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Productos&t=${Date.now()}`;
-                const resp = await fetch(url, { cache: "no-store" });
+                const sheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+                const url = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?sheet=Productos&tq=' + encodeURIComponent('select A, B') + '&tqx=out:json&_t=' + Date.now();
+                const resp = await fetch(url);
                 if (!resp.ok) return;
-                const csvText = await resp.text();
-                const rows = parseCSV(csvText);
-                if (!rows || rows.length <= 1) return;
+                const text = await resp.text();
+                const start = text.indexOf('{');
+                const end = text.lastIndexOf('}') + 1;
+                if (start === -1 || end <= start) return;
+                const json = JSON.parse(text.substring(start, end));
+                if (!json || !json.table || !Array.isArray(json.table.rows)) return;
                 const activos = [];
                 const vistos = new Set();
-                for (let i = 1; i < rows.length; i++) {
-                    const r = rows[i];
-                    if (!r || !r.length) continue;
-                    const nombre = String(r[0] || "").trim().toUpperCase();
-                    const estado = String(r[1] || "Activo").trim().toLowerCase();
-                    if (nombre && estado !== "inactivo" && !vistos.has(nombre)) {
+                json.table.rows.forEach(r => {
+                    if (!r || !r.c) return;
+                    const nombre = String((r.c[0] && r.c[0].v) || '').trim().toUpperCase();
+                    const estado = String((r.c[1] && r.c[1].v) || 'Activo').trim().toLowerCase();
+                    if (nombre && nombre !== 'PRODUCTO' && nombre !== 'NOMBRE' && estado !== 'inactivo' && !vistos.has(nombre)) {
                         vistos.add(nombre);
                         activos.push(nombre);
                     }
-                }
+                });
                 if (activos.length > 0) {
                     productosPestanaOficial = activos;
                 }
@@ -950,6 +953,22 @@
             if (/^HUESOS?\s+(?:DE\s+)?RES\b/i.test(k)) return "HUESO BLANCO";
             if (/^HUESOS?\s+(?:DE\s+)?CERDO\b|^HUESO\s+PORCINO\b/i.test(k)) return "HUESO DE CERDO";
             return raw.toUpperCase();
+        }
+
+        function productosCoinciden(prod1, prod2) {
+            if (!prod1 || !prod2) return false;
+            const norm = (s) => String(s || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+            const p1 = norm(prod1);
+            const p2 = norm(prod2);
+            if (!p1 || !p2) return false;
+            if (p1 === p2) return true;
+            const h1 = norm(homologarMateriaCliente(p1));
+            const h2 = norm(homologarMateriaCliente(p2));
+            if (h1 && h2 && h1 === h2) return true;
+            if (p1 + 'S' === p2 || p2 + 'S' === p1 || p1 + 'ES' === p2 || p2 + 'ES' === p1) {
+                if (!p1.includes('POLLO') && !p2.includes('POLLO')) return true;
+            }
+            return false;
         }
 
 
@@ -1442,6 +1461,16 @@
             if (oldScript) oldScript.remove();
         }
 
+        async function fetchWithTimeout(url, timeoutMs = 2500) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(url, { signal: controller.signal });
+            } finally {
+                clearTimeout(id);
+            }
+        }
+
         async function fetchDataDirecto(btn) {
             if (cargaDatosCompletada && rawData && rawData.length > 0) return;
             updateStatus('🌐 Conectando directamente con Google Sheets (Modo Sin Filtros)...', 'normal');
@@ -1450,25 +1479,17 @@
             const exportTsvUrl = 'https:' + '/' + '/docs.google.com/spreadsheets/d/' + sheetId + '/export?format=tsv&sheet=Recolecciones&_t=' + Date.now();
             const gvizBase = 'https:' + '/' + '/docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?sheet=Recolecciones';
 
-            // 1. Prioridad 1: Exportación TSV Directa (Ignora el 100% de los filtros visuales activos en Google Sheets)
-            try {
-                const respTsv = await fetch(exportTsvUrl);
-                if (respTsv.ok) {
-                    const tsvText = await respTsv.text();
-                    const tableTsv = convertirTsvATablaGviz(tsvText);
-                    if (tableTsv && tableTsv.rows && tableTsv.rows.length > 0) {
-                        procesarTablaGviz(tableTsv, btn, 'Directo Sin Filtros');
-                        return;
-                    }
+            // Lanzar respaldo JSONP en paralelo tras 1.2s si aún no ha respondido fetch (ideal para iframes de Google Sheets)
+            setTimeout(() => {
+                if (!cargaDatosCompletada && (!rawData || rawData.length === 0)) {
+                    fetchDataViaJSONP(btn, gvizBase);
                 }
-            } catch(eTsv) {
-                console.info("Exportación TSV directa no disponible en origen local, usando GViz + Fusión Sin Filtros...");
-            }
+            }, 1200);
 
-            // 2. Prioridad 2: Fetch GViz CORS + Fusión Automática con Base Completa Sin Filtros
+            // 1. Prioridad 1: Fetch GViz CORS Directo (Ultrarrápido y compatible con iframes)
             try {
                 const url = gvizBase + '&tqx=out:json&_t=' + Date.now();
-                const resp = await fetch(url);
+                const resp = await fetchWithTimeout(url, 2500);
                 if (resp.ok) {
                     const text = await resp.text();
                     const start = text.indexOf('{');
@@ -1482,7 +1503,22 @@
                     }
                 }
             } catch(eFetch) {
-                console.warn("fetch() CORS falló, recurriendo a JSONP...", eFetch);
+                console.warn("fetch() GViz CORS falló o tardó, probando TSV / JSONP...", eFetch);
+            }
+
+            // 2. Prioridad 2: Exportación TSV Directa
+            try {
+                const respTsv = await fetchWithTimeout(exportTsvUrl, 2500);
+                if (respTsv.ok) {
+                    const tsvText = await respTsv.text();
+                    const tableTsv = convertirTsvATablaGviz(tsvText);
+                    if (tableTsv && tableTsv.rows && tableTsv.rows.length > 0) {
+                        procesarTablaGviz(tableTsv, btn, 'Directo Sin Filtros');
+                        return;
+                    }
+                }
+            } catch(eTsv) {
+                console.info("Exportación TSV directa no disponible, usando JSONP...");
             }
 
             // 3. Fallback a JSONP
@@ -1547,8 +1583,8 @@
             }
         }
 
-        function fetchData() {
-            if (isLoading && !(window.DATOS_INICIALES_SERVIDOR && window.DATOS_INICIALES_SERVIDOR.success)) return;
+        function fetchData(forzar = false) {
+            if (!forzar && isLoading && !(window.DATOS_INICIALES_SERVIDOR && window.DATOS_INICIALES_SERVIDOR.success)) return;
 
             // 1. Prioridad Máxima: Si el servidor ya inyectó los datos en el HTML al abrir la ventana,
             // cargarlos de inmediato a 0 milisegundos sin llamadas de red ni esperas.
