@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** Noviembre 2026 (Versión 1.9.7)  
+> **Última Actualización:** 10 de Noviembre 2026 (Versión 1.9.8)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -786,6 +786,15 @@ i.fecha), consolidándose directamente en la fila de ese día.
 - **Visor Directo de Evidencia (`app.js`):**
   - Se implementó `verificarVisorSoporteURL` que responde al parámetro `?view=soporte&id=REC-...`.
   - Al hacer clic en el enlace de la columna `Foto_Soporte` en Google Sheets o el Conciliador, se despliega instantáneamente una ventana modal en alta resolución con la fotografía del pesaje, el carnicero que entregó, el conductor, la fecha y el comercio.
+- **Validación Operativa en Producción en Google Sheets:**
+  - Sincronización en vivo verificada exitosamente para la recolección `REC-1794320693857-7570` (Francisco Larrahondo / Migan Capital - La Montaña Cosmocentro):
+    * Filas 3402 y 3403 de la hoja `Recolecciones`.
+    * Columna R (18): `Báscula / Reloj`
+    * Columna S (19): `https://proteinagro-app.vercel.app/?view=soporte&id=REC-1794320693857-7570`
+    * Columna T (20): `Ramón`
+    * Columna I (9): `[Soporte: Báscula / Reloj] [Entregó: Ramón]`
+    * Columna N (14) `Alerta`: `✅ OK`
+    * Tabla de auditoría de duplicados intacta en columnas U a Z sin fórmulas rotas.
 
 ---
 

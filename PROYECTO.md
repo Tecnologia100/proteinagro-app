@@ -1,7 +1,7 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.9.5`  
-> **Última Actualización:** Noviembre 2026  
+> **Versión Actual:** `v=1.9.8`  
+> **Última Actualización:** 10 de Noviembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
 
@@ -1108,3 +1108,12 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Visor Directo de Evidencia (`app.js`):**
   - Se implementó `verificarVisorSoporteURL` que responde al parámetro `?view=soporte&id=REC-...`.
   - Al hacer clic en el enlace de la columna `Foto_Soporte` en Google Sheets o el Conciliador, se despliega instantáneamente una ventana modal en alta resolución con la fotografía del pesaje, el carnicero que entregó, el conductor, la fecha y el comercio.
+- **Validación Operativa en Producción en Google Sheets:**
+  - Sincronización en vivo verificada exitosamente para la recolección `REC-1794320693857-7570` (Francisco Larrahondo / Migan Capital - La Montaña Cosmocentro):
+    * Filas 3402 y 3403 de la hoja `Recolecciones`.
+    * Columna R (18): `Báscula / Reloj`
+    * Columna S (19): `https://proteinagro-app.vercel.app/?view=soporte&id=REC-1794320693857-7570`
+    * Columna T (20): `Ramón`
+    * Columna I (9): `[Soporte: Báscula / Reloj] [Entregó: Ramón]`
+    * Columna N (14) `Alerta`: `✅ OK`
+    * Tabla de auditoría de duplicados intacta en columnas U a Z sin fórmulas rotas.
