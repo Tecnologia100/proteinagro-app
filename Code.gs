@@ -63,6 +63,11 @@ function doGet(e) {
       return habilitarColumnasFacturaHttp(ss);
     }
 
+    // 0.087 Habilitar columnas de Soporte de Pesaje y Visto Bueno X:Z (v1.9.8)
+    if (e && e.parameter && (e.parameter.action === 'habilitarColumnasSoporte' || e.parameter.action === 'crearColumnasSoporte')) {
+      return habilitarColumnasSoporteHttp(ss);
+    }
+
     // 0.088 Aplicar novedades automáticas desde Conciliador (v1.9.1)
     if (e && e.parameter && e.parameter.action === 'aplicarNovedadesConciliacion') {
       var payloadConc = e.parameter.payload || e.parameter.data || '';
@@ -873,6 +878,47 @@ function habilitarColumnasFacturaHttp(ss) {
     return ContentService.createTextOutput(JSON.stringify({
       result: "success",
       message: res.desplazado ? "Columnas desplazadas y encabezados O:Q configurados" : "Columnas O:Q ya estaban configuradas",
+      detalle: res
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "error",
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function menuHabilitarColumnasSoporte() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert("Error: No se encontró la hoja Recolecciones.");
+      return;
+    }
+    var res = garantizarEstructuraColumnasSoporte(sheet);
+    SpreadsheetApp.getUi().alert(
+      "✅ Columnas de Soporte Habilitadas en X:Z:\n\n" +
+      "1. Se configuraron los encabezados en las columnas 24, 25 y 26:\n" +
+      "   - Columna X: Tipo_Soporte (Báscula, Cuaderno, Recibo)\n" +
+      "   - Columna Y: Foto_Soporte (Enlace a la fotografía de pesaje)\n" +
+      "   - Columna Z: Entregado_Por (Nombre del carnicero / responsable)\n\n" +
+      "Sin desplazar ni alterar ninguna fórmula contable de las columnas A a W."
+    );
+  } catch(e) {
+    SpreadsheetApp.getUi().alert("Error: " + e.toString());
+  }
+}
+
+function habilitarColumnasSoporteHttp(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Recolecciones");
+    if (!sheet) throw new Error("No existe la hoja Recolecciones.");
+    var res = garantizarEstructuraColumnasSoporte(sheet);
+    return ContentService.createTextOutput(JSON.stringify({
+      result: "success",
+      message: "Columnas X:Z (Tipo_Soporte, Foto_Soporte, Entregado_Por) configuradas exitosamente",
       detalle: res
     })).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
@@ -2441,6 +2487,10 @@ function doPost(e) {
       return habilitarColumnasFacturaHttp(ss);
     }
 
+    if (action === 'habilitarColumnasSoporte' || action === 'crearColumnasSoporte') {
+      return habilitarColumnasSoporteHttp(ss);
+    }
+
     if (action === 'crearProductoTarifa') {
       var pData = payload;
       if (typeof pData === 'string') {
@@ -2467,6 +2517,12 @@ function doPost(e) {
 // ==============================================================================
 function onOpen() {
   try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss ? ss.getSheetByName("Recolecciones") : null;
+    if (sheet) {
+      garantizarEstructuraColumnasSoporte(sheet);
+    }
+
     var ui = SpreadsheetApp.getUi();
     
     // 1. Menú Oficial del Conciliador (Operación Diaria)
@@ -2474,6 +2530,7 @@ function onOpen() {
       .addItem('🗔 Abrir aquí en Sheets (Ventana Flotante)', 'abrirConciliadorFlotante')
       .addItem('⚖️ Conciliar Proveedor con Excel (Directo)', 'abrirConciliacionDirectaFlotante')
       .addSeparator()
+      .addItem('📷 Habilitar Columnas de Soporte (X:Z)', 'menuHabilitarColumnasSoporte')
       .addItem('💰 Liquidar Precios Vacíos en Recolecciones', 'menuLiquidarPreciosVacios')
       .addSeparator()
       .addItem('🚀 Abrir Conciliador (Ventana Aparte)', 'abrirConciliadorNuevaVentana')
