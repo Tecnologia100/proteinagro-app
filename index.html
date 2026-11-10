@@ -49,7 +49,7 @@
             <div class="logo-icon" style="font-size: 3rem; text-align: center; margin-bottom: 10px;">🌿</div>
             <h2 style="text-align: center; margin-bottom: 5px; color: var(--primary);">ProteinAgro</h2>
             <p style="text-align: center; color: var(--text-muted); margin-bottom: 22px;">
-                Acceso al Sistema <button type="button" onclick="forzarActualizacionApp()" class="btn-update-badge" style="margin-left: 6px;" title="Tocar o hacer clic para forzar actualización inmediata">🔄 v1.9.6</button>
+                Acceso al Sistema <button type="button" onclick="forzarActualizacionApp()" class="btn-update-badge" style="margin-left: 6px;" title="Tocar o hacer clic para forzar actualización inmediata">🔄 v1.9.7</button>
             </p>
             
             <!-- Modo Conductor (Predeterminado) -->
@@ -133,10 +133,10 @@
             <div class="logo-container">
                 <div class="logo-icon">👑</div>
                 <h1>Panel Administrativo</h1>
-                <span class="version-tag">v1.9.6</span>
+                <span class="version-tag">v1.9.7</span>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" class="btn-text btn-update-badge" title="Forzar actualización de la app" onclick="forzarActualizacionApp()">🔄 v1.9.6</button>
+                <button type="button" class="btn-text btn-update-badge" title="Forzar actualización de la app" onclick="forzarActualizacionApp()">🔄 v1.9.7</button>
                 <button id="btn-logout-admin" class="btn-secondary" style="padding: 8px 16px;">Salir</button>
             </div>
         </header>
@@ -295,10 +295,10 @@
                     <h1 style="font-size: 1.25rem; line-height: 1.1; margin: 0;">ProteinAgro</h1>
                     <span id="driver-header-badge" class="driver-header-badge" style="display: none;">👤 <span id="driver-header-name">Conductor</span></span>
                 </div>
-                <span class="version-tag">v1.9.6</span>
+                <span class="version-tag">v1.9.7</span>
             </div>
             <div class="app-header-right">
-                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.9.6</button>
+                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.9.7</button>
                 <button id="btn-pwa-install-header" class="btn-text" style="display: none; color: #10b981; font-weight: 600; font-size: 0.85rem; align-items: center; gap: 4px;">📲 Instalar</button>
                 <div class="status-indicator offline" id="network-status">
                     <span class="dot"></span>
@@ -516,6 +516,41 @@
                         </div>
                     </div>
 
+                    <!-- Evidencia de Pesaje en Sitio (Foto Flexible: Báscula / Cuaderno / Recibo) - v1.9.7 -->
+                    <div id="evidencia-pesaje-container" class="evidencia-pesaje-card">
+                        <div class="evidencia-pesaje-header">
+                            <span class="evidencia-icon">⚖️</span>
+                            <div>
+                                <h4 class="evidencia-title">Foto de Soporte / Pesaje en Sitio <span style="color: #dc2626;">*</span></h4>
+                                <p class="evidencia-subtitle">Obligatorio: Báscula (reloj/visor), cuaderno de notas o recibo</p>
+                            </div>
+                        </div>
+
+                        <!-- Selector de Tipo de Evidencia -->
+                        <div class="evidencia-tipo-selector" id="evidencia-tipo-selector">
+                            <button type="button" class="btn-tipo-evidencia active" data-tipo="Báscula / Reloj">⚖️ Báscula / Reloj</button>
+                            <button type="button" class="btn-tipo-evidencia" data-tipo="Cuaderno / Apuntes">📝 Cuaderno / Apuntes</button>
+                            <button type="button" class="btn-tipo-evidencia" data-tipo="Recibo / Remisión">🧾 Recibo / Remisión</button>
+                        </div>
+
+                        <input type="file" id="evidencia-foto-input" accept="image/*" capture="environment" style="display: none;">
+                        <button type="button" id="btn-capturar-evidencia" class="btn-secondary btn-camera-evidencia">
+                            📸 Tomar Foto de Evidencia
+                        </button>
+
+                        <div id="evidencia-foto-preview-box" style="display: none; margin-top: 10px; text-align: center;">
+                            <div style="position: relative; display: inline-block; max-width: 100%;">
+                                <img id="evidencia-foto-preview" src="" alt="Evidencia pesaje" style="max-width: 100%; max-height: 200px; border-radius: 10px; border: 2px solid #10b981; object-fit: contain; background: #0f172a;">
+                                <span id="evidencia-tipo-badge" class="badge-tipo-evidencia">⚖️ Báscula / Reloj</span>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <button type="button" id="btn-eliminar-foto-evidencia" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 5px 14px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                                    🗑️ Cambiar / Borrar Foto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Observaciones / Novedades -->
                     <div class="form-group">
                         <label for="observaciones">Observaciones / Novedades</label>
@@ -540,7 +575,7 @@
 
                 <!-- Footer de Versión & Ayuda de Caché -->
                 <div style="text-align: center; margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">ProteinAgro Digital v1.9.6 • Soporte Oficial Admin & Trazabilidad Diaria</p>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">ProteinAgro Digital v1.9.7 • Soporte Oficial Admin & Trazabilidad Diaria</p>
                     <button type="button" onclick="forzarActualizacionApp()" style="background: none; border: 1px dashed #cbd5e1; color: #64748b; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">
                         🔄 ¿No ves los cambios? Toca aquí para actualizar
                     </button>
@@ -550,6 +585,62 @@
         
         <!-- Success Toast -->
         <div id="toast" class="toast">✅ Recolección guardada exitosamente</div>
+    </div>
+
+    <!-- Modal de Visto Bueno con Proveedor (Modo Datáfono LCD) - v1.9.7 -->
+    <div id="modal-visto-bueno" class="dataphone-modal-overlay" style="display: none;">
+        <div class="dataphone-card">
+            <!-- Barra Superior Tipo Terminal POS -->
+            <div class="dataphone-screen-header">
+                <div class="dataphone-signal">📶 PROTEINAGRO POS • VALIDACIÓN EN SITIO</div>
+                <div class="dataphone-time" id="vb-time">--:--</div>
+            </div>
+
+            <!-- Pantalla LCD de Alto Contraste -->
+            <div class="dataphone-lcd">
+                <div class="dataphone-lcd-title">RESUMEN DE ENTREGA</div>
+                <div class="dataphone-prov" id="vb-proveedor">--</div>
+                <div class="dataphone-branch" id="vb-punto">📍 --</div>
+
+                <div class="dataphone-divider"></div>
+
+                <!-- Lista de Productos y Pesajes -->
+                <div class="dataphone-items" id="vb-items-list">
+                    <!-- Filas dinámicas en letra grande -->
+                </div>
+
+                <!-- Caja de Total Gigante LCD -->
+                <div class="dataphone-total-box">
+                    <span class="dataphone-total-label">TOTAL RECOLECTADO:</span>
+                    <span class="dataphone-total-val" id="vb-total-val">0.00 KG</span>
+                </div>
+
+                <!-- Estado de la Evidencia Fotográfica -->
+                <div class="dataphone-evidence-status" id="vb-evidence-status">
+                    ✅ Evidencia de soporte vinculada: <strong id="vb-evidence-type">Báscula / Reloj</strong>
+                </div>
+            </div>
+
+            <!-- Sección de Validación en Persona -->
+            <div class="dataphone-validation-section">
+                <label for="vb-entregado-por" class="dataphone-input-label">
+                    👤 ¿Quién entrega en carnicería / punto? <span style="color: #dc2626;">*</span>
+                </label>
+                <input type="text" id="vb-entregado-por" class="dataphone-input" placeholder="Ej: Don Carlos / Wilson / Encargado" autocomplete="off" required>
+                <small id="vb-entregado-error" class="dataphone-error-hint" style="display: none;">⚠️ Ingrese obligatoriamente el nombre de la persona que entrega.</small>
+            </div>
+
+            <!-- Botones de Acción Datáfono -->
+            <div class="dataphone-actions">
+                <button type="button" id="btn-confirmar-visto-bueno" class="btn-dataphone-confirm">
+                    <span class="btn-vb-text">✅ CONFIRMADO CON EL PROVEEDOR</span>
+                    <div class="spinner vb-spinner" style="display: none;"></div>
+                </button>
+                <button type="button" id="btn-cancelar-visto-bueno" class="btn-dataphone-cancel">
+                    ✏️ Modificar / Corregir Kilos
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de Comprobante / Soporte de Recolección (Voucher Digital) -->
@@ -574,6 +665,9 @@
                 <div><strong>🗺️ Ruta:</strong> <span id="receipt-route">--</span></div>
                 <div class="voucher-meta-full"><strong>🏬 Proveedor:</strong> <span id="receipt-provider">--</span></div>
                 <div class="voucher-meta-full"><strong>📍 Sucursal / Punto:</strong> <span id="receipt-branch">--</span></div>
+                <div class="voucher-meta-full" id="receipt-entregado-container" style="display: none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 6px 10px; color: #065f46; font-size: 0.85rem;">
+                    <strong>👤 Entregado y Validado por:</strong> <span id="receipt-entregado-por" style="font-weight: 700;">--</span>
+                </div>
             </div>
 
             <!-- Tabla Productos -->
@@ -605,6 +699,14 @@
             <!-- Observaciones si hay -->
             <div id="receipt-obs-container" class="voucher-obs-box">
                 <strong>Observaciones:</strong> <span id="receipt-obs">--</span>
+            </div>
+
+            <!-- Evidencia de Pesaje Foto si hay -->
+            <div id="receipt-soporte-box" class="voucher-obs-box" style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 10px;">
+                <strong>📷 Evidencia de Pesaje (<span id="receipt-soporte-tipo">Báscula</span>):</strong>
+                <div style="margin-top: 6px;">
+                    <img id="receipt-soporte-img" src="" alt="Evidencia de Pesaje" style="max-height: 140px; max-width: 100%; border-radius: 6px; border: 1px solid #cbd5e1; object-fit: contain; background: #0f172a; cursor: pointer;">
+                </div>
             </div>
 
             <!-- Firma Preview -->

@@ -109,6 +109,36 @@ async function subirFotoFacturaAStorage(dataUrl, recordId) {
     }
 }
 
+// Función auxiliar para subir foto de soporte de pesaje (Báscula, Cuaderno o Recibo) a Firebase Storage (v1.9.7)
+async function subirFotoSoporteAStorage(dataUrl, recordId) {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) return dataUrl;
+    if (!navigator.onLine || !storage) return dataUrl;
+
+    try {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const storageRef = storage.ref().child(`soportes_pesaje/${recordId}.jpg`);
+
+        const uploadTask = storageRef.put(blob, { contentType: 'image/jpeg' });
+        const uploadPromise = new Promise((resolve, reject) => {
+            uploadTask.on('state_changed', null, reject, async () => {
+                const downloadURL = await storageRef.getDownloadURL();
+                resolve(downloadURL);
+            });
+        });
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout subiendo foto de soporte a Firebase Storage")), 5000)
+        );
+
+        const urlFinal = await Promise.race([uploadPromise, timeoutPromise]);
+        console.log("⚖️ Foto de evidencia de pesaje subida a Firebase Storage exitosamente:", urlFinal);
+        return urlFinal;
+    } catch (err) {
+        console.warn("⚠️ No se pudo subir foto de soporte a Storage (se conservará Base64 comprimido):", err);
+        return dataUrl;
+    }
+}
+
 let ULTIMA_UBICACION_GPS = "0";
 
 // Captura GPS en segundo plano totalmente asíncrona (0 milisegundos de bloqueo)
@@ -2840,6 +2870,88 @@ document.getElementById('factura-foto-input')?.addEventListener('change', (event
     reader.readAsDataURL(file);
 });
 
+// ==============================================================================
+// MÓDULO: CAPTURA DE EVIDENCIA DE PESAJE EN SITIO (FOTO FLEXIBLE v1.9.7)
+// ==============================================================================
+let capturedSoportePhoto = null;
+let capturedSoporteTipo = 'Báscula / Reloj';
+
+function inicializarModuloEvidenciaPesaje() {
+    // Selector rápido de tipo de evidencia (Báscula, Cuaderno o Recibo)
+    document.querySelectorAll('.btn-tipo-evidencia').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.btn-tipo-evidencia').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            capturedSoporteTipo = btn.getAttribute('data-tipo') || 'Báscula / Reloj';
+            const badge = document.getElementById('evidencia-tipo-badge');
+            if (badge) badge.textContent = capturedSoporteTipo;
+        });
+    });
+
+    document.getElementById('btn-capturar-evidencia')?.addEventListener('click', () => {
+        document.getElementById('evidencia-foto-input')?.click();
+    });
+
+    document.getElementById('btn-eliminar-foto-evidencia')?.addEventListener('click', () => {
+        limpiarFotoEvidenciaPesaje();
+    });
+
+    document.getElementById('evidencia-foto-input')?.addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvasEl = document.createElement('canvas');
+                const maxDim = 1024;
+                let width = img.width;
+                let height = img.height;
+                if (width > height) {
+                    if (width > maxDim) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    }
+                } else {
+                    if (height > maxDim) {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                canvasEl.width = width;
+                canvasEl.height = height;
+                const cCtx = canvasEl.getContext('2d');
+                cCtx.drawImage(img, 0, 0, width, height);
+                capturedSoportePhoto = canvasEl.toDataURL('image/jpeg', 0.70);
+
+                const previewImg = document.getElementById('evidencia-foto-preview');
+                const previewBox = document.getElementById('evidencia-foto-preview-box');
+                const btnCam = document.getElementById('btn-capturar-evidencia');
+                const badge = document.getElementById('evidencia-tipo-badge');
+
+                if (badge) badge.textContent = capturedSoporteTipo;
+                if (previewImg) previewImg.src = capturedSoportePhoto;
+                if (previewBox) previewBox.style.display = 'block';
+                if (btnCam) btnCam.style.display = 'none';
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function limpiarFotoEvidenciaPesaje() {
+    capturedSoportePhoto = null;
+    const fotoInput = document.getElementById('evidencia-foto-input');
+    const previewBox = document.getElementById('evidencia-foto-preview-box');
+    const previewImg = document.getElementById('evidencia-foto-preview');
+    const btnCam = document.getElementById('btn-capturar-evidencia');
+    if (fotoInput) fotoInput.value = '';
+    if (previewBox) previewBox.style.display = 'none';
+    if (previewImg) previewImg.src = '';
+    if (btnCam) btnCam.style.display = 'flex';
+}
+
 window.eliminarProductoRegistrado = function(index) {
     if (index >= 0 && index < collectedProducts.length) {
         collectedProducts.splice(index, 1);
@@ -3073,42 +3185,183 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         valorFacturaVal = Math.round(parsedValor);
     }
 
-    const btnSubmit = document.getElementById('btn-submit');
-    const spinner = btnSubmit.querySelector('.spinner');
-    const textSpan = btnSubmit.querySelector('.btn-text-content');
-    
-    textSpan.style.display = 'none';
-    spinner.style.display = 'block';
-    btnSubmit.disabled = true;
+    // Validación obligatoria de Foto de Evidencia de Pesaje (Propuesta 1 - v1.9.7)
+    if (!capturedSoportePhoto) {
+        alert("⚠️ FOTO DE EVIDENCIA OBLIGATORIA:\n\nDebe tomar una fotografía del pesaje en sitio (Báscula/Reloj, Cuaderno o Recibo) antes de registrar la recolección.");
+        const elEv = document.getElementById('btn-capturar-evidencia');
+        if (elEv) {
+            elEv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            elEv.focus();
+        }
+        return;
+    }
 
-    // Obtener observaciones
-    const observacionesVal = document.getElementById('observaciones')?.value.trim() || '';
+    // Preparar paquete de datos para validación presencial ("Pantalla de Visto Bueno" - v1.9.7)
+    pendingRecoleccionData = {
+        conductorName,
+        rutaName,
+        proveedorName,
+        sucursalName,
+        collectedProducts: [...collectedProducts],
+        totalKilos,
+        totalAtados,
+        requiereFacturaCaribe,
+        numeroFacturaVal,
+        valorFacturaVal,
+        observacionesVal: document.getElementById('observaciones')?.value.trim() || '',
+        firmaDataUrl: canvas ? canvas.toDataURL() : ''
+    };
 
-    // Obtener firma base64
-    const firmaDataUrl = canvas.toDataURL();
+    // Abrir Modal de Visto Bueno con Proveedor (Modo Datáfono LCD)
+    abrirModalVistoBueno(pendingRecoleccionData);
+});
+
+// ==============================================================================
+// PANTALLA DE VISTO BUENO / MODO DATÁFONO LCD CON PROVEEDOR (v1.9.7)
+// ==============================================================================
+let pendingRecoleccionData = null;
+
+function abrirModalVistoBueno(data) {
+    const modal = document.getElementById('modal-visto-bueno');
+    if (!modal) return;
+
+    // Hora actual en formato local
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const vbTimeEl = document.getElementById('vb-time');
+    if (vbTimeEl) vbTimeEl.textContent = timeStr;
+
+    // Proveedor y Sucursal
+    const vbProvEl = document.getElementById('vb-proveedor');
+    if (vbProvEl) vbProvEl.textContent = homologarNombreProveedor(data.proveedorName) || 'PROVEEDOR';
+    const vbPuntoEl = document.getElementById('vb-punto');
+    if (vbPuntoEl) vbPuntoEl.textContent = `📍 ${homologarNombrePunto(data.sucursalName) || 'General'}`;
+
+    // Lista de ítems con números grandes estilo datáfono
+    const itemsListEl = document.getElementById('vb-items-list');
+    if (itemsListEl) {
+        itemsListEl.innerHTML = '';
+        data.collectedProducts.forEach(p => {
+            const row = document.createElement('div');
+            row.className = 'dataphone-item-row';
+            const isAtado = esProductoAtado(p.producto);
+            const qtyStr = isAtado ? `${p.kilos} ${p.kilos === 1 ? 'ATADO' : 'ATADOS'}` : `${formatKilosDisplay(p.kilos)} KG`;
+            row.innerHTML = `
+                <span class="dataphone-item-name">${getEmojiForProduct(p.producto)} ${escapeHtml(p.producto)}</span>
+                <span class="dataphone-item-qty">${qtyStr}</span>
+            `;
+            itemsListEl.appendChild(row);
+        });
+    }
+
+    // Total LCD Gigante
+    const totalValEl = document.getElementById('vb-total-val');
+    if (totalValEl) {
+        totalValEl.textContent = formatResumenTotales({ totalKilos: data.totalKilos, totalAtados: data.totalAtados });
+    }
+
+    // Estado y tipo de evidencia fotográfica vinculada
+    const evidenceTypeEl = document.getElementById('vb-evidence-type');
+    if (evidenceTypeEl) {
+        evidenceTypeEl.textContent = capturedSoporteTipo || 'Báscula / Reloj';
+    }
+
+    // Limpiar input y mensaje de error de quien entrega
+    const entregadoInput = document.getElementById('vb-entregado-por');
+    const entregadoError = document.getElementById('vb-entregado-error');
+    if (entregadoInput) {
+        entregadoInput.value = '';
+        entregadoInput.classList.remove('input-error');
+    }
+    if (entregadoError) entregadoError.style.display = 'none';
+
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        if (entregadoInput) entregadoInput.focus();
+    }, 200);
+}
+
+function inicializarModalVistoBueno() {
+    const btnCancel = document.getElementById('btn-cancelar-visto-bueno');
+    btnCancel?.addEventListener('click', () => {
+        const modal = document.getElementById('modal-visto-bueno');
+        if (modal) modal.style.display = 'none';
+    });
+
+    const btnConfirm = document.getElementById('btn-confirmar-visto-bueno');
+    btnConfirm?.addEventListener('click', async () => {
+        if (!pendingRecoleccionData) return;
+        const entregadoInput = document.getElementById('vb-entregado-por');
+        const entregadoError = document.getElementById('vb-entregado-error');
+        const nombreEntregado = (entregadoInput?.value || '').trim();
+
+        if (!nombreEntregado) {
+            if (entregadoInput) {
+                entregadoInput.classList.add('input-error');
+                entregadoInput.focus();
+            }
+            if (entregadoError) entregadoError.style.display = 'block';
+            return;
+        }
+        if (entregadoError) entregadoError.style.display = 'none';
+
+        const btnVb = document.getElementById('btn-confirmar-visto-bueno');
+        const vbSpinner = btnVb?.querySelector('.vb-spinner');
+        const vbText = btnVb?.querySelector('.btn-vb-text');
+        if (vbText) vbText.style.display = 'none';
+        if (vbSpinner) vbSpinner.style.display = 'block';
+        if (btnVb) btnVb.disabled = true;
+
+        try {
+            await ejecutarGuardadoRecoleccion(pendingRecoleccionData, nombreEntregado);
+            const modal = document.getElementById('modal-visto-bueno');
+            if (modal) modal.style.display = 'none';
+        } catch (err) {
+            console.error("Error al guardar tras visto bueno:", err);
+            alert("Hubo un error al guardar la recolección. Por favor intente nuevamente.");
+        } finally {
+            if (vbText) vbText.style.display = 'inline';
+            if (vbSpinner) vbSpinner.style.display = 'none';
+            if (btnVb) btnVb.disabled = false;
+        }
+    });
+}
+
+// Ejecución atómica y desacoplada de la persistencia de la recolección
+async function ejecutarGuardadoRecoleccion(dataParams, nombreEntregado) {
     const recordId = 'REC-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
     const tsNow = Date.now();
-
-    // Coordenada GPS en segundo plano (0 ms de espera, 100% inmediato y sin demoras)
     const ubicacionGps = ULTIMA_UBICACION_GPS || "0";
+
+    const nombreEntregadoLimpio = aNombrePropio(nombreEntregado);
+    let obsCompleta = dataParams.observacionesVal || '';
+    if (nombreEntregadoLimpio) {
+        const prefijo = `[Entregó: ${nombreEntregadoLimpio}]`;
+        if (!obsCompleta.includes(prefijo)) {
+            obsCompleta = (prefijo + ' ' + obsCompleta).trim();
+        }
+    }
 
     const data = {
         id: recordId,
         timestamp: tsNow,
-        conductor: aNombrePropio(conductorName),
-        ruta: homologarRuta(rutaName),
-        proveedor: homologarNombreProveedor(proveedorName),
-        sucursal: homologarNombrePunto(sucursalName),
-        punto: homologarNombrePunto(sucursalName),
-        productos: collectedProducts,
-        totalKilos: totalKilos,
-        totalAtados: totalAtados,
-        observaciones: observacionesVal,
-        numeroFactura: numeroFacturaVal || '',
-        valorFactura: valorFacturaVal !== '' ? valorFacturaVal : '',
+        conductor: aNombrePropio(dataParams.conductorName),
+        ruta: homologarRuta(dataParams.rutaName),
+        proveedor: homologarNombreProveedor(dataParams.proveedorName),
+        sucursal: homologarNombrePunto(dataParams.sucursalName),
+        punto: homologarNombrePunto(dataParams.sucursalName),
+        productos: dataParams.collectedProducts,
+        totalKilos: dataParams.totalKilos,
+        totalAtados: dataParams.totalAtados,
+        observaciones: obsCompleta,
+        entregadoPor: nombreEntregadoLimpio,
+        numeroFactura: dataParams.numeroFacturaVal || '',
+        valorFactura: dataParams.valorFacturaVal !== '' ? dataParams.valorFacturaVal : '',
         fotoFactura: '',
+        fotoSoporte: '',
+        tipoSoporte: capturedSoporteTipo || 'Báscula / Reloj',
         ubicacionGps: ubicacionGps,
-        firma: firmaDataUrl,
+        firma: dataParams.firmaDataUrl || '',
         fecha: (() => {
             const now = new Date();
             const d = now.getDate();
@@ -3123,13 +3376,25 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     };
 
     try {
-        // 0.1 Intentar subir firma y foto de factura a Firebase Storage (o mantener base64 offline)
-        let firmaURL = firmaDataUrl;
-        if (navigator.onLine) {
-            firmaURL = await subirFirmaAStorage(firmaDataUrl, recordId);
+        // 0.1 Intentar subir firma, foto de evidencia de pesaje y foto de factura a Firebase Storage
+        let firmaURL = data.firma;
+        if (navigator.onLine && data.firma) {
+            firmaURL = await subirFirmaAStorage(data.firma, recordId);
         }
+        data.firma = firmaURL;
+
+        let fotoSoporteFinal = '';
+        if (capturedSoportePhoto) {
+            if (navigator.onLine) {
+                fotoSoporteFinal = await subirFotoSoporteAStorage(capturedSoportePhoto, recordId);
+            } else {
+                fotoSoporteFinal = capturedSoportePhoto;
+            }
+        }
+        data.fotoSoporte = fotoSoporteFinal || '';
+
         let fotoFacturaFinal = '';
-        if (requiereFacturaCaribe && capturedFacturaPhoto) {
+        if (dataParams.requiereFacturaCaribe && capturedFacturaPhoto) {
             if (navigator.onLine) {
                 fotoFacturaFinal = await subirFotoFacturaAStorage(capturedFacturaPhoto, recordId);
             } else {
@@ -3159,6 +3424,9 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
                     if (cleanItem.fotoFactura && cleanItem.fotoFactura.startsWith('data:image')) {
                         cleanItem.fotoFactura = 'Foto Factura Registrada';
                     }
+                    if (cleanItem.fotoSoporte && cleanItem.fotoSoporte.startsWith('data:image')) {
+                        cleanItem.fotoSoporte = 'Foto Soporte Registrada';
+                    }
                     if (cleanItem.firma && cleanItem.firma.startsWith('data:image') && cleanItem.firma.length > 500) {
                         cleanItem.firma = '';
                     }
@@ -3170,7 +3438,7 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
             console.warn("⚠️ Aviso al respaldar localmente:", backupErr);
         }
 
-        // 2. Sincronizar inmediatamente con Google Sheets (vía webhook sin bloquear) - con URL de firma
+        // 2. Sincronizar inmediatamente con Google Sheets (vía webhook sin bloquear)
         if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== "") {
             enviarAGoogleSheets({ ...data, firma: firmaURL, id: recordId }).then(ok => {
                 if (ok) {
@@ -3225,6 +3493,8 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
         resetearDropdownSucursal("Primero seleccione un proveedor");
         limpiarCamposFacturaCaribe();
         actualizarVisibilidadFacturaCaribe();
+        limpiarFotoEvidenciaPesaje();
+        pendingRecoleccionData = null;
 
         // Mostrar Comprobante Digital Modal al conductor e información del recibo
         mostrarComprobanteDigital({ ...data, firma: firmaURL, id: recordId });
@@ -3232,13 +3502,9 @@ document.getElementById('recoleccion-form').addEventListener('submit', async (e)
     } catch (error) {
         console.error("Error guardando documento: ", error);
         alert("Hubo un error guardando la recolección.");
-    } finally {
-        textSpan.style.display = 'block';
-        spinner.style.display = 'none';
-        btnSubmit.disabled = false;
+        throw error;
     }
-});
-
+}
 
 // === LÓGICA DEL ADMIN DASHBOARD & CHART.JS ===
 let chartProveedor = null;
@@ -3463,12 +3729,21 @@ function renderRecordsInTable(records, tbody) {
             facturaBadgeHtml = `<div style="margin-top:3px;"><span style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:1px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">🧾 Fact: ${escapeHtml(String(data.numeroFactura || 'S/N'))}${valStr}</span>${fotoLink}</div>`;
         }
 
+        let soporteBadgeHtml = '';
+        if (data.entregadoPor || data.fotoSoporte) {
+            const entSpan = data.entregadoPor ? `<span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:1px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">👤 ${escapeHtml(data.entregadoPor)}</span>` : '';
+            const fotoSopLink = data.fotoSoporte
+                ? ` <a href="#" onclick="verFotoSoporte('${docId}', '${recordLocalId}'); return false;" title="Ver Foto Soporte/Báscula" style="color:#059669; text-decoration:underline; margin-left:4px; font-weight:700;">📷 Pesaje</a>`
+                : '';
+            soporteBadgeHtml = `<div style="margin-top:3px;">${entSpan}${fotoSopLink}</div>`;
+        }
+
         tr.innerHTML = `
             <td style="font-weight: 500; white-space: nowrap;">${escapeHtml(fechaTexto)}</td>
             <td style="text-transform: capitalize;">${escapeHtml(aNombrePropio(data.conductor || '-'))}</td>
             <td style="text-transform: capitalize;">${escapeHtml(ruta)}</td>
             <td style="text-transform: capitalize;">${escapeHtml(provDisplay)}</td>
-            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${escapeHtml(sucDisplay)}${gpsLink}${facturaBadgeHtml}</td>
+            <td style="font-size: 0.85rem; color: #0284c7; font-weight: 500;">${escapeHtml(sucDisplay)}${gpsLink}${facturaBadgeHtml}${soporteBadgeHtml}</td>
             <td style="font-weight: bold;">${cleanTotalKg}</td>
             <td style="max-width: 200px; font-size: 0.85rem; color: #475569; word-break: break-word;">${escapeHtml(obsText)}</td>
             <td><span class="badge ${badgeClass}" ${badgeStyle}>${escapeHtml(badgeText)}</span></td>
@@ -3504,6 +3779,26 @@ window.verFotoFactura = function(docId, recordLocalId) {
         const w = window.open('', '_blank');
         if (w) {
             w.document.write(`<html><head><title>Factura ${escapeHtml(String(rec.numeroFactura || ''))}</title></head><body style="margin:0;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${url}" style="max-width:98vw;max-height:98vh;object-fit:contain;"></body></html>`);
+            w.document.close();
+        }
+    } else {
+        alert("Soporte registrado: " + url);
+    }
+};
+
+window.verFotoSoporte = function(docId, recordLocalId) {
+    const rec = adminRecordsCache.find(r => (docId && r._docId === docId) || (recordLocalId && (r.id === recordLocalId || r._docId === recordLocalId)));
+    const url = rec ? rec.fotoSoporte : '';
+    if (!url) {
+        alert("No hay fotografía de soporte/pesaje disponible para este registro.");
+        return;
+    }
+    if (String(url).startsWith('http')) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    } else if (String(url).startsWith('data:image')) {
+        const w = window.open('', '_blank');
+        if (w) {
+            w.document.write(`<html><head><title>Evidencia de Pesaje ${escapeHtml(String(rec.id || ''))}</title></head><body style="margin:0;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${url}" style="max-width:98vw;max-height:98vh;object-fit:contain;"></body></html>`);
             w.document.close();
         }
     } else {
@@ -5045,6 +5340,41 @@ function mostrarComprobanteDigital(data) {
         obsContainer.style.display = 'none';
     }
 
+    // Persona que entrega en punto y valida (v1.9.7)
+    const entregadoContainer = document.getElementById('receipt-entregado-container');
+    const entregadoEl = document.getElementById('receipt-entregado-por');
+    if (data.entregadoPor && String(data.entregadoPor).trim() !== '') {
+        if (entregadoContainer) entregadoContainer.style.display = 'block';
+        if (entregadoEl) entregadoEl.textContent = data.entregadoPor;
+    } else {
+        if (entregadoContainer) entregadoContainer.style.display = 'none';
+    }
+
+    // Evidencia fotográfica de pesaje en sitio (v1.9.7)
+    const soporteBox = document.getElementById('receipt-soporte-box');
+    const soporteImg = document.getElementById('receipt-soporte-img');
+    const soporteTipoEl = document.getElementById('receipt-soporte-tipo');
+    if (data.fotoSoporte) {
+        if (soporteBox) soporteBox.style.display = 'block';
+        if (soporteTipoEl) soporteTipoEl.textContent = data.tipoSoporte || 'Báscula / Reloj';
+        if (soporteImg) {
+            soporteImg.src = data.fotoSoporte;
+            soporteImg.onclick = () => {
+                if (data.fotoSoporte.startsWith('http')) {
+                    window.open(data.fotoSoporte, '_blank', 'noopener,noreferrer');
+                } else {
+                    const w = window.open('', '_blank');
+                    if (w) {
+                        w.document.write(`<html><head><title>Evidencia de Pesaje</title></head><body style="margin:0;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${data.fotoSoporte}" style="max-width:98vw;max-height:98vh;object-fit:contain;"></body></html>`);
+                        w.document.close();
+                    }
+                }
+            };
+        }
+    } else {
+        if (soporteBox) soporteBox.style.display = 'none';
+    }
+
     const sigImg = document.getElementById('receipt-signature-img');
     if (data.firma) {
         sigImg.src = data.firma;
@@ -5106,12 +5436,14 @@ document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
         `🗺️ *Ruta:* ${d.ruta}\n` +
         `🏬 *Proveedor:* ${homologarNombreProveedor(d.proveedor)}\n` +
         `📍 *Sucursal/Punto:* ${homologarNombrePunto(d.punto || d.sucursal) || 'General'}\n` +
+        (d.entregadoPor ? `👤 *Entregado y Validado por:* ${d.entregadoPor}\n` : '') +
         `-----------------------------------------\n` +
         `📦 *PRODUCTOS RECOLECTADOS:*\n${prodsTxt}\n` +
         `-----------------------------------------\n` +
         `⚖️ *TOTAL RECOLECTADO: ${totalResumenStr}*\n` +
         (d.numeroFactura ? `🧾 *Factura Proveedor:* N° ${d.numeroFactura}${d.valorFactura ? ' ($' + Number(d.valorFactura).toLocaleString('es-CO') + ')' : ''}\n` : '') +
         (d.observaciones ? `📝 *Observaciones:* ${d.observaciones}\n` : '') +
+        (d.fotoSoporte ? `📷 *Evidencia Pesaje:* Registrada (${d.tipoSoporte || 'Báscula'})\n` : '') +
         `✍️ *Firma Registrada:* OK\n` +
         `-----------------------------------------\n` +
         `_Certificado digital emitido en punto por ProteinAgro_`;
@@ -6474,6 +6806,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initAdminEditModal();
     initNovedadesModal();
     inicializarSelectorAtados();
+    inicializarModuloEvidenciaPesaje();
+    inicializarModalVistoBueno();
 
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
@@ -6486,12 +6820,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.9.5 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.9.7 para PWA instalable con actualización automática inmediata
     if ('serviceWorker' in navigator) {
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.9.5')
+            navigator.serviceWorker.register('/sw.js?v=1.9.7')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.9.5 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.9.7 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {

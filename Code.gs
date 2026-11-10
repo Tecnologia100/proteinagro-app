@@ -474,6 +474,12 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     var proveedor = removerEmojisDecorativos(data.proveedor || '');
     var punto = data.punto || data.sucursal || '';
     var observaciones = data.observaciones || '';
+    if (data.entregadoPor && String(data.entregadoPor).trim() !== '') {
+      var entPrefijo = '[Entregó: ' + String(data.entregadoPor).trim() + ']';
+      if (observaciones.indexOf(entPrefijo) === -1) {
+        observaciones = (entPrefijo + ' ' + observaciones).trim();
+      }
+    }
     var ubicacionGps = data.ubicacionGps || '0';
     var numeroFactura = String(data.numeroFactura || data.numero_factura || '').trim();
     var valorFacturaRaw = (data.valorFactura !== undefined && data.valorFactura !== null && data.valorFactura !== '') ? data.valorFactura : ((data.valor_factura !== undefined && data.valor_factura !== null && data.valor_factura !== '') ? data.valor_factura : '');

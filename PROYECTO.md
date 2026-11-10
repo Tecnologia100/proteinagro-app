@@ -1037,3 +1037,37 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Modal Móvil de Alta Rápida al Vuelo (#modal-nuevo-producto):** Botón ➕ Otro Material / Nuevo que valida selección de proveedor, ofrece datalist predictivo con el catálogo maestro, selector de unidad segregada (Kg vs Atados), sanitización contra inyección de fórmulas (=, +, -, @), y selección automática del producto recién creado con foco en pesaje.
 - **Backend Concurrente en Apps Script (Code.gs):** Endpoint ction=crearProductoTarifa con LockService(20000), inserción atómica en Tarifas con auto-expansión de renglones, actualización del catálogo maestro Productos si es un material inédito, y exportación de proveedor_productos en doGet.
 - **Resiliencia Offline y Caché PWA:** Copia local en localStorage con herencia automática de productos existentes del cliente. Bumping a Service Worker proteinagro-v1.9.6 en sw.js y index.html.
+
+
+
+### 37. Módulo de Evidencia Visual Flexible y Conformidad en Sitio (Pantalla de Visto Bueno POS) (`v1.9.7`)
+- **Problema Abordado:**
+  Inconsistencias frecuentes en kilos y productos registrados por los conductores frente a los comprobantes de los proveedores, lo que generaba pérdida de tiempo en conciliaciones manuales y reclamos por falta de validación presencial.
+- **Opción 1: Alternativa Visual (Foto Flexible de Respaldo en Sitio):**
+  - Card reactiva `#evidencia-pesaje-container` en el formulario del conductor.
+  - No exige tiquete impreso; selector rápido de 3 tipos de evidencia:
+    * `⚖️ Báscula / Reloj`: Visor digital o aguja de reloj de la balanza.
+    * `📝 Cuaderno / Apuntes`: Anotaciones manuscritas del carnicero o conductor.
+    * `🧾 Recibo / Remisión`: Tiquete o talonario manual entregado en el punto.
+  - Validación de obligatoriedad: Impide registrar la recolección si no se ha tomado la fotografía de evidencia.
+  - Compresión client-side en canvas (`1024px` máx, JPEG 0.70) manteniendo archivos ligeros (~60-100 KB) para no saturar LocalStorage ni fallar sin conectividad.
+  - Carga asíncrona a Firebase Storage (`soportes_pesaje/[recordId].jpg`) con fallback seguro a Base64 local.
+  - Protección de cuota LocalStorage: purga automática de fotos pesadas si ocurre `QuotaExceededError`.
+- **Opción 2: Mecanismo de Conformidad ("Pantalla de Visto Bueno" Modo Datáfono LCD):**
+  - Modal `#modal-visto-bueno` de alto contraste simulando un terminal punto de venta / datáfono POS.
+  - Pantalla LCD que proyecta en tipografía gigante:
+    * Nombre homologado del Proveedor y Punto/Sucursal.
+    * Desglose completo de productos con cantidades legibles a distancia.
+    * Caja de Total Gigante en LCD (`TOTAL RECOLECTADO: XXX.XX KG | X ATADOS`).
+    * Estado de evidencia fotográfica vinculada.
+  - Campo obligatorio: `👤 ¿Quién entrega en carnicería / punto? *` (normalizado automáticamente a Title Case).
+  - Botón verde de confirmación presencial: `[ ✅ CONFIRMADO CON EL PROVEEDOR ]`.
+  - Botón secundario no destructivo: `[ ✏️ Modificar / Corregir Kilos ]` (cierra el modal y permite al conductor corregir cantidades de inmediato si el carnicero observa alguna diferencia).
+- **Integración con Comprobantes Digitales y WhatsApp:**
+  - El soporte digital (`#receipt-modal`) y el mensaje automático generado para WhatsApp integran:
+    * `👤 Entregado y Validado por: [Nombre]`
+    * `📷 Evidencia Pesaje: Registrada ([Tipo])`
+  - La tabla administrativa muestra badges visuales con acceso directo (`📷 Pesaje`) para auditar la foto en resolución completa.
+  - En Google Sheets (`Code.gs`), `guardarRecoleccionSheet` incorpora automáticamente el prefijo `[Entregó: [Nombre]]` en la columna *Observaciones*, garantizando trazabilidad sin alterar la cuadrícula de fórmulas contables M:N.
+- **Actualización de Service Worker:**
+  - Bumping a `proteinagro-v1.9.7` en `sw.js` e `index.html`.
