@@ -1092,20 +1092,19 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 
 ---
 
-### 43. Persistencia de Campos de Soporte en Google Sheets (Cols X:Z) y Visor Directo sin Afectar Conciliador (`v1.9.8`)
-- **Problema Abordado:**
-  Los nuevos campos introducidos en la v1.9.7 (`Foto de Soporte / Pesaje en Sitio`, `Tipo de Soporte` y `Entregado por`) residían en Firestore y LocalStorage, pero se requería que cayeran directamente en la base de Google Sheets (`Recolecciones`) sin alterar la estructura previa ni dañar las modificaciones recientes de `Code.gs` para el Conciliador.
-- **Estructura Segura en Google Sheets (Cero Desplazamiento y Cero Riesgo):**
-  - Se mantuvieron 100% intactas las columnas A a W (Cols 1 a 23), incluyendo `ID_Clave` (M), `Alerta` (N), `Numero_Factura` (O), `Valor_Factura` (P), `Foto_Factura` (Q) y la tabla de auditoría de duplicados (R:W).
-  - Se habilitaron de forma no invasiva las columnas vacías 24, 25 y 26 en la hoja `Recolecciones`:
-    * **Columna 24 (X):** `Tipo_Soporte` (`Báscula / Reloj`, `Cuaderno / Apuntes`, `Recibo / Remisión`).
-    * **Columna 25 (Y):** `Foto_Soporte` (Enlace directo y liviano al visor oficial de la evidencia).
-    * **Columna 26 (Z):** `Entregado_Por` (Nombre de quien entrega el producto en la carnicería/punto).
+### 43. Persistencia de Campos de Soporte en Google Sheets (Cols R:T) y Visor Directo sin Afectar Conciliador (`v1.9.8`)
+- **Estructura Oficial en Google Sheets (Ubicación Continua en R, S, T):**
+  - Las columnas de soporte se ubicaron contiguas a la data de la recolección, a partir de la columna 18 (R):
+    * **Columna 18 (R):** `Tipo_Soporte` (`Báscula / Reloj`, `Cuaderno / Apuntes`, `Recibo / Remisión`).
+    * **Columna 19 (S):** `Foto_Soporte` (Enlace directo y liviano al visor oficial de la evidencia).
+    * **Columna 20 (T):** `Entregado_Por` (Nombre de quien entrega el producto en la carnicería/punto).
+  - La tabla de auditoría de duplicados se desplazó de forma segura hacia las columnas U a Z, recalculando automáticamente sus fórmulas sin generar errores `#REF!`.
   - En la Columna 9 (I) `Observaciones`: Se formatean de forma estándar `[Entregó: ...] [Soporte: ...]` para lectura humana inmediata en cualquier consulta tradicional o exportación rápida.
 - **Blindaje del Conciliador y de `Code.gs`:**
-  - Función `garantizarEstructuraColumnasSoporte(sheet)` en `Code.gs`: Crea/valida los encabezados en X1:Z1 con fondo verde esmeralda institucional (`#065f46`) sin insertar columnas ni desplazar ningún rango existente.
+  - Función `garantizarEstructuraColumnasSoporte(sheet)` en `Code.gs`: Crea/valida los encabezados en R1:T1 con fondo verde esmeralda institucional (`#065f46`).
+  - Escritura en bloque atómico en Cols 18:20 (`sheet.getRange(targetRow + 1, 18, filasSoporte.length, 3).setValues(filasSoporte)`).
   - Se preservó 100% la lógica del Conciliador (`aplicarNovedadesConciliacionSheet`, `eliminarRecoleccionSheet` con `productoTarget`, `RECLASIFICAR`, `ELIMINAR`).
-  - Mapeo en `CONCILIADOR.html` y en `getDashboardDataRaw`: Tanto el frontend como el backend del Conciliador leen `Tipo_Soporte`, `Foto_Soporte` y `Entregado_Por`, desplegando badges interactivos en cada fila para agilizar la resolución de inconsistencias con los proveedores.
+  - Mapeo dinámico por nombre de encabezado en `CONCILIADOR.html` y en `getDashboardDataRaw`: Lee `Tipo_Soporte` (Col R), `Foto_Soporte` (Col S) y `Entregado_Por` (Col T), desplegando badges interactivos en cada fila para agilizar la resolución de inconsistencias con los proveedores.
 - **Visor Directo de Evidencia (`app.js`):**
   - Se implementó `verificarVisorSoporteURL` que responde al parámetro `?view=soporte&id=REC-...`.
   - Al hacer clic en el enlace de la columna `Foto_Soporte` en Google Sheets o el Conciliador, se despliega instantáneamente una ventana modal en alta resolución con la fotografía del pesaje, el carnicero que entregó, el conductor, la fecha y el comercio.

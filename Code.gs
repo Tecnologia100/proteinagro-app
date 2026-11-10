@@ -719,15 +719,15 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         sheet.getRange(targetRow + 1, 15, cleanEmpty.length, 3).setValues(cleanEmpty);
       }
 
-      // Escribir columnas de Soporte de Pesaje (X:Z -> Cols 24:26)
+      // Escribir columnas de Soporte de Pesaje (R:T -> Cols 18:20)
       if (tipoSoporte || fotoSoporte || entregadoPor) {
-        sheet.getRange(targetRow + 1, 24, filasSoporte.length, 3).setValues(filasSoporte);
+        sheet.getRange(targetRow + 1, 18, filasSoporte.length, 3).setValues(filasSoporte);
       } else {
         var cleanEmptySop = [];
         for (var cEmptyS = 0; cEmptyS < filasNuevas.length; cEmptyS++) {
           cleanEmptySop.push(['', '', '']);
         }
-        sheet.getRange(targetRow + 1, 24, cleanEmptySop.length, 3).setValues(cleanEmptySop);
+        sheet.getRange(targetRow + 1, 18, cleanEmptySop.length, 3).setValues(cleanEmptySop);
       }
     }
 
@@ -806,8 +806,7 @@ function garantizarEstructuraColumnasFactura(sheet) {
 
 // ==============================================================================
 // GARANTIZAR ESTRUCTURA DE COLUMNAS DE SOPORTE DE PESAJE (v1.9.8)
-// Habilita las columnas X:Z (24 a 26) para Tipo_Soporte, Foto_Soporte, Entregado_Por
-// sin desplazar ni alterar ninguna columna existente (A..W)
+// Habilita las columnas R:T (18 a 20) para Tipo_Soporte, Foto_Soporte, Entregado_Por
 // ==============================================================================
 function garantizarEstructuraColumnasSoporte(sheet) {
   if (!sheet) {
@@ -817,26 +816,26 @@ function garantizarEstructuraColumnasSoporte(sheet) {
   if (!sheet) return { configurado: false, razon: "No existe la hoja Recolecciones" };
 
   var maxCols = sheet.getMaxColumns();
-  if (maxCols < 26) {
-    sheet.insertColumnsAfter(maxCols, 26 - maxCols);
+  if (maxCols < 20) {
+    sheet.insertColumnsAfter(maxCols, 20 - maxCols);
   }
 
-  var hdrX = String(sheet.getRange(1, 24).getValue() || '').trim();
-  var hdrY = String(sheet.getRange(1, 25).getValue() || '').trim();
-  var hdrZ = String(sheet.getRange(1, 26).getValue() || '').trim();
+  var hdrR = String(sheet.getRange(1, 18).getValue() || '').trim();
+  var hdrS = String(sheet.getRange(1, 19).getValue() || '').trim();
+  var hdrT = String(sheet.getRange(1, 20).getValue() || '').trim();
 
-  if (hdrX === "Tipo_Soporte" && hdrY === "Foto_Soporte" && hdrZ === "Entregado_Por") {
-    return { configurado: true, razon: "Columnas X:Z ya configuradas" };
+  if (hdrR === "Tipo_Soporte" && hdrS === "Foto_Soporte" && hdrT === "Entregado_Por") {
+    return { configurado: true, razon: "Columnas R:T ya configuradas" };
   }
 
-  var rangeHdr = sheet.getRange(1, 24, 1, 3);
+  var rangeHdr = sheet.getRange(1, 18, 1, 3);
   rangeHdr.setValues([["Tipo_Soporte", "Foto_Soporte", "Entregado_Por"]]);
   rangeHdr.setBackground('#065f46')
           .setFontColor('#ffffff')
           .setFontWeight('bold')
           .setHorizontalAlignment('center');
 
-  return { configurado: true, razon: "Encabezados X:Z configurados exitosamente" };
+  return { configurado: true, razon: "Encabezados R:T configurados exitosamente" };
 }
 
 function menuHabilitarColumnasFactura() {
@@ -898,12 +897,12 @@ function menuHabilitarColumnasSoporte() {
     }
     var res = garantizarEstructuraColumnasSoporte(sheet);
     SpreadsheetApp.getUi().alert(
-      "✅ Columnas de Soporte Habilitadas en X:Z:\n\n" +
-      "1. Se configuraron los encabezados en las columnas 24, 25 y 26:\n" +
-      "   - Columna X: Tipo_Soporte (Báscula, Cuaderno, Recibo)\n" +
-      "   - Columna Y: Foto_Soporte (Enlace a la fotografía de pesaje)\n" +
-      "   - Columna Z: Entregado_Por (Nombre del carnicero / responsable)\n\n" +
-      "Sin desplazar ni alterar ninguna fórmula contable de las columnas A a W."
+      "✅ Columnas de Soporte Habilitadas en R:T:\n\n" +
+      "1. Se configuraron los encabezados en las columnas 18, 19 y 20:\n" +
+      "   - Columna R: Tipo_Soporte (Báscula, Cuaderno, Recibo)\n" +
+      "   - Columna S: Foto_Soporte (Enlace a la fotografía de pesaje)\n" +
+      "   - Columna T: Entregado_Por (Nombre del carnicero / responsable)\n\n" +
+      "Las recolecciones registrarán automáticamente estos datos en estas columnas."
     );
   } catch(e) {
     SpreadsheetApp.getUi().alert("Error: " + e.toString());
@@ -918,7 +917,7 @@ function habilitarColumnasSoporteHttp(ss) {
     var res = garantizarEstructuraColumnasSoporte(sheet);
     return ContentService.createTextOutput(JSON.stringify({
       result: "success",
-      message: "Columnas X:Z (Tipo_Soporte, Foto_Soporte, Entregado_Por) configuradas exitosamente",
+      message: "Columnas R:T (Tipo_Soporte, Foto_Soporte, Entregado_Por) configuradas exitosamente",
       detalle: res
     })).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
@@ -2530,7 +2529,7 @@ function onOpen() {
       .addItem('🗔 Abrir aquí en Sheets (Ventana Flotante)', 'abrirConciliadorFlotante')
       .addItem('⚖️ Conciliar Proveedor con Excel (Directo)', 'abrirConciliacionDirectaFlotante')
       .addSeparator()
-      .addItem('📷 Habilitar Columnas de Soporte (X:Z)', 'menuHabilitarColumnasSoporte')
+      .addItem('📷 Habilitar Columnas de Soporte (R:T)', 'menuHabilitarColumnasSoporte')
       .addItem('💰 Liquidar Precios Vacíos en Recolecciones', 'menuLiquidarPreciosVacios')
       .addSeparator()
       .addItem('🚀 Abrir Conciliador (Ventana Aparte)', 'abrirConciliadorNuevaVentana')
@@ -2797,9 +2796,9 @@ function getDashboardDataRaw() {
     if (colMap.numFactura === -1 && headers.length >= 15) colMap.numFactura = 14;
     if (colMap.valorFactura === -1 && headers.length >= 16) colMap.valorFactura = 15;
     if (colMap.fotoFactura === -1 && headers.length >= 17) colMap.fotoFactura = 16;
-    if (colMap.tipoSoporte === -1 && headers.length >= 24) colMap.tipoSoporte = 23;
-    if (colMap.fotoSoporte === -1 && headers.length >= 25) colMap.fotoSoporte = 24;
-    if (colMap.entregadoPor === -1 && headers.length >= 26) colMap.entregadoPor = 25;
+    if (colMap.tipoSoporte === -1 && headers.length >= 18) colMap.tipoSoporte = 17;
+    if (colMap.fotoSoporte === -1 && headers.length >= 19) colMap.fotoSoporte = 18;
+    if (colMap.entregadoPor === -1 && headers.length >= 20) colMap.entregadoPor = 19;
 
     var timeZone = ss.getSpreadsheetTimeZone() || "America/Bogota";
     var data = [];
