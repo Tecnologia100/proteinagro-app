@@ -73,6 +73,19 @@ function doGet(e) {
       return diagnosticoPreciosSheet(ss, e.parameter.proveedor, e.parameter.producto);
     }
 
+    // 0.15 Alta rápida de producto / materia prima en Tarifas y Productos (v1.9.6)
+    if (e && e.parameter && e.parameter.action === 'crearProductoTarifa') {
+      var pData = {};
+      if (e.parameter.payload) {
+        try { pData = JSON.parse(e.parameter.payload); } catch(ex) { pData = e.parameter; }
+      } else {
+        pData = e.parameter;
+      }
+      var resCrear = crearProductoTarifaSheet(ss, pData);
+      return ContentService.createTextOutput(JSON.stringify(resCrear))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 1. Obtener Productos (filtrando Inactivos)
     var sheetProductos = ss.getSheetByName("Productos");
     var productos = [];
@@ -237,15 +250,41 @@ function doGet(e) {
       return a.localeCompare(b, 'es', { sensitivity: 'base' });
     });
 
+    // Mapa dinámico de productos por proveedor desde Tarifas (v1.9.6)
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    var mapaProveedorProductos = {};
+    if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
+      var tData = sheetTarifas.getRange(2, 1, sheetTarifas.getLastRow() - 1, 6).getValues();
+      for (var ti = 0; ti < tData.length; ti++) {
+        var tProv = homologarProveedor(tData[ti][1]);
+        var tPunto = homologarPunto(tData[ti][2]);
+        var tProd = String(tData[ti][3] || '').trim().toUpperCase();
+        var tEst = String(tData[ti][5] || 'Activo').trim().toLowerCase();
+        if (!tProv || !tProd || tEst === 'inactivo') continue;
+        
+        var keyPunto = tProv + '|' + tPunto;
+        if (!mapaProveedorProductos[keyPunto]) mapaProveedorProductos[keyPunto] = [];
+        if (mapaProveedorProductos[keyPunto].indexOf(tProd) === -1) {
+          mapaProveedorProductos[keyPunto].push(tProd);
+        }
+        
+        if (!mapaProveedorProductos[tProv]) mapaProveedorProductos[tProv] = [];
+        if (mapaProveedorProductos[tProv].indexOf(tProd) === -1) {
+          mapaProveedorProductos[tProv].push(tProd);
+        }
+      }
+    }
+
     var output = {
-      version: "1.4.3-desacoplado-proveedores",
+      version: "1.9.6-catalogo-dinamico-proveedor",
       productos: productos,
       conductores: conductores,
       conductores_detalle: conductoresDetalle,
       admin_clave: adminClave,
       rutas: rutas,
       puntos_rutas: puntosRutas,
-      proveedores: listaProveedoresCompleta
+      proveedores: listaProveedoresCompleta,
+      proveedor_productos: mapaProveedorProductos
     };
 
     return ContentService.createTextOutput(JSON.stringify(output))
@@ -2167,6 +2206,16 @@ function doPost(e) {
     if (action === 'habilitarColumnasFactura' || action === 'desplazarColumnasFactura') {
       return habilitarColumnasFacturaHttp(ss);
     }
+
+    if (action === 'crearProductoTarifa') {
+      var pData = payload;
+      if (typeof pData === 'string') {
+        try { pData = JSON.parse(pData); } catch(ex) {}
+      }
+      var resCrear = crearProductoTarifaSheet(ss, pData);
+      return ContentService.createTextOutput(JSON.stringify(resCrear))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     
     return guardarRecoleccionSheet(ss, payload);
   } catch (error) {
@@ -2951,5 +3000,151 @@ function saveExcelToDriveFolder(base64Data, fileName, optProvName) {
       success: false,
       error: err.message || err.toString()
     };
+  }
+}
+
+// ==============================================================================
+// ALTA RÁPIDA DE MATERIA PRIMA / PRODUCTO EN TARIFAS Y PRODUCTOS (v1.9.6)
+// ==============================================================================
+function crearProductoTarifaSheet(ss, payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+  } catch (e) {
+    return { success: false, error: 'Servidor ocupado. Intente nuevamente en unos segundos.' };
+  }
+
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!payload || typeof payload !== 'object') {
+      return { success: false, error: 'Payload inválido.' };
+    }
+
+    var ruta = sanitizarParaHoja(payload.ruta || 'Ruta General');
+    var proveedor = homologarProveedor(payload.proveedor || '');
+    var punto = homologarPunto(payload.punto || proveedor);
+    var producto = sanitizarParaHoja((payload.producto || '').toString().trim().toUpperCase());
+    var precioRaw = payload.precio;
+    var precio = (precioRaw !== undefined && precioRaw !== null && String(precioRaw).trim() !== '')
+      ? Number(String(precioRaw).replace(/[^0-9.-]/g, ''))
+      : '';
+    var tienePrecioValido = precio !== '' && !isNaN(precio) && Number(precio) > 0;
+    var estado = tienePrecioValido ? 'Activo' : 'Pendiente Precio';
+
+    if (!proveedor || !producto) {
+      return { success: false, error: 'Proveedor y Producto son campos obligatorios.' };
+    }
+
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    if (!sheetTarifas) {
+      return { success: false, error: 'No se encontró la pestaña Tarifas en Google Sheets.' };
+    }
+
+    // 1. Revisar si ya existe este producto para este proveedor y punto
+    var lastRowTarifas = sheetTarifas.getLastRow();
+    var yaExisteEnTarifas = false;
+    var filaExistente = -1;
+
+    if (lastRowTarifas > 1) {
+      var dataTarifas = sheetTarifas.getRange(2, 1, lastRowTarifas - 1, 6).getValues();
+      var provNorm = normalizarTexto(proveedor);
+      var puntoNorm = normalizarTexto(punto);
+      var prodNorm = normalizarTexto(producto);
+
+      for (var i = 0; i < dataTarifas.length; i++) {
+        var rowProv = normalizarTexto(dataTarifas[i][1]);
+        var rowPunto = normalizarTexto(dataTarifas[i][2]);
+        var rowProd = normalizarTexto(dataTarifas[i][3]);
+
+        if (rowProv === provNorm && productosCoinciden(rowProd, prodNorm)) {
+          if (!puntoNorm || rowPunto === puntoNorm || !rowPunto) {
+            yaExisteEnTarifas = true;
+            filaExistente = i + 2;
+            break;
+          }
+        }
+      }
+    }
+
+    if (yaExisteEnTarifas) {
+      // Si ya existía y se envía un precio válido desde Administrador, actualizar tarifa
+      if (tienePrecioValido) {
+        sheetTarifas.getRange(filaExistente, 5).setValue(Number(precio));
+        sheetTarifas.getRange(filaExistente, 6).setValue('Activo');
+        return {
+          success: true,
+          mensaje: 'Tarifa actualizada a $' + precio + ' para ' + producto + ' en ' + proveedor,
+          producto: producto,
+          proveedor: proveedor,
+          punto: punto,
+          precio: Number(precio),
+          actualizado: true
+        };
+      }
+      return {
+        success: true,
+        mensaje: 'El producto ' + producto + ' ya se encuentra configurado para ' + proveedor,
+        producto: producto,
+        proveedor: proveedor,
+        punto: punto,
+        yaExiste: true
+      };
+    }
+
+    // 2. Si no existe, insertar nueva fila en Tarifas
+    if (sheetTarifas.getLastRow() >= sheetTarifas.getMaxRows()) {
+      sheetTarifas.insertRowsAfter(sheetTarifas.getMaxRows(), 50);
+    }
+
+    var nextRowTarifas = sheetTarifas.getLastRow() + 1;
+    sheetTarifas.getRange(nextRowTarifas, 1, 1, 6).setValues([[
+      ruta,
+      proveedor,
+      punto,
+      producto,
+      tienePrecioValido ? Number(precio) : '',
+      estado
+    ]]);
+
+    // 3. Revisar si existe en pestaña Productos; si no, agregarlo
+    var sheetProductos = ss.getSheetByName("Productos");
+    var agregadoAProductos = false;
+    if (sheetProductos) {
+      var lastRowProd = sheetProductos.getLastRow();
+      var prodExisteEnMaestro = false;
+      if (lastRowProd > 1) {
+        var prodData = sheetProductos.getRange(2, 1, lastRowProd - 1, 1).getValues();
+        var pNorm = normalizarTexto(producto);
+        for (var p = 0; p < prodData.length; p++) {
+          if (normalizarTexto(prodData[p][0]) === pNorm) {
+            prodExisteEnMaestro = true;
+            break;
+          }
+        }
+      }
+      if (!prodExisteEnMaestro) {
+        if (sheetProductos.getLastRow() >= sheetProductos.getMaxRows()) {
+          sheetProductos.insertRowsAfter(sheetProductos.getMaxRows(), 20);
+        }
+        var nextRowProd = sheetProductos.getLastRow() + 1;
+        sheetProductos.getRange(nextRowProd, 1, 1, 2).setValues([[producto, 'Activo']]);
+        agregadoAProductos = true;
+      }
+    }
+
+    return {
+      success: true,
+      mensaje: 'Producto ' + producto + ' asociado exitosamente a ' + proveedor,
+      producto: producto,
+      proveedor: proveedor,
+      punto: punto,
+      precio: tienePrecioValido ? Number(precio) : null,
+      agregadoAProductos: agregadoAProductos
+    };
+  } catch (err) {
+    Logger.log("Error en crearProductoTarifaSheet: " + err.toString());
+    return { success: false, error: err.toString() };
+  } finally {
+    lock.releaseLock();
   }
 }

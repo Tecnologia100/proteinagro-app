@@ -345,6 +345,95 @@ label {
     transform: scale(0.98);
 }
 
+/* Productos Sugeridos por Proveedor y Filtro Dinámico (v1.9.6) */
+.product-btn.frecuente {
+    border-color: #10b981;
+    background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.18);
+    position: relative;
+}
+
+.product-btn.frecuente::after {
+    content: "⭐";
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.product-btn.frecuente.active {
+    background: #059669;
+    border-color: #047857;
+    color: #ffffff;
+}
+
+.btn-nuevo-producto-shortcut {
+    border: 1px solid #10b981;
+    color: #047857;
+    background: #ecfdf5;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-nuevo-producto-shortcut:hover,
+.btn-nuevo-producto-shortcut:active {
+    background: #059669;
+    color: #ffffff;
+    border-color: #059669;
+}
+
+.product-filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+    gap: 8px;
+}
+
+.product-filter-label {
+    font-weight: 700;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-toggle-catalog {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #0284c7;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+.btn-toggle-catalog:hover,
+.btn-toggle-catalog:active {
+    background: #f0f9ff;
+    border-color: #0284c7;
+}
+
 /* Buttons */
 .btn-primary {
     background-color: var(--primary);

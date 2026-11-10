@@ -681,6 +681,42 @@ i.fecha), consolidándose directamente en la fila de ese día.
   6. *Sincronización con Plantillas y Módulos de Exportación:*
      - `descargarPlantillaEstandarProveedor` reconoce la selección múltiple y plasma los nombres seleccionados en el archivo Excel generado.
 
+### 41. Catálogo Dinámico de Materias Primas por Proveedor y Alta Rápida al Vuelo (`v1.9.6`)
+- **Problema / Necesidad Operativa en Campo:**
+  - En el formulario de recolección de los conductores (`#driver-view`), la cuadrícula `#product-grid` mostraba de manera fija e indiscriminada las 22 materias primas del catálogo general, obligando a los conductores a buscar entre decenas de botones en pantallas móviles pequeñas.
+  - Además, si un proveedor entregaba una materia prima adicional no catalogada previamente para ese punto, no existía un mecanismo para registrarla al vuelo sin intervención manual externa.
+- **Arquitectura de Solución Implementada (`v1.9.6`):**
+  1. *Privacidad Infranqueable de Precios para Conductores:*
+     - Los conductores en ruta **JAMÁS** ven tarifas, precios por kilo ni liquidaciones en dinero.
+     - En el modal de alta rápida `#modal-nuevo-producto`, el campo de tarifa pactada se oculta y desactiva automáticamente para los conductores (`#modal-prod-conductor-notice` visible, registrándose con estado `Pendiente Precio` para posterior liquidación contable en oficina).
+     - Si la sesión activa corresponde al **Administrador** (`esUsuarioAdmin()`), el campo `#modal-prod-precio-group` se despliega en COP para ingresar la tarifa correspondiente.
+  2. *Filtrado Reactivo por Proveedor y Punto:*
+     - Estado local `MAPA_PROVEEDOR_PRODUCTOS` precargado con una base offline sólida de **80 claves normalizadas** extraídas de la pestaña `Tarifas` (`CATALOGO_TARIFAS_PROVEEDORES_DEFAULT`).
+     - Al seleccionar o cambiar de Proveedor o Sucursal, `actualizarCatalogoProductosSegunSeleccion()` consulta en memoria los productos autorizados para dicho punto (`prov + '|' + punto` o `prov`).
+     - Si el proveedor tiene productos tarifados:
+       - Se activa la barra superior `#product-filter-header` (`⭐ X materias primas de [Proveedor]`).
+       - Se muestran prioritariamente los botones destacados con estilo `.product-btn.frecuente` (fondo gradiente verde, borde esmeralda e ícono ⭐).
+       - Botón conmutador `#btn-toggle-todos-productos` permite alternar con un solo toque entre `Ver todo el catálogo (22) ▾` y `Ver solo sugeridos (X) ▴`.
+  3. *Modal Táctil de Alta Rápida al Vuelo (`#modal-nuevo-producto`):*
+     - Botón de acceso directo `➕ Otro Material / Nuevo` ubicado junto a la etiqueta del producto.
+     - Valida que el conductor haya elegido previamente el proveedor; si no, alerta preventivamente y enfoca el selector.
+     - Resumen visual con Proveedor, Sucursal y Ruta.
+     - Campo de texto con `datalist` predictivo conectado a `productosOficialesSheets` para seleccionar rápidamente una materia prima del catálogo maestro o ingresar un nombre nuevo.
+     - Selector táctil de unidad de medida segregada (`Kilogramos (KG)` vs `Atados (Leña)`).
+     - Sanitización obligatoria contra inyección de fórmulas (`=`, `+`, `-`, `@`).
+  4. *Selección Automática y Experiencia Fluida:*
+     - Al guardar, la función `registrarProductoEnMapaLocal` incorpora la materia prima tanto a nivel de proveedor como de punto, heredando los productos preexistentes para no perder el catálogo del cliente.
+     - El producto recién creado se renderiza de inmediato en el grid, se activa automáticamente (`.active`) y se enfoca el campo de pesaje / atados.
+     - Notificación toast no bloqueante: `✨ Materia prima "[NOMBRE]" asociada a [PROVEEDOR]`.
+  5. *Persistencia y Backend Concurrente (`Code.gs`):*
+     - Nuevo endpoint `action=crearProductoTarifa` en `doGet` y `doPost` protegido con `LockService(20000)`.
+     - Inserta la fila en la pestaña `Tarifas` con auto-expansión proactiva de filas (`insertRowsAfter`). Si viene con precio de administrador se registra como `Activo`; si viene de conductor, como `Pendiente Precio`.
+     - Si la materia prima no existe en la pestaña maestra `Productos`, la inserta automáticamente como `Activo`.
+     - El `doGet` del Webhook incluye ahora `proveedor_productos` (sin precios) para sincronización automática en frío.
+     - `sincronizarCatalogosDesdeGviz()` lee la pestaña `Tarifas` por CSV y actualiza en tiempo real `MAPA_PROVEEDOR_PRODUCTOS` y `localStorage`.
+  6. *Actualización de Service Worker y Caché:*
+     - Service Worker actualizado a `proteinagro-v1.9.6` en `sw.js` y parámetros `?v=1.9.6` en `index.html`.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue

@@ -9,3 +9,4 @@ app-recolecciones/
 __pycache__/
 PROTEINAGRO_Backup_*/
 *.csv
+scratch/

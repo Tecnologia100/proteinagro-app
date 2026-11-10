@@ -28,7 +28,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.9.5">
+    <link rel="stylesheet" href="styles.css?v=1.9.6">
 
     <!-- Firebase (Carga no bloqueante con defer para acelerar FCP) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
@@ -40,7 +40,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.9.5" defer></script>
+    <script src="app.js?v=1.9.6" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -49,7 +49,7 @@
             <div class="logo-icon" style="font-size: 3rem; text-align: center; margin-bottom: 10px;">🌿</div>
             <h2 style="text-align: center; margin-bottom: 5px; color: var(--primary);">ProteinAgro</h2>
             <p style="text-align: center; color: var(--text-muted); margin-bottom: 22px;">
-                Acceso al Sistema <button type="button" onclick="forzarActualizacionApp()" class="btn-update-badge" style="margin-left: 6px;" title="Tocar o hacer clic para forzar actualización inmediata">🔄 v1.9.5</button>
+                Acceso al Sistema <button type="button" onclick="forzarActualizacionApp()" class="btn-update-badge" style="margin-left: 6px;" title="Tocar o hacer clic para forzar actualización inmediata">🔄 v1.9.6</button>
             </p>
             
             <!-- Modo Conductor (Predeterminado) -->
@@ -133,10 +133,10 @@
             <div class="logo-container">
                 <div class="logo-icon">👑</div>
                 <h1>Panel Administrativo</h1>
-                <span class="version-tag">v1.9.5</span>
+                <span class="version-tag">v1.9.6</span>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" class="btn-text btn-update-badge" title="Forzar actualización de la app" onclick="forzarActualizacionApp()">🔄 v1.9.5</button>
+                <button type="button" class="btn-text btn-update-badge" title="Forzar actualización de la app" onclick="forzarActualizacionApp()">🔄 v1.9.6</button>
                 <button id="btn-logout-admin" class="btn-secondary" style="padding: 8px 16px;">Salir</button>
             </div>
         </header>
@@ -254,7 +254,7 @@
                         <button id="btn-export" class="btn-primary btn-export-csv">📥 Exportar CSV</button>
                     </div>
                 </div>
-                <!-- v1.9.5: Barra de desplazamiento horizontal superior sincronizada + botones de navegación rápida -->
+                <!-- v1.9.6: Barra de desplazamiento horizontal superior sincronizada + botones de navegación rápida -->
                 <div class="table-scroll-toolbar" id="admin-scroll-toolbar">
                     <button type="button" class="btn-scroll-nav" data-scroll-dir="-1" title="Desplazar a la izquierda">◀</button>
                     <div class="table-top-scroll" id="admin-top-scroll"><div class="table-top-scroll-inner"></div></div>
@@ -295,10 +295,10 @@
                     <h1 style="font-size: 1.25rem; line-height: 1.1; margin: 0;">ProteinAgro</h1>
                     <span id="driver-header-badge" class="driver-header-badge" style="display: none;">👤 <span id="driver-header-name">Conductor</span></span>
                 </div>
-                <span class="version-tag">v1.9.5</span>
+                <span class="version-tag">v1.9.6</span>
             </div>
             <div class="app-header-right">
-                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.9.5</button>
+                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.9.6</button>
                 <button id="btn-pwa-install-header" class="btn-text" style="display: none; color: #10b981; font-weight: 600; font-size: 0.85rem; align-items: center; gap: 4px;">📲 Instalar</button>
                 <div class="status-indicator offline" id="network-status">
                     <span class="dot"></span>
@@ -399,8 +399,24 @@
                     </div>
 
                     <!-- Selección de Productos (Botones Grandes) -->
-                    <div class="form-group">
-                        <label>Producto Recolectado</label>
+                    <div class="form-group" style="position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <label style="margin-bottom: 0;">Producto Recolectado</label>
+                            <button type="button" id="btn-abrir-modal-nuevo-producto" class="btn-nuevo-producto-shortcut" title="Dar de alta nuevo producto al vuelo">
+                                ➕ Otro Material / Nuevo
+                            </button>
+                        </div>
+
+                        <!-- Barra de Filtro de Productos Frecuentes del Proveedor (v1.9.6) -->
+                        <div id="product-filter-header" class="product-filter-bar" style="display: none;">
+                            <span id="product-filter-label" class="product-filter-label">
+                                ⭐ Materias primas del proveedor
+                            </span>
+                            <button type="button" id="btn-toggle-todos-productos" class="btn-toggle-catalog">
+                                Ver todo el catálogo (22) ▾
+                            </button>
+                        </div>
+
                         <div class="product-grid" id="product-grid">
                             <button type="button" class="product-btn" data-value="ACEITE">🛢️ ACEITE</button>
                             <button type="button" class="product-btn" data-value="CABEZAS">🐮 CABEZAS</button>
@@ -524,7 +540,7 @@
 
                 <!-- Footer de Versión & Ayuda de Caché -->
                 <div style="text-align: center; margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">ProteinAgro Digital v1.9.5 • Soporte Oficial Admin & Trazabilidad Diaria</p>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">ProteinAgro Digital v1.9.6 • Soporte Oficial Admin & Trazabilidad Diaria</p>
                     <button type="button" onclick="forzarActualizacionApp()" style="background: none; border: 1px dashed #cbd5e1; color: #64748b; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">
                         🔄 ¿No ves los cambios? Toca aquí para actualizar
                     </button>
@@ -888,6 +904,90 @@
                     </button>
                 </div>
 
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Alta Rápida de Nuevo Producto / Materia Prima al Vuelo (v1.9.6) -->
+    <div id="modal-nuevo-producto" class="voucher-modal-overlay" style="display: none;">
+        <div class="voucher-card" style="max-width: 480px; width: 94%; max-height: 92vh; overflow-y: auto; text-align: left; padding: 22px;">
+            
+            <!-- Cabecera del Modal -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.7rem; background: #ecfdf5; padding: 6px; border-radius: 10px;">✨</span>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem; color: #065f46; font-weight: 800;">Alta Rápida de Materia Prima</h3>
+                        <p style="margin: 0; font-size: 0.78rem; color: #059669;">Asociar material al proveedor en tarifas</p>
+                    </div>
+                </div>
+                <button type="button" id="btn-cerrar-modal-nuevo-producto" style="background: none; border: none; font-size: 1.8rem; color: #94a3b8; cursor: pointer; padding: 0 4px; line-height: 1;">&times;</button>
+            </div>
+
+            <!-- Resumen del Proveedor y Punto Destino -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-bottom: 16px; font-size: 0.86rem; color: #334155; line-height: 1.5;">
+                <div><strong>🏬 Proveedor:</strong> <span id="modal-prod-resumen-proveedor" style="color: #0f172a; font-weight: 700;">--</span></div>
+                <div><strong>📍 Punto / Sucursal:</strong> <span id="modal-prod-resumen-punto" style="color: #0284c7; font-weight: 700;">--</span></div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+                    <strong>🗺️ Ruta:</strong> <span id="modal-prod-resumen-ruta">--</span>
+                </div>
+            </div>
+
+            <!-- Formulario -->
+            <form id="form-nuevo-producto" novalidate>
+                <!-- 1. Nombre de la Materia Prima -->
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="nuevo-producto-nombre" style="font-weight: 700; color: #1e293b; font-size: 0.88rem;">
+                        Nombre del Material / Producto <span style="color: #ef4444;">*</span>
+                    </label>
+                    <input type="text" id="nuevo-producto-nombre" list="lista-sugerencias-productos" class="premium-input" placeholder="Ej: HUESO DE POLLO, SEBO, PIELES..." required autocomplete="off" style="font-size: 0.95rem; font-weight: 600; text-transform: uppercase;">
+                    <datalist id="lista-sugerencias-productos">
+                        <!-- Rellenado dinámicamente con las materias primas del catálogo maestro -->
+                    </datalist>
+                    <span style="font-size: 0.75rem; color: #64748b; display: block; margin-top: 4px;">Seleccione del catálogo maestro o escriba un nombre nuevo.</span>
+                </div>
+
+                <!-- 2. Unidad de Medida -->
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label style="font-weight: 700; color: #1e293b; font-size: 0.88rem; display: block; margin-bottom: 6px;">
+                        Unidad de Medida <span style="color: #ef4444;">*</span>
+                    </label>
+                    <div style="display: flex; gap: 12px;">
+                        <label style="flex: 1; display: flex; align-items: center; gap: 8px; background: #f1f5f9; padding: 10px 14px; border-radius: 8px; cursor: pointer; border: 2px solid #cbd5e1; font-weight: 600; font-size: 0.9rem;">
+                            <input type="radio" name="nuevo-producto-unidad" value="Kg" checked style="accent-color: #059669; transform: scale(1.2);">
+                            <span>⚖️ Kilogramos (KG)</span>
+                        </label>
+                        <label style="flex: 1; display: flex; align-items: center; gap: 8px; background: #fef3c7; padding: 10px 14px; border-radius: 8px; cursor: pointer; border: 2px solid #fde68a; font-weight: 600; font-size: 0.9rem; color: #92400e;">
+                            <input type="radio" name="nuevo-producto-unidad" value="Atado" style="accent-color: #d97706; transform: scale(1.2);">
+                            <span>🪵 Atados (Leña)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 3. Precio Pactado en COP (Solo visible para Administrador) -->
+                <div class="form-group" id="modal-prod-precio-group" style="display: none; margin-bottom: 16px;">
+                    <label for="nuevo-producto-precio" style="font-weight: 700; color: #1e293b; font-size: 0.88rem;">
+                        Tarifa Pactada ($ COP / Kg o Atado) <span style="color: #059669; font-size: 0.75rem;">(Modo Administrador)</span>
+                    </label>
+                    <input type="number" id="nuevo-producto-precio" class="premium-input" placeholder="Ej: 350" min="0" step="1" style="font-size: 0.95rem; font-weight: 600;">
+                    <span style="font-size: 0.75rem; color: #64748b; display: block; margin-top: 4px;">Si se deja vacío, quedará como tarifa pendiente de liquidar en oficina.</span>
+                </div>
+
+                <!-- Banner Informativo para Conductores -->
+                <div id="modal-prod-conductor-notice" style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 8px 12px; margin-bottom: 16px; font-size: 0.78rem; color: #1e40af; line-height: 1.4;">
+                    ℹ️ <strong>Registro de Campo:</strong> El nuevo producto quedará activo de inmediato para tu recolección. La tarifa se asigna y valida contablemente en oficina.
+                </div>
+
+                <!-- Botones de Acción -->
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="button" id="btn-cancelar-nuevo-producto" class="btn-secondary" style="flex: 1; padding: 12px; font-weight: 600;">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-guardar-nuevo-producto" class="btn-primary" style="flex: 2; padding: 12px; background: #059669; border-color: #059669; font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span class="spinner" style="display: none; width: 16px; height: 16px; border: 2px solid #ffffff; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+                        <span class="btn-text-content">💾 Asignar y Usar Ahora</span>
+                    </button>
+                </div>
             </form>
         </div>
     </div>

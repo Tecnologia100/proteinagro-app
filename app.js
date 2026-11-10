@@ -471,6 +471,7 @@ const entrarComoAdmin = () => {
     driverView.style.display = 'none';
     adminView.style.display = 'block';
     document.body.style.backgroundColor = 'var(--bg-color)';
+    try { sessionStorage.setItem('proteinagro_role', 'admin'); } catch(e) {}
     loadAdminData();
 };
 
@@ -486,6 +487,7 @@ const entrarComoConductor = (nombre = null) => {
         CURRENT_LOGGED_DRIVER = cleanNombre;
         try {
             sessionStorage.setItem('proteinagro_current_driver', cleanNombre);
+            sessionStorage.setItem('proteinagro_role', 'conductor');
         } catch(e) {}
 
         const select = document.getElementById('conductor');
@@ -1085,6 +1087,618 @@ const DEFAULT_PRODUCTOS = [
 ];
 let productosOficialesSheets = [...DEFAULT_PRODUCTOS];
 
+// ==============================================================================
+// CATÁLOGO DINÁMICO DE PRODUCTOS POR PROVEEDOR Y ALTA RÁPIDA (v1.9.6)
+// ==============================================================================
+const CATALOGO_TARIFAS_PROVEEDORES_DEFAULT = {
+  "bodegasantaelena": [
+    "ACEITE",
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO SECO",
+    "MANTECA",
+    "SEBO EN RAMA"
+  ],
+  "alejandrogaray": [
+    "ACEITE",
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO SECO",
+    "MANTECA",
+    "SEBO EN RAMA"
+  ],
+  "sevillanasantaelena": [
+    "ACEITE",
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO SECO",
+    "MANTECA",
+    "SEBO EN RAMA"
+  ],
+  "barbaragomez": [
+    "SEBO EN RAMA"
+  ],
+  "loslagos": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "caribe": [
+    "DESPERDICIO",
+    "SEBO EN RAMA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "PIEL POLLO"
+  ],
+  "sevillana": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "migancapital": [
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "SEBO EN RAMA"
+  ],
+  "freddyhernandez": [
+    "SEBO EN RAMA"
+  ],
+  "edinsonaguirre": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "lareserva": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "santaelena": [
+    "ACEITE",
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO SECO",
+    "MANTECA",
+    "SEBO EN RAMA"
+  ],
+  "cavasa": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "baratoncarnesberlin": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO"
+  ],
+  "carnesmaiale": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "SEBO EN RAMA"
+  ],
+  "ciudaddelcampo": [
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "SEBO EN RAMA"
+  ],
+  "comercializadorarye": [
+    "DESPERDICIO",
+    "GORDANA"
+  ],
+  "districarneslg": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "SEBO EN RAMA"
+  ],
+  "elrebajon": [
+    "DESPERDICIO",
+    "HUESO BLANCO",
+    "SEBO EN RAMA"
+  ],
+  "lacosechademitierra": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO"
+  ],
+  "supercarneslosandes": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "SEBO EN RAMA"
+  ],
+  "supertiendacanaveral": [
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "PIEL POLLO",
+    "SEBO EN RAMA"
+  ],
+  "carnicoslafama": [
+    "ACEITE",
+    "DESPERDICIO",
+    "SEBO EN RAMA"
+  ],
+  "ciudadeladelrio": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO"
+  ],
+  "jaimezuluaga": [
+    "DESPERDICIO",
+    "HUESO BLANCO"
+  ],
+  "lagrancolombia": [
+    "DESPERDICIO"
+  ],
+  "miltonmunoz": [
+    "DESPERDICIO",
+    "EMPELLA",
+    "HUESO BLANCO"
+  ],
+  "sevillanarepublicadeisrael": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "albertomillan": [
+    "CABEZAS",
+    "CALAMBOMBO DE RES",
+    "DESPERDICIO",
+    "HUESO BLANCO",
+    "SEBO EN RAMA"
+  ],
+  "frigorivalle": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "PIEL POLLO",
+    "SEBO EN RAMA"
+  ],
+  "hernandohidalgo": [
+    "DESPERDICIO",
+    "MANTECA"
+  ],
+  "jhonatanmartinez": [
+    "HUESO BLANCO",
+    "SEBO EN RAMA"
+  ],
+  "supertiendacanaveralfrigorivalle": [
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "PIEL POLLO",
+    "SEBO EN RAMA"
+  ],
+  "yimisanclemente": [
+    "HUESO BLANCO",
+    "SEBO EN RAMA"
+  ],
+  "carlosrebolledo": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO"
+  ],
+  "carniceriafabianlopezaguilaroja": [
+    "HUESO BLANCO",
+    "HUESO DE CERDO"
+  ],
+  "centralhenrymartinez": [
+    "DESPERDICIO",
+    "HUESO BLANCO"
+  ],
+  "jorgeadrianrodasvillagorgona": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "SEBO EN RAMA"
+  ],
+  "josealexpareja": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO"
+  ],
+  "mercamio": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "LEÑA"
+  ],
+  "nutrialimentosvaldezvillagorgona": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO"
+  ],
+  "orlandogiraldo": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "SEBO EN RAMA"
+  ],
+  "ricardogil": [
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "SEBO EN RAMA"
+  ],
+  "yeniferdiazvillagorgona": [
+    "HUESO DE CERDO",
+    "SEBO EN RAMA"
+  ],
+  "distribuidoradecarnesmillan": [
+    "HUESO DE CERDO"
+  ],
+  "laesperanza": [
+    "DESPERDICIO",
+    "HUESO BLANCO",
+    "SEBO EN RAMA"
+  ],
+  "mercaunion": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "SEBO EN RAMA"
+  ],
+  "orlandomartinez": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "SEBO EN RAMA"
+  ],
+  "belalcazar": [
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO SECO",
+    "SEBO EN RAMA"
+  ],
+  "augustomunoz": [
+    "DESPERDICIO"
+  ],
+  "carloscaicedo": [
+    "ACEITE"
+  ],
+  "crhistiancedeno": [
+    "ACEITE"
+  ],
+  "diegobuitrago": [
+    "SEBO EN RAMA"
+  ],
+  "fabianlopez": [
+    "HUESO BLANCO",
+    "HUESO DE CERDO"
+  ],
+  "freddyfernandez": [
+    "ACEITE"
+  ],
+  "gildardotejada": [
+    "ACEITE",
+    "HUESO SECO"
+  ],
+  "graxpro": [
+    "MANTECA"
+  ],
+  "hebergamboa": [
+    "ACEITE",
+    "MANTECA"
+  ],
+  "jairomosquera": [
+    "ACEITE",
+    "DESPERDICIO",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO SECO",
+    "MANTECA",
+    "SEBO EN RAMA"
+  ],
+  "julianluna": [
+    "ACEITE"
+  ],
+  "mariaelsialegria": [
+    "ACEITE"
+  ],
+  "martinperez": [
+    "ACEITE"
+  ],
+  "miguelangelotero": [
+    "CABEZAS",
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "MANTECA",
+    "SEBO EN RAMA"
+  ],
+  "milsongonsalez": [
+    "ACEITE",
+    "MANTECA"
+  ],
+  "miriamcuaran": [
+    "ACEITE"
+  ],
+  "oscarlara": [
+    "ACEITE"
+  ],
+  "wilmerbustamante": [
+    "DESPERDICIO",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "SEBO EN RAMA"
+  ],
+  "bodegasantaelena|santaelena": [
+    "ACEITE",
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO SECO",
+    "MANTECA",
+    "SEBO EN RAMA"
+  ],
+  "alejandrogaray|santaelena": [
+    "ACEITE",
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO SECO",
+    "MANTECA",
+    "SEBO EN RAMA"
+  ],
+  "sevillanasantaelena|sevillanasantaelena": [
+    "ACEITE",
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "EMPELLA",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO SECO",
+    "MANTECA",
+    "SEBO EN RAMA"
+  ],
+  "barbaragomez|cavasa": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "loslagos|cavasa": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "caribe|cavasa": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES"
+  ],
+  "sevillana|cavasa": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "migancapital|cavasa": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "freddyhernandez|cavasa": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "edinsonaguirre|cavasa": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "lareserva|cavasa": [
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "HUESO PROMOCION",
+    "PIELES",
+    "SEBO EN RAMA"
+  ],
+  "supermercadoscaribe": [
+    "DESPERDICIO",
+    "SEBO EN RAMA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "PIEL POLLO"
+  ],
+  "canaveral": [
+    "CALAMBOMBO DE CERDO",
+    "DESPERDICIO",
+    "GORDANA",
+    "HUESO BLANCO",
+    "HUESO DE CERDO",
+    "PIEL POLLO",
+    "SEBO EN RAMA"
+  ]
+};
+
+function normalizarClaveTarifa(str) {
+    if (!str) return "";
+    return String(str).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+let MAPA_PROVEEDOR_PRODUCTOS = (function() {
+    try {
+        const stored = localStorage.getItem("proteinagro_proveedor_productos");
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && typeof parsed === "object") {
+                return Object.assign({}, CATALOGO_TARIFAS_PROVEEDORES_DEFAULT, parsed);
+            }
+        }
+    } catch (e) {}
+    return Object.assign({}, CATALOGO_TARIFAS_PROVEEDORES_DEFAULT);
+})();
+
+let MOSTRAR_TODOS_LOS_PRODUCTOS = false;
+
+function getProductosPorProveedor(provRaw, puntoRaw) {
+    if (!provRaw || provRaw === "TODOS" || provRaw === "OTRO") return null;
+    const kProv = normalizarClaveTarifa(provRaw);
+    const kPunto = normalizarClaveTarifa(puntoRaw);
+    
+    if (kProv && kPunto && MAPA_PROVEEDOR_PRODUCTOS[kProv + "|" + kPunto] && MAPA_PROVEEDOR_PRODUCTOS[kProv + "|" + kPunto].length > 0) {
+        return MAPA_PROVEEDOR_PRODUCTOS[kProv + "|" + kPunto];
+    }
+    if (kProv && MAPA_PROVEEDOR_PRODUCTOS[kProv] && MAPA_PROVEEDOR_PRODUCTOS[kProv].length > 0) {
+        return MAPA_PROVEEDOR_PRODUCTOS[kProv];
+    }
+    if (kPunto && MAPA_PROVEEDOR_PRODUCTOS[kPunto] && MAPA_PROVEEDOR_PRODUCTOS[kPunto].length > 0) {
+        return MAPA_PROVEEDOR_PRODUCTOS[kPunto];
+    }
+    return null;
+}
+
+function registrarProductoEnMapaLocal(prov, punto, prod) {
+    if (!prod) return;
+    const cleanProd = String(prod).trim().toUpperCase();
+    if (!productosOficialesSheets.includes(cleanProd)) {
+        productosOficialesSheets.push(cleanProd);
+    }
+    const kProv = normalizarClaveTarifa(prov);
+    const kPunto = normalizarClaveTarifa(punto);
+    if (kProv) {
+        if (!MAPA_PROVEEDOR_PRODUCTOS[kProv]) MAPA_PROVEEDOR_PRODUCTOS[kProv] = [];
+        if (!MAPA_PROVEEDOR_PRODUCTOS[kProv].includes(cleanProd)) {
+            MAPA_PROVEEDOR_PRODUCTOS[kProv].push(cleanProd);
+        }
+    }
+    if (kProv && kPunto) {
+        const keyPunto = kProv + "|" + kPunto;
+        if (!MAPA_PROVEEDOR_PRODUCTOS[keyPunto]) {
+            MAPA_PROVEEDOR_PRODUCTOS[keyPunto] = (MAPA_PROVEEDOR_PRODUCTOS[kProv] && Array.isArray(MAPA_PROVEEDOR_PRODUCTOS[kProv]))
+                ? [...MAPA_PROVEEDOR_PRODUCTOS[kProv]]
+                : [];
+        }
+        if (!MAPA_PROVEEDOR_PRODUCTOS[keyPunto].includes(cleanProd)) {
+            MAPA_PROVEEDOR_PRODUCTOS[keyPunto].push(cleanProd);
+        }
+    }
+    try {
+        localStorage.setItem("proteinagro_proveedor_productos", JSON.stringify(MAPA_PROVEEDOR_PRODUCTOS));
+        localStorage.setItem("proteinagro_productos_cache", JSON.stringify(productosOficialesSheets));
+    } catch (e) {
+        console.warn("Aviso al persistir catálogo de productos:", e);
+    }
+}
+
+function actualizarCatalogoProductosSegunSeleccion() {
+    const provSel = document.getElementById("proveedor");
+    const headerEl = document.getElementById("product-filter-header");
+    const labelEl = document.getElementById("product-filter-label");
+    const toggleBtn = document.getElementById("btn-toggle-todos-productos");
+    const prov = (provSel?.value || "").trim();
+    const punto = typeof obtenerPuntoSeleccionado === "function" ? obtenerPuntoSeleccionado() : "";
+    const prodsProveedor = getProductosPorProveedor(prov, punto);
+    if (prodsProveedor && prodsProveedor.length > 0) {
+        if (headerEl) headerEl.style.display = "flex";
+        const provCorto = prov.length > 22 ? prov.substring(0, 20) + "..." : prov;
+        if (labelEl) {
+            labelEl.innerHTML = "⭐ <strong>" + prodsProveedor.length + " materias primas de " + escapeHtml(provCorto) + "</strong>";
+        }
+        if (!MOSTRAR_TODOS_LOS_PRODUCTOS) {
+            if (toggleBtn) {
+                toggleBtn.textContent = "Ver todo el catálogo (" + productosOficialesSheets.length + ") ▾";
+                toggleBtn.title = "Mostrar todas las materias primas oficiales";
+            }
+            renderDynamicProducts(prodsProveedor, true, prodsProveedor);
+        } else {
+            if (toggleBtn) {
+                toggleBtn.textContent = "Ver solo sugeridos (" + prodsProveedor.length + ") ▴";
+                toggleBtn.title = "Filtrar solo las materias primas asignadas a este proveedor";
+            }
+            renderDynamicProducts(productosOficialesSheets, false, prodsProveedor);
+        }
+    } else {
+        if (headerEl) headerEl.style.display = "none";
+        renderDynamicProducts(productosOficialesSheets);
+    }
+}
+
+
 const MAPA_HOMOLOGACION_PRODUCTOS_PESTANA = {
     "ACEITE": "ACEITE",
     "ACEITE USADO": "ACEITE",
@@ -1314,19 +1928,32 @@ function validarPuntoObligatorio(mostrarAlerta = true) {
     return true;
 }
 
-function renderDynamicProducts(prods) {
+function renderDynamicProducts(prods, sonFrecuentes = false, listaFrecuentes = []) {
     if (Array.isArray(prods) && prods.length > 0) {
-        productosOficialesSheets = prods.map(p => String(p || '').trim().toUpperCase()).filter(Boolean);
+        prods.forEach(p => {
+            const pUpper = String(p || '').trim().toUpperCase();
+            if (pUpper && !productosOficialesSheets.includes(pUpper)) {
+                productosOficialesSheets.push(pUpper);
+            }
+        });
     }
     const grid = document.getElementById('product-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    // Ordenar siempre los productos alfabéticamente de la A a la Z
+
     const prodsOrdenados = (Array.isArray(prods) ? prods.slice() : []).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    const setFrecuentes = new Set(Array.isArray(listaFrecuentes) ? listaFrecuentes.map(x => String(x || '').trim().toUpperCase()) : []);
+
     prodsOrdenados.forEach(pName => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'product-btn';
+        if (sonFrecuentes || setFrecuentes.has(pName)) {
+            btn.classList.add('frecuente');
+        }
+        if (currentProduct === pName) {
+            btn.classList.add('active');
+        }
         btn.dataset.value = pName;
         btn.innerHTML = `${getEmojiForProduct(pName)} ${getDisplayLabelForProduct(pName)}`;
         btn.addEventListener('click', () => {
@@ -1745,15 +2372,36 @@ async function sincronizarCatalogosDesdeGviz() {
                 const provsTarif = [];
                 for (let i = 1; i < linesT.length; i++) {
                     const cols = linesT[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
-                    if (cols[1]) provsTarif.push(cols[1]);
+                    const tProv = cols[1];
+                    const tPunto = cols[2];
+                    const tProd = (cols[3] || '').trim().toUpperCase();
+                    const tEstado = (cols[5] || 'Activo').toLowerCase();
+                    if (tProv) provsTarif.push(tProv);
+                    if (tProv && tProd && tEstado !== 'inactivo') {
+                        const kProv = normalizarClaveTarifa(tProv);
+                        const kPunto = normalizarClaveTarifa(tPunto);
+                        if (kProv) {
+                            if (!MAPA_PROVEEDOR_PRODUCTOS[kProv]) MAPA_PROVEEDOR_PRODUCTOS[kProv] = [];
+                            if (!MAPA_PROVEEDOR_PRODUCTOS[kProv].includes(tProd)) MAPA_PROVEEDOR_PRODUCTOS[kProv].push(tProd);
+                        }
+                        if (kProv && kPunto) {
+                            const keyP = kProv + '|' + kPunto;
+                            if (!MAPA_PROVEEDOR_PRODUCTOS[keyP]) MAPA_PROVEEDOR_PRODUCTOS[keyP] = [];
+                            if (!MAPA_PROVEEDOR_PRODUCTOS[keyP].includes(tProd)) MAPA_PROVEEDOR_PRODUCTOS[keyP].push(tProd);
+                        }
+                    }
                     if (typeof esProveedorCaribe === 'function' && (esProveedorCaribe(cols[1] || '') || esProveedorCaribe(cols[2] || ''))) {
-                        const prodClean = (cols[3] || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        const prodClean = (cols[3] || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
                         const precioNum = parseFloat(String(cols[4] || '').replace(/[^0-9.-]/g, ''));
                         if (prodClean && !isNaN(precioNum) && precioNum > 0 && typeof TARIFAS_REFERENCIA_CARIBE === 'object') {
                             TARIFAS_REFERENCIA_CARIBE[prodClean] = precioNum;
                         }
                     }
                 }
+                try {
+                    localStorage.setItem('proteinagro_proveedor_productos', JSON.stringify(MAPA_PROVEEDOR_PRODUCTOS));
+                } catch(e) {}
+                actualizarCatalogoProductosSegunSeleccion();
                 if (provsTarif.length > 0) {
                     actualizarCatalogoMaestroProveedores(provsTarif);
                     console.log("✅ Catálogo maestro enriquecido desde Tarifas (Gviz):", provsTarif.length);
@@ -1834,7 +2482,23 @@ async function cargarCatalogosDinamicos() {
                             actualizarCatalogoMaestroProveedores(data.proveedores);
                         }
                         if (data.puntos_rutas && data.puntos_rutas.length > 0) procesarPuntosRutasDinamicos(data.puntos_rutas);
+                        if (data.proveedor_productos && typeof data.proveedor_productos === 'object') {
+                            for (const [k, prods] of Object.entries(data.proveedor_productos)) {
+                                const kNorm = k.includes('|') ? (normalizarClaveTarifa(k.split('|')[0]) + '|' + normalizarClaveTarifa(k.split('|')[1])) : normalizarClaveTarifa(k);
+                                if (!MAPA_PROVEEDOR_PRODUCTOS[kNorm]) MAPA_PROVEEDOR_PRODUCTOS[kNorm] = [];
+                                (Array.isArray(prods) ? prods : []).forEach(p => {
+                                    const pUpper = String(p).trim().toUpperCase();
+                                    if (pUpper && !MAPA_PROVEEDOR_PRODUCTOS[kNorm].includes(pUpper)) {
+                                        MAPA_PROVEEDOR_PRODUCTOS[kNorm].push(pUpper);
+                                    }
+                                });
+                            }
+                            try {
+                                localStorage.setItem('proteinagro_proveedor_productos', JSON.stringify(MAPA_PROVEEDOR_PRODUCTOS));
+                            } catch(e) {}
+                        }
                         renderDynamicProducts(data.productos);
+                        actualizarCatalogoProductosSegunSeleccion();
                     if (data.conductores && data.conductores.length > 0) {
                         renderDynamicDrivers(data.conductores);
                         try {
@@ -3762,6 +4426,7 @@ function initRutasYProveedores() {
             }
         }
         actualizarVisibilidadFacturaCaribe();
+        actualizarCatalogoProductosSegunSeleccion();
     });
 
     document.getElementById('custom-sucursal')?.addEventListener('input', () => {
@@ -3784,6 +4449,8 @@ function initRutasYProveedores() {
             populardropdownProveedoresPorRuta(currentRuta, true);
             resetearDropdownSucursal("Seleccione un proveedor de la lista");
             actualizarVisibilidadFacturaCaribe();
+            MOSTRAR_TODOS_LOS_PRODUCTOS = false;
+            actualizarCatalogoProductosSegunSeleccion();
             return;
         }
 
@@ -3804,6 +4471,8 @@ function initRutasYProveedores() {
             populardropdownSucursales(selectedProv);
         }
         actualizarVisibilidadFacturaCaribe();
+        MOSTRAR_TODOS_LOS_PRODUCTOS = false;
+        actualizarCatalogoProductosSegunSeleccion();
     });
 
     // Cargar banner con itinerario recomendado según día de la semana
@@ -4137,6 +4806,7 @@ function populardropdownSucursales(proveedorSeleccionado) {
     optOtra.value = 'OTRA_SUCURSAL';
     optOtra.textContent = '➕ Otro Punto / Sucursal...';
     sucursalSelect.appendChild(optOtra);
+    actualizarCatalogoProductosSegunSeleccion();
 }
 
 // Cronograma de Rutas (se llena dinámicamente desde Google Sheets via procesarPuntosRutasDinamicos)
@@ -6629,3 +7299,179 @@ function inicializarScrollHorizontalSuperior(containerId, topScrollId, toolbarId
 document.addEventListener('DOMContentLoaded', () => {
     inicializarScrollHorizontalSuperior('admin-table-scroll', 'admin-top-scroll', 'admin-scroll-toolbar');
 });
+
+
+// ==============================================================================
+// CONTROLADOR: ALTA RÁPIDA DE NUEVO PRODUCTO Y TOGGLE DE CATÁLOGO (v1.9.6)
+// ==============================================================================
+function esUsuarioAdmin() {
+    try {
+        if (sessionStorage.getItem('proteinagro_role') === 'admin') return true;
+        if (typeof adminView !== 'undefined' && adminView && adminView.style.display !== 'none') return true;
+    } catch(e) {}
+    return false;
+}
+
+// Toggle Ver Todo el Catálogo vs Ver Solo Sugeridos
+document.getElementById('btn-toggle-todos-productos')?.addEventListener('click', () => {
+    MOSTRAR_TODOS_LOS_PRODUCTOS = !MOSTRAR_TODOS_LOS_PRODUCTOS;
+    actualizarCatalogoProductosSegunSeleccion();
+});
+
+// Apertura del Modal de Alta Rápida
+const btnAbrirModalNuevoProd = document.getElementById('btn-abrir-modal-nuevo-producto');
+if (btnAbrirModalNuevoProd) {
+    btnAbrirModalNuevoProd.addEventListener('click', () => {
+        const provSel = document.getElementById('proveedor');
+        const rutaSel = document.getElementById('ruta');
+        const prov = (provSel?.value || '').trim();
+        if (!prov || prov === 'TODOS' || prov === 'OTRO') {
+            if (provSel) {
+                provSel.classList.add('input-error');
+                provSel.focus();
+                provSel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            alert("⚠️ Por favor seleccione primero el Proveedor / Razón Social para asociarle el producto.");
+            return;
+        }
+
+        const punto = typeof obtenerPuntoSeleccionado === 'function' ? (obtenerPuntoSeleccionado() || 'Sede Principal / General') : 'Sede Principal / General';
+        const ruta = (rutaSel?.value || 'Ruta General');
+
+        const elResProv = document.getElementById('modal-prod-resumen-proveedor');
+        const elResPunto = document.getElementById('modal-prod-resumen-punto');
+        const elResRuta = document.getElementById('modal-prod-resumen-ruta');
+        if (elResProv) elResProv.textContent = prov;
+        if (elResPunto) elResPunto.textContent = punto;
+        if (elResRuta) elResRuta.textContent = ruta;
+
+        // Rellenar datalist de sugerencias con catálogo maestro
+        const dataList = document.getElementById('lista-sugerencias-productos');
+        if (dataList) {
+            dataList.innerHTML = '';
+            productosOficialesSheets.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                opt.textContent = `${getEmojiForProduct(p)} ${p}`;
+                dataList.appendChild(opt);
+            });
+        }
+
+        // Determinar visibilidad de precio según rol
+        const esAdmin = esUsuarioAdmin();
+        const precioGroup = document.getElementById('modal-prod-precio-group');
+        const conductorNotice = document.getElementById('modal-prod-conductor-notice');
+
+        if (precioGroup) precioGroup.style.display = esAdmin ? 'block' : 'none';
+        if (conductorNotice) conductorNotice.style.display = esAdmin ? 'none' : 'block';
+
+        // Resetear campos
+        const nombreInput = document.getElementById('nuevo-producto-nombre');
+        const precioInput = document.getElementById('nuevo-producto-precio');
+        if (nombreInput) nombreInput.value = '';
+        if (precioInput) precioInput.value = '';
+        const radioKg = document.querySelector('input[name="nuevo-producto-unidad"][value="Kg"]');
+        if (radioKg) radioKg.checked = true;
+
+        const modal = document.getElementById('modal-nuevo-producto');
+        if (modal) {
+            modal.style.display = 'flex';
+            setTimeout(() => { if (nombreInput) nombreInput.focus(); }, 120);
+        }
+    });
+}
+
+const cerrarModalNuevoProd = () => {
+    const modal = document.getElementById('modal-nuevo-producto');
+    if (modal) modal.style.display = 'none';
+};
+
+document.getElementById('btn-cerrar-modal-nuevo-producto')?.addEventListener('click', cerrarModalNuevoProd);
+document.getElementById('btn-cancelar-nuevo-producto')?.addEventListener('click', cerrarModalNuevoProd);
+
+// Envío del Formulario de Alta Rápida
+const formNuevoProd = document.getElementById('form-nuevo-producto');
+if (formNuevoProd) {
+    formNuevoProd.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const nombreInput = document.getElementById('nuevo-producto-nombre');
+        let prodNombre = (nombreInput?.value || '').trim().toUpperCase();
+
+        // Sanitización contra Inyección de Fórmulas
+        if (/^[=+\-@]/.test(prodNombre)) {
+            prodNombre = prodNombre.replace(/^[=+\-@]+/, '').trim();
+        }
+
+        if (!prodNombre || prodNombre.length < 2) {
+            alert("⚠️ Por favor ingrese un nombre válido para el producto o materia prima.");
+            if (nombreInput) nombreInput.focus();
+            return;
+        }
+
+        const unidad = document.querySelector('input[name="nuevo-producto-unidad"]:checked')?.value || 'Kg';
+        const precioInput = document.getElementById('nuevo-producto-precio');
+        const precioVal = precioInput && precioInput.value !== '' ? parseFloat(precioInput.value) : '';
+
+        const prov = document.getElementById('modal-prod-resumen-proveedor')?.textContent || '';
+        const punto = document.getElementById('modal-prod-resumen-punto')?.textContent || '';
+        const ruta = document.getElementById('modal-prod-resumen-ruta')?.textContent || '';
+
+        const btnSubmit = document.getElementById('btn-guardar-nuevo-producto');
+        const spinner = btnSubmit?.querySelector('.spinner');
+        if (spinner) spinner.style.display = 'inline-block';
+        if (btnSubmit) btnSubmit.disabled = true;
+
+        try {
+            // 1. Guardar de inmediato en estado local y persistir
+            registrarProductoEnMapaLocal(prov, punto, prodNombre);
+
+            // 2. Cerrar modal y refrescar la cuadrícula
+            cerrarModalNuevoProd();
+            actualizarCatalogoProductosSegunSeleccion();
+
+            // 3. Activar automáticamente el nuevo producto
+            setTimeout(() => {
+                const nuevoBtn = Array.from(document.querySelectorAll('.product-btn'))
+                    .find(b => b.dataset.value === prodNombre);
+                if (nuevoBtn) {
+                    nuevoBtn.click();
+                }
+            }, 80);
+
+            // Toast de éxito
+            if (typeof mostrarToastAutoSync === 'function') {
+                mostrarToastAutoSync(`✨ Materia prima "${prodNombre}" asociada a ${prov}`);
+            }
+
+            // 4. Sincronizar en segundo plano vía Webhook si hay conexión
+            if (navigator.onLine && GOOGLE_SHEETS_WEBHOOK_URL) {
+                const payloadSync = {
+                    action: 'crearProductoTarifa',
+                    ruta: ruta,
+                    proveedor: prov,
+                    punto: punto,
+                    producto: prodNombre,
+                    precio: precioVal,
+                    unidad: unidad
+                };
+
+                fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payloadSync)
+                }).then(res => res.json()).then(data => {
+                    console.log("✅ Producto sincronizado con Google Sheets Tarifas:", data);
+                }).catch(err => {
+                    console.warn("⚠️ Sincronización diferida de producto en Tarifas:", err);
+                });
+            }
+        } catch (errSubmit) {
+            console.error("Error guardando nuevo producto:", errSubmit);
+            alert("Ocurrió un error al registrar el producto: " + errSubmit.message);
+        } finally {
+            if (spinner) spinner.style.display = 'none';
+            if (btnSubmit) btnSubmit.disabled = false;
+        }
+    });
+}
