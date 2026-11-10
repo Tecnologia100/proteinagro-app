@@ -1387,7 +1387,7 @@
 
             const cols = (table.cols || []).map(c => String(c ? (c.label || c.id) : '').toLowerCase().trim());
             
-            const colMap = { fecha: -1, proveedor: -1, punto: -1, materia: -1, kg: -1, precio: -1, valor: -1, id: -1, ruta: -1, conductor: -1, observaciones: -1, numFactura: -1, valorFactura: -1, fotoFactura: -1 };
+            const colMap = { fecha: -1, proveedor: -1, punto: -1, materia: -1, kg: -1, precio: -1, valor: -1, id: -1, ruta: -1, conductor: -1, observaciones: -1, numFactura: -1, valorFactura: -1, fotoFactura: -1, tipoSoporte: -1, fotoSoporte: -1, entregadoPor: -1 };
             for (let c = 0; c < cols.length; c++) {
                 const h = cols[c];
                 if (/fecha/i.test(h) && colMap.fecha === -1) colMap.fecha = c;
@@ -1404,6 +1404,9 @@
                 else if (/numero_factura|num_factura|factura/i.test(h) && !/valor|foto/i.test(h) && colMap.numFactura === -1) colMap.numFactura = c;
                 else if (/valor_factura/i.test(h) && colMap.valorFactura === -1) colMap.valorFactura = c;
                 else if (/foto_factura/i.test(h) && colMap.fotoFactura === -1) colMap.fotoFactura = c;
+                else if (/tipo_soporte/i.test(h) && colMap.tipoSoporte === -1) colMap.tipoSoporte = c;
+                else if (/foto_soporte/i.test(h) && colMap.fotoSoporte === -1) colMap.fotoSoporte = c;
+                else if (/entregado_por/i.test(h) && colMap.entregadoPor === -1) colMap.entregadoPor = c;
                 else if (/valor|total/i.test(h) && colMap.valor === -1) colMap.valor = c;
             }
 
@@ -1421,6 +1424,9 @@
             if (colMap.numFactura === -1) colMap.numFactura = 14;
             if (colMap.valorFactura === -1) colMap.valorFactura = 15;
             if (colMap.fotoFactura === -1) colMap.fotoFactura = 16;
+            if (colMap.tipoSoporte === -1 && cols.length >= 24) colMap.tipoSoporte = 23;
+            if (colMap.fotoSoporte === -1 && cols.length >= 25) colMap.fotoSoporte = 24;
+            if (colMap.entregadoPor === -1 && cols.length >= 26) colMap.entregadoPor = 25;
 
             let data = [];
             const provSet = new Set();
@@ -1469,6 +1475,20 @@
 
                 if (provClean) provSet.add(provClean);
 
+                let tipoSopVal = colMap.tipoSoporte !== -1 ? String(getVal(colMap.tipoSoporte)).trim() : '';
+                let fotoSopVal = colMap.fotoSoporte !== -1 ? String(getVal(colMap.fotoSoporte)).trim() : '';
+                let entregadoVal = colMap.entregadoPor !== -1 ? String(getVal(colMap.entregadoPor)).trim() : '';
+                const obsVal = colMap.observaciones !== -1 ? String(getVal(colMap.observaciones)).trim() : '';
+
+                if (!entregadoVal && obsVal.indexOf('[Entregó:') !== -1) {
+                    const mEnt = obsVal.match(/\[Entregó:\s*([^\]]+)\]/i);
+                    if (mEnt) entregadoVal = mEnt[1].trim();
+                }
+                if (!tipoSopVal && obsVal.indexOf('[Soporte:') !== -1) {
+                    const mSop = obsVal.match(/\[Soporte:\s*([^\]]+)\]/i);
+                    if (mSop) tipoSopVal = mSop[1].trim();
+                }
+
                 data.push({
                     FECHA: fechaRaw.split(' ')[0],
                     PROVEEDOR: provClean,
@@ -1480,10 +1500,13 @@
                     ID: colMap.id !== -1 ? String(getVal(colMap.id)).trim() : '',
                     RUTA: colMap.ruta !== -1 ? String(getVal(colMap.ruta)).trim() : '',
                     CONDUCTOR: colMap.conductor !== -1 ? String(getVal(colMap.conductor)).trim() : '',
-                    OBSERVACIONES: colMap.observaciones !== -1 ? String(getVal(colMap.observaciones)).trim() : '',
+                    OBSERVACIONES: obsVal,
                     NUMERO_FACTURA: colMap.numFactura !== -1 ? String(getVal(colMap.numFactura)).trim() : '',
                     VALOR_FACTURA: colMap.valorFactura !== -1 ? getNum(colMap.valorFactura) : 0,
-                    FOTO_FACTURA: colMap.fotoFactura !== -1 ? String(getVal(colMap.fotoFactura)).trim() : ''
+                    FOTO_FACTURA: colMap.fotoFactura !== -1 ? String(getVal(colMap.fotoFactura)).trim() : '',
+                    TIPO_SOPORTE: tipoSopVal,
+                    FOTO_SOPORTE: fotoSopVal,
+                    ENTREGADO_POR: entregadoVal
                 });
             });
 
@@ -1922,11 +1945,14 @@
                 const facturaBadge = row.NUMERO_FACTURA
                     ? `<div style="margin-top:3px; font-size:0.74rem; color:#1e40af; font-weight:600;">🧾 Fact: ${row.NUMERO_FACTURA}${row.VALOR_FACTURA ? ' ($' + Math.round(Number(row.VALOR_FACTURA)).toLocaleString('es-CO') + ')' : ''}${row.FOTO_FACTURA && /^https?:\/\//i.test(row.FOTO_FACTURA) ? ` <a href="${row.FOTO_FACTURA}" target="_blank" rel="noopener" style="color:#2563eb; text-decoration:underline; margin-left:4px;">📷 Ver Foto</a>` : ''}</div>`
                     : '';
+                const soporteBadge = (row.ENTREGADO_POR || row.TIPO_SOPORTE || (row.FOTO_SOPORTE && /^https?:\/\//i.test(row.FOTO_SOPORTE)))
+                    ? `<div style="margin-top:3px; font-size:0.72rem; color:#065f46; background:#ecfdf5; border:1px solid #a7f3d0; padding:1px 6px; border-radius:4px; display:inline-block;">${row.ENTREGADO_POR ? `👤 Entregó: <strong>${escapeHtml(row.ENTREGADO_POR)}</strong> ` : ''}${row.TIPO_SOPORTE ? `• ⚖️ ${escapeHtml(row.TIPO_SOPORTE)} ` : ''}${row.FOTO_SOPORTE && /^https?:\/\//i.test(row.FOTO_SOPORTE) ? `<a href="${row.FOTO_SOPORTE}" target="_blank" rel="noopener" style="color:#059669; text-decoration:underline; font-weight:700; margin-left:3px;">📷 Ver Pesaje</a>` : ''}</div>`
+                    : '';
 
                 tr.innerHTML = `
                     <td>${row.FECHA || '-'}</td>
                     <td>${row.PROVEEDOR || '-'}</td>
-                    <td>${row.PUNTO || '-'}${facturaBadge}</td>
+                    <td>${row.PUNTO || '-'}${facturaBadge}${soporteBadge}</td>
                     <td>${row.MATERIA || '-'}</td>
                     <td class="num">${kgVal.toLocaleString('es-CO', {maximumFractionDigits: 2})}</td>
                     <td class="num">${precVal.toLocaleString('es-CO', {maximumFractionDigits: 0})}</td>

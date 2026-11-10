@@ -474,11 +474,26 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     var conductor = data.conductor || '';
     var proveedor = removerEmojisDecorativos(data.proveedor || '');
     var punto = data.punto || data.sucursal || '';
+    var entregadoPor = String(data.entregadoPor || data.entregado_por || '').trim();
+    var tipoSoporte = String(data.tipoSoporte || data.tipo_soporte || '').trim();
+    var fotoSoporte = String(data.fotoSoporte || data.foto_soporte || '').trim();
+    
+    // Si no vino fotoSoporte explícita o vino texto genérico pero hay id de recolección
+    if ((!fotoSoporte || fotoSoporte === 'Foto Soporte Registrada') && id && !String(id).startsWith('NOV-')) {
+      fotoSoporte = 'https://proteinagro-app.vercel.app/?view=soporte&id=' + encodeURIComponent(id);
+    }
+
     var observaciones = data.observaciones || '';
-    if (data.entregadoPor && String(data.entregadoPor).trim() !== '') {
-      var entPrefijo = '[Entregó: ' + String(data.entregadoPor).trim() + ']';
+    if (entregadoPor !== '') {
+      var entPrefijo = '[Entregó: ' + entregadoPor + ']';
       if (observaciones.indexOf(entPrefijo) === -1) {
         observaciones = (entPrefijo + ' ' + observaciones).trim();
+      }
+    }
+    if (tipoSoporte !== '') {
+      var sopPrefijo = '[Soporte: ' + tipoSoporte + ']';
+      if (observaciones.indexOf(sopPrefijo) === -1) {
+        observaciones = (sopPrefijo + ' ' + observaciones).trim();
       }
     }
     var ubicacionGps = data.ubicacionGps || '0';
@@ -578,6 +593,7 @@ function guardarRecoleccionSheet(ss, rawPayload) {
 
     var filasNuevas = [];
     var filasFactura = [];
+    var filasSoporte = [];
 
     for (var p = 0; p < productos.length; p++) {
       var prodItem = productos[p];
@@ -663,12 +679,17 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         (valorFactura !== '' && valorFactura > 0) ? valorFactura : '',
         sanitizarParaHoja(fotoFactura)
       ]);
+      filasSoporte.push([
+        sanitizarParaHoja(tipoSoporte),
+        sanitizarParaHoja(fotoSoporte),
+        sanitizarParaHoja(aNombrePropio(entregadoPor))
+      ]);
 
       existingRecordsMap[prodKey] = true;
       existingIdsMap[id] = true;
     }
 
-    // 3. Escritura atómica en lote (1 sola llamada setValues para A:L y 1 para O:Q sin tocar M:N)
+    // 3. Escritura atómica en lote (1 sola llamada setValues para A:L, 1 para O:Q y 1 para X:Z sin tocar M:N ni R:W)
     if (filasNuevas.length > 0) {
       // Blindaje de capacidad: asegurar que la hoja tenga suficientes renglones y columnas antes de escribir
       var maxFilasActuales = sheet.getMaxRows();
@@ -679,6 +700,8 @@ function guardarRecoleccionSheet(ss, rawPayload) {
       }
       // Garantizar que existan las columnas de Factura O, P, Q y que los duplicados estén corridos a la derecha
       garantizarEstructuraColumnasFactura(sheet);
+      // Garantizar columnas oficiales de Soporte de Pesaje X, Y, Z (Cols 24 a 26) sin tocar duplicados
+      garantizarEstructuraColumnasSoporte(sheet);
 
       sheet.getRange(targetRow + 1, 1, filasNuevas.length, 12).setValues(filasNuevas);
       if (numeroFactura || (valorFactura !== '' && valorFactura > 0) || fotoFactura) {
@@ -689,6 +712,17 @@ function guardarRecoleccionSheet(ss, rawPayload) {
           cleanEmpty.push(['', '', '']);
         }
         sheet.getRange(targetRow + 1, 15, cleanEmpty.length, 3).setValues(cleanEmpty);
+      }
+
+      // Escribir columnas de Soporte de Pesaje (X:Z -> Cols 24:26)
+      if (tipoSoporte || fotoSoporte || entregadoPor) {
+        sheet.getRange(targetRow + 1, 24, filasSoporte.length, 3).setValues(filasSoporte);
+      } else {
+        var cleanEmptySop = [];
+        for (var cEmptyS = 0; cEmptyS < filasNuevas.length; cEmptyS++) {
+          cleanEmptySop.push(['', '', '']);
+        }
+        sheet.getRange(targetRow + 1, 24, cleanEmptySop.length, 3).setValues(cleanEmptySop);
       }
     }
 
@@ -763,6 +797,41 @@ function garantizarEstructuraColumnasFactura(sheet) {
   sheet.getRange(2, 16, lastRow - 1, 1).setNumberFormat("$#,##0");
 
   return { desplazado: desplazado, razon: desplazado ? "Columnas P:U desplazadas exitosamente a R:W" : "Encabezados O:Q asegurados" };
+}
+
+// ==============================================================================
+// GARANTIZAR ESTRUCTURA DE COLUMNAS DE SOPORTE DE PESAJE (v1.9.8)
+// Habilita las columnas X:Z (24 a 26) para Tipo_Soporte, Foto_Soporte, Entregado_Por
+// sin desplazar ni alterar ninguna columna existente (A..W)
+// ==============================================================================
+function garantizarEstructuraColumnasSoporte(sheet) {
+  if (!sheet) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    sheet = ss.getSheetByName("Recolecciones");
+  }
+  if (!sheet) return { configurado: false, razon: "No existe la hoja Recolecciones" };
+
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols < 26) {
+    sheet.insertColumnsAfter(maxCols, 26 - maxCols);
+  }
+
+  var hdrX = String(sheet.getRange(1, 24).getValue() || '').trim();
+  var hdrY = String(sheet.getRange(1, 25).getValue() || '').trim();
+  var hdrZ = String(sheet.getRange(1, 26).getValue() || '').trim();
+
+  if (hdrX === "Tipo_Soporte" && hdrY === "Foto_Soporte" && hdrZ === "Entregado_Por") {
+    return { configurado: true, razon: "Columnas X:Z ya configuradas" };
+  }
+
+  var rangeHdr = sheet.getRange(1, 24, 1, 3);
+  rangeHdr.setValues([["Tipo_Soporte", "Foto_Soporte", "Entregado_Por"]]);
+  rangeHdr.setBackground('#065f46')
+          .setFontColor('#ffffff')
+          .setFontWeight('bold')
+          .setHorizontalAlignment('center');
+
+  return { configurado: true, razon: "Encabezados X:Z configurados exitosamente" };
 }
 
 function menuHabilitarColumnasFactura() {
@@ -2638,7 +2707,7 @@ function getDashboardDataRaw() {
     }
 
     var headers = values[0];
-    var colMap = { fecha: -1, proveedor: -1, punto: -1, materia: -1, kg: -1, precio: -1, valor: -1, id: -1, gps: -1, numFactura: -1, valorFactura: -1, fotoFactura: -1 };
+    var colMap = { fecha: -1, proveedor: -1, punto: -1, materia: -1, kg: -1, precio: -1, valor: -1, id: -1, gps: -1, numFactura: -1, valorFactura: -1, fotoFactura: -1, tipoSoporte: -1, fotoSoporte: -1, entregadoPor: -1, observaciones: -1 };
 
     for (var c = 0; c < headers.length; c++) {
       var h = String(headers[c] || "").trim().toLowerCase();
@@ -2651,6 +2720,10 @@ function getDashboardDataRaw() {
       else if (/numero_factura|num_factura|nro_factura/i.test(h) && colMap.numFactura === -1) colMap.numFactura = c;
       else if (/valor_factura|total_factura/i.test(h) && colMap.valorFactura === -1) colMap.valorFactura = c;
       else if (/foto_factura|soporte_factura/i.test(h) && colMap.fotoFactura === -1) colMap.fotoFactura = c;
+      else if (/tipo_soporte/i.test(h) && colMap.tipoSoporte === -1) colMap.tipoSoporte = c;
+      else if (/foto_soporte/i.test(h) && colMap.fotoSoporte === -1) colMap.fotoSoporte = c;
+      else if (/entregado_por/i.test(h) && colMap.entregadoPor === -1) colMap.entregadoPor = c;
+      else if (/observ/i.test(h) && colMap.observaciones === -1) colMap.observaciones = c;
       else if (/valor|total/i.test(h) && colMap.valor === -1) colMap.valor = c;
       else if (/^id/i.test(h) && colMap.id === -1) colMap.id = c;
       else if (/gps|ubicaci/i.test(h) && colMap.gps === -1) colMap.gps = c;
@@ -2661,11 +2734,15 @@ function getDashboardDataRaw() {
     if (colMap.punto === -1) colMap.punto = 5;
     if (colMap.materia === -1) colMap.materia = 6;
     if (colMap.kg === -1) colMap.kg = 7;
+    if (colMap.observaciones === -1) colMap.observaciones = 8;
     if (colMap.precio === -1) colMap.precio = 10;
     if (colMap.valor === -1) colMap.valor = 11;
     if (colMap.numFactura === -1 && headers.length >= 15) colMap.numFactura = 14;
     if (colMap.valorFactura === -1 && headers.length >= 16) colMap.valorFactura = 15;
     if (colMap.fotoFactura === -1 && headers.length >= 17) colMap.fotoFactura = 16;
+    if (colMap.tipoSoporte === -1 && headers.length >= 24) colMap.tipoSoporte = 23;
+    if (colMap.fotoSoporte === -1 && headers.length >= 25) colMap.fotoSoporte = 24;
+    if (colMap.entregadoPor === -1 && headers.length >= 26) colMap.entregadoPor = 25;
 
     var timeZone = ss.getSpreadsheetTimeZone() || "America/Bogota";
     var data = [];
@@ -2713,6 +2790,20 @@ function getDashboardDataRaw() {
       else if (rawValFact) valFactNum = parseFloat(String(rawValFact).replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0;
       var fotoFactStr = (colMap.fotoFactura !== -1 && row.length > colMap.fotoFactura && row[colMap.fotoFactura] !== null && row[colMap.fotoFactura] !== undefined) ? String(row[colMap.fotoFactura]).trim() : "";
 
+      var tipoSopStr = (colMap.tipoSoporte !== -1 && row.length > colMap.tipoSoporte && row[colMap.tipoSoporte]) ? String(row[colMap.tipoSoporte]).trim() : "";
+      var fotoSopStr = (colMap.fotoSoporte !== -1 && row.length > colMap.fotoSoporte && row[colMap.fotoSoporte]) ? String(row[colMap.fotoSoporte]).trim() : "";
+      var entregadoStr = (colMap.entregadoPor !== -1 && row.length > colMap.entregadoPor && row[colMap.entregadoPor]) ? String(row[colMap.entregadoPor]).trim() : "";
+      var obsStr = (colMap.observaciones !== -1 && row.length > colMap.observaciones && row[colMap.observaciones]) ? String(row[colMap.observaciones]).trim() : "";
+
+      if (!entregadoStr && obsStr.indexOf('[Entregó:') !== -1) {
+        var mEnt = obsStr.match(/\[Entregó:\s*([^\]]+)\]/i);
+        if (mEnt) entregadoStr = mEnt[1].trim();
+      }
+      if (!tipoSopStr && obsStr.indexOf('[Soporte:') !== -1) {
+        var mSop = obsStr.match(/\[Soporte:\s*([^\]]+)\]/i);
+        if (mSop) tipoSopStr = mSop[1].trim();
+      }
+
       data.push({
         FECHA: fechaStr,
         PROVEEDOR: provClean,
@@ -2724,7 +2815,11 @@ function getDashboardDataRaw() {
         ID: colMap.id !== -1 ? String(row[colMap.id] || "").trim() : "",
         NUMERO_FACTURA: numFactStr,
         VALOR_FACTURA: valFactNum,
-        FOTO_FACTURA: fotoFactStr
+        FOTO_FACTURA: fotoFactStr,
+        TIPO_SOPORTE: tipoSopStr,
+        FOTO_SOPORTE: fotoSopStr,
+        ENTREGADO_POR: entregadoStr,
+        OBSERVACIONES: obsStr
       });
     }
 

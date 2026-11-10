@@ -3920,7 +3920,7 @@ async function enviarAGoogleSheets(data) {
         dataLight.fotoFactura = "Foto Factura Registrada";
     }
     if (dataLight.fotoSoporte && dataLight.fotoSoporte.length > 300 && !dataLight.fotoSoporte.startsWith('http')) {
-        dataLight.fotoSoporte = "Foto Soporte Registrada";
+        dataLight.fotoSoporte = `https://proteinagro-app.vercel.app/?view=soporte&id=${encodeURIComponent(dataLight.id || '')}`;
     }
 
     if (dataLight.ruta) {
@@ -3956,7 +3956,7 @@ async function enviarAGoogleSheets(data) {
                 dataLightGet.fotoFactura = "Foto Factura Registrada";
             }
             if (dataLightGet.fotoSoporte && dataLightGet.fotoSoporte.length > 300 && !dataLightGet.fotoSoporte.startsWith('http')) {
-                dataLightGet.fotoSoporte = "Foto Soporte Registrada";
+                dataLightGet.fotoSoporte = `https://proteinagro-app.vercel.app/?view=soporte&id=${encodeURIComponent(dataLightGet.id || '')}`;
             }
             const payloadParamGet = encodeURIComponent(JSON.stringify(dataLightGet));
             const getUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=${actionType}&payload=${payloadParamGet}`;
@@ -7815,3 +7815,92 @@ if (formNuevoProd) {
         }
     });
 }
+
+// ==============================================================================
+// VISOR DIRECTO DE EVIDENCIA DE PESAJE EN SITIO (URL EXTERNA / SHEETS) (v1.9.8)
+// ==============================================================================
+async function verificarVisorSoporteURL() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('view') !== 'soporte') return;
+        const targetId = String(params.get('id') || '').trim();
+        if (!targetId) return;
+
+        let fotoUrl = '';
+        let tipoSop = 'Báscula / Reloj';
+        let entregado = '';
+        let info = null;
+
+        // 1. Intentar buscar en Firestore si está disponible
+        if (typeof db !== 'undefined' && db) {
+            try {
+                const docSnap = await db.collection('recolecciones').doc(targetId).get();
+                if (docSnap.exists) {
+                    info = docSnap.data();
+                    fotoUrl = info.fotoSoporte || '';
+                    tipoSop = info.tipoSoporte || 'Báscula / Reloj';
+                    entregado = info.entregadoPor || '';
+                }
+            } catch(eFs) {}
+        }
+
+        // 2. Fallback a LocalStorage
+        if (!fotoUrl) {
+            try {
+                const bkp = JSON.parse(localStorage.getItem('recolecciones_backup') || '[]');
+                const found = bkp.find(r => r.id === targetId);
+                if (found) {
+                    info = found;
+                    fotoUrl = found.fotoSoporte || '';
+                    tipoSop = found.tipoSoporte || 'Báscula / Reloj';
+                    entregado = found.entregadoPor || '';
+                }
+            } catch(eBkp) {}
+        }
+
+        // 3. Renderizar visor en pantalla completa
+        const modalContainer = document.createElement('div');
+        modalContainer.id = 'visor-directo-soporte-modal';
+        modalContainer.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,23,42,0.92); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:15px; box-sizing:border-box; backdrop-filter:blur(6px);';
+
+        const provTxt = info ? escapeHtml(info.proveedor || '') : '';
+        const puntoTxt = info ? escapeHtml(info.punto || info.sucursal || '') : '';
+        const condTxt = info ? escapeHtml(info.conductor || '') : '';
+        const fechaTxt = info ? escapeHtml(info.fecha || '') : '';
+
+        modalContainer.innerHTML = `
+            <div style="background:#ffffff; width:100%; max-width:680px; max-height:92vh; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); border:1px solid #cbd5e1;">
+                <div style="background:#065f46; color:#ffffff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-weight:800; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+                        <span>📷</span>
+                        <span>Evidencia Oficial de Pesaje</span>
+                    </div>
+                    <button type="button" onclick="document.getElementById('visor-directo-soporte-modal').remove(); window.history.replaceState({}, document.title, window.location.pathname);" style="background:#047857; color:#ffffff; border:none; width:32px; height:32px; border-radius:50%; font-size:1.2rem; cursor:pointer; font-weight:bold; display:flex; align-items:center; justify-content:center;">✕</button>
+                </div>
+                <div style="padding:14px 18px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; flex-wrap:wrap; gap:8px; font-size:0.8rem;">
+                    <span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:3px 8px; border-radius:6px; font-weight:700;">⚖️ Tipo: ${escapeHtml(tipoSop)}</span>
+                    ${entregado ? `<span style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; padding:3px 8px; border-radius:6px; font-weight:700;">👤 Entregó: ${escapeHtml(entregado)}</span>` : ''}
+                    <span style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:3px 8px; border-radius:6px; font-weight:600;">📋 ${escapeHtml(targetId)}</span>
+                    ${provTxt ? `<span style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:3px 8px; border-radius:6px;">🏪 ${provTxt} - ${puntoTxt}</span>` : ''}
+                    ${condTxt ? `<span style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:3px 8px; border-radius:6px;">🚚 ${condTxt}</span>` : ''}
+                    ${fechaTxt ? `<span style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; padding:3px 8px; border-radius:6px;">📅 ${fechaTxt}</span>` : ''}
+                </div>
+                <div style="flex:1; overflow:auto; padding:16px; display:flex; align-items:center; justify-content:center; background:#0f172a; min-height:260px;">
+                    ${fotoUrl ? `<img src="${fotoUrl}" alt="Evidencia de Pesaje" style="max-width:100%; max-height:65vh; object-fit:contain; border-radius:8px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.3);">` : `<div style="color:#94a3b8; text-align:center; padding:40px;"><p style="font-size:2rem; margin:0 0 10px;">⚠️</p><p>No se encontró fotografía de soporte para este registro.</p></div>`}
+                </div>
+                <div style="padding:12px 18px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px;">
+                    ${fotoUrl && fotoUrl.startsWith('http') ? `<a href="${fotoUrl}" target="_blank" rel="noopener" style="background:#0284c7; color:#ffffff; text-decoration:none; padding:8px 14px; border-radius:6px; font-size:0.85rem; font-weight:700; display:inline-flex; align-items:center; gap:6px;">↗ Abrir Original</a>` : ''}
+                    <button type="button" onclick="document.getElementById('visor-directo-soporte-modal').remove(); window.history.replaceState({}, document.title, window.location.pathname);" style="background:#334155; color:#ffffff; border:none; padding:8px 16px; border-radius:6px; font-size:0.85rem; font-weight:700; cursor:pointer;">Cerrar</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modalContainer);
+    } catch(e) {
+        console.warn("Aviso en visor directo de soporte:", e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(verificarVisorSoporteURL, 800);
+});
