@@ -34,7 +34,8 @@ function doGet(e) {
 
     // 0.04 Si viene una petición de eliminación por ID
     if (e && e.parameter && e.parameter.action === 'deleteRecoleccion' && e.parameter.id) {
-      return eliminarRecoleccionSheet(ss, e.parameter.id);
+      var prodTarget = e.parameter.producto || e.parameter.materia || '';
+      return eliminarRecoleccionSheet(ss, e.parameter.id, prodTarget);
     }
 
     // 0.05 Si viene una petición de actualización/edición de recolección
@@ -1052,6 +1053,158 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
             _uid: nov._uid || ''
           });
         }
+      } else if (tipo === 'RECLASIFICAR' || tipo === 'CAMBIAR_PRODUCTO') {
+        var prodAnterior = String(nov.productoAnterior || nov.producto || '').trim();
+        var prodNuevo = String(nov.productoNuevo || nov.nuevoProducto || '').trim();
+        var rowToUpdate = -1;
+        var rowArrIndex = -1;
+
+        if (nov.id && idRowIndexMap[nov.id]) {
+          var matchedRows = idRowIndexMap[nov.id];
+          for (var m = 0; m < matchedRows.length; m++) {
+            var rIdx = matchedRows[m];
+            var rowArray = allData[rIdx - 2];
+            var pHoja = String(rowArray[6] || '').trim();
+            if (productosCoinciden(pHoja, prodAnterior) || matchedRows.length === 1) {
+              rowToUpdate = rIdx;
+              rowArrIndex = rIdx - 2;
+              break;
+            }
+          }
+        }
+
+        if (rowToUpdate === -1 && nov.fecha && allData.length > 0) {
+          var targetDateNorm = normalizarFechaDia(nov.fecha);
+          var targetProvNorm = normalizarTexto(prov);
+          var targetPuntoNorm = normalizarTexto(punto);
+          for (var ar = allData.length - 1; ar >= 0; ar--) {
+            var fHoja = normalizarFechaDia(allData[ar][1]);
+            var prHoja = normalizarTexto(allData[ar][4]);
+            var ptHoja = normalizarTexto(allData[ar][5]);
+            var pdHoja = String(allData[ar][6] || '').trim();
+
+            if (fHoja === targetDateNorm && productosCoinciden(pdHoja, prodAnterior)) {
+              if (!targetProvNorm || prHoja.indexOf(targetProvNorm) !== -1 || targetProvNorm.indexOf(prHoja) !== -1) {
+                if (!targetPuntoNorm || ptHoja.indexOf(targetPuntoNorm) !== -1 || targetPuntoNorm.indexOf(ptHoja) !== -1) {
+                  rowToUpdate = ar + 2;
+                  rowArrIndex = ar;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (rowToUpdate !== -1) {
+          var rowData = allData[rowArrIndex];
+          var curKg = kgTarget > 0 ? kgTarget : parseKilosNumero(rowData[7]);
+          var nuevoPrecio = buscarPrecioEnCatalogoTarifas(catalogoTarifas, prov || rowData[4], punto || rowData[5], prodNuevo);
+          if (nuevoPrecio === null || nuevoPrecio <= 0) {
+            if (!catalogoHistorico) catalogoHistorico = cargarHistoricoRecolecciones(ss);
+            nuevoPrecio = buscarPrecioEnHistorico(catalogoHistorico, prov || rowData[4], punto || rowData[5], prodNuevo) || parsePrecioMoneda(rowData[10]) || 0;
+          }
+
+          var nuevoValor = (nuevoPrecio > 0 && curKg > 0) ? Math.round(nuevoPrecio * curKg * 100) / 100 : '';
+          var prevObs = String(rowData[8] || '').trim();
+          var notaReclasif = "Reclasificado por Conciliador (" + (prodAnterior || rowData[6]) + " ➔ " + aNombrePropio(prodNuevo) + ")";
+          var obsFinal = prevObs ? (prevObs + " | " + notaReclasif) : notaReclasif;
+
+          sheet.getRange(rowToUpdate, 7).setValue(sanitizarParaHoja(aNombrePropio(prodNuevo)));
+          if (kgTarget > 0) {
+            sheet.getRange(rowToUpdate, 8).setValue(kgTarget);
+          }
+          sheet.getRange(rowToUpdate, 9).setValue(sanitizarParaHoja(capitalizarOracion(obsFinal)));
+          if (nuevoPrecio > 0) {
+            sheet.getRange(rowToUpdate, 11).setValue(nuevoPrecio);
+          }
+          sheet.getRange(rowToUpdate, 12).setValue(nuevoValor);
+
+          allData[rowArrIndex][6] = aNombrePropio(prodNuevo);
+          if (kgTarget > 0) allData[rowArrIndex][7] = kgTarget;
+          allData[rowArrIndex][8] = obsFinal;
+          allData[rowArrIndex][10] = nuevoPrecio;
+          allData[rowArrIndex][11] = nuevoValor;
+
+          actualizados++;
+          detalles.push({
+            id: rowData[0],
+            accion: 'RECLASIFICADO',
+            fila: rowToUpdate,
+            productoAnterior: prodAnterior,
+            productoNuevo: aNombrePropio(prodNuevo),
+            kg: curKg,
+            precio: nuevoPrecio,
+            valor: nuevoValor,
+            _uid: nov._uid || ''
+          });
+        } else {
+          detalles.push({
+            id: nov.id || '',
+            accion: 'NO_ENCONTRADO_PARA_RECLASIFICAR',
+            producto: prodAnterior,
+            _uid: nov._uid || ''
+          });
+        }
+      } else if (tipo === 'ELIMINAR' || tipo === 'ELIMINAR_SOBRANTE') {
+        var rowToDelete = -1;
+        var rowArrIndex = -1;
+
+        if (nov.id && idRowIndexMap[nov.id]) {
+          var matchedRows = idRowIndexMap[nov.id];
+          for (var m = 0; m < matchedRows.length; m++) {
+            var rIdx = matchedRows[m];
+            var rowArray = allData[rIdx - 2];
+            var pHoja = String(rowArray[6] || '').trim();
+            if (!prodNombre || productosCoinciden(pHoja, prodNombre) || matchedRows.length === 1) {
+              rowToDelete = rIdx;
+              rowArrIndex = rIdx - 2;
+              break;
+            }
+          }
+        }
+
+        if (rowToDelete === -1 && nov.fecha && allData.length > 0) {
+          var targetDateNorm = normalizarFechaDia(nov.fecha);
+          var targetProvNorm = normalizarTexto(prov);
+          var targetPuntoNorm = normalizarTexto(punto);
+          for (var ar = allData.length - 1; ar >= 0; ar--) {
+            var fHoja = normalizarFechaDia(allData[ar][1]);
+            var prHoja = normalizarTexto(allData[ar][4]);
+            var ptHoja = normalizarTexto(allData[ar][5]);
+            var pdHoja = String(allData[ar][6] || '').trim();
+
+            if (fHoja === targetDateNorm && (!prodNombre || productosCoinciden(pdHoja, prodNombre))) {
+              if (!targetProvNorm || prHoja.indexOf(targetProvNorm) !== -1 || targetProvNorm.indexOf(prHoja) !== -1) {
+                if (!targetPuntoNorm || ptHoja.indexOf(targetPuntoNorm) !== -1 || targetPuntoNorm.indexOf(ptHoja) !== -1) {
+                  rowToDelete = ar + 2;
+                  rowArrIndex = ar;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (rowToDelete !== -1) {
+          var idBorrado = allData[rowArrIndex][0];
+          sheet.deleteRow(rowToDelete);
+          allData.splice(rowArrIndex, 1);
+          actualizados++;
+          detalles.push({
+            id: idBorrado,
+            accion: 'ELIMINADO',
+            fila: rowToDelete,
+            producto: prodNombre,
+            _uid: nov._uid || ''
+          });
+        } else {
+          detalles.push({
+            id: nov.id || '',
+            accion: 'NO_ENCONTRADO_PARA_ELIMINAR',
+            producto: prodNombre,
+            _uid: nov._uid || ''
+          });
+        }
       } else {
         // INSERTAR_FALTANTE (o por defecto)
         var newId = 'REC-' + new Date().getTime() + '-' + Math.floor(1000 + Math.random() * 9000);
@@ -1165,9 +1318,9 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
 }
 
 // ==============================================================================
-// ELIMINAR RECOLECCIÓN POR ID (v1.4.9)
+// ELIMINAR RECOLECCIÓN POR ID O ID + PRODUCTO (v1.9.8)
 // ==============================================================================
-function eliminarRecoleccionSheet(ss, idTarget) {
+function eliminarRecoleccionSheet(ss, idTarget, productoTarget) {
   try {
     var sheet = ss.getSheetByName("Recolecciones");
     if (!sheet) throw new Error("No existe la pestaña Recolecciones.");
@@ -1179,15 +1332,20 @@ function eliminarRecoleccionSheet(ss, idTarget) {
       throw new Error("Formato de ID no válido para eliminación.");
     }
 
+    productoTarget = String(productoTarget || '').trim();
+
     var lastRow = sheet.getLastRow();
     var deletedCount = 0;
     if (lastRow > 1) {
-      var idColData = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-      for (var r = idColData.length - 1; r >= 0; r--) {
-        var currentId = String(idColData[r][0] || '').trim();
+      var rowsData = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+      for (var r = rowsData.length - 1; r >= 0; r--) {
+        var currentId = String(rowsData[r][0] || '').trim();
+        var currentProd = String(rowsData[r][6] || '').trim();
         if (currentId === idTarget) {
-          sheet.deleteRow(r + 2);
-          deletedCount++;
+          if (!productoTarget || productosCoinciden(currentProd, productoTarget)) {
+            sheet.deleteRow(r + 2);
+            deletedCount++;
+          }
         }
       }
     }
@@ -2198,7 +2356,8 @@ function doPost(e) {
 
     if (action === 'deleteRecoleccion' && ((e && e.parameter && e.parameter.id) || (payload && typeof payload === 'object' && payload.id))) {
       var targetId = (e && e.parameter && e.parameter.id) || payload.id;
-      return eliminarRecoleccionSheet(ss, targetId);
+      var prodTarget = (e && e.parameter && (e.parameter.producto || e.parameter.materia)) || (payload && (payload.producto || payload.materia)) || '';
+      return eliminarRecoleccionSheet(ss, targetId, prodTarget);
     }
 
     if (action === 'updateRecoleccion') {

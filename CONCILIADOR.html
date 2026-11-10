@@ -5246,6 +5246,110 @@
             }
         }
 
+        function toggleSelectorReclasificar(uid) {
+            const el = document.getElementById('selectorReclasificar_' + uid);
+            if (!el) return;
+            const isOpen = el.style.display !== 'none';
+            el.style.display = isOpen ? 'none' : 'flex';
+        }
+
+        function generarOpcionesProductosReclasificar(productoActual, products) {
+            const list = [];
+            const prodActNorm = (productoActual || '').toUpperCase().trim();
+            // 1. Productos presentes en la matriz de la factura
+            (products || []).forEach(p => {
+                const pNorm = (p || '').toUpperCase().trim();
+                if (pNorm && pNorm !== prodActNorm && !list.includes(p)) list.push(p);
+            });
+            // 2. Otros productos oficiales del catálogo
+            CATALOGO_PRODUCTOS_OFICIALES.forEach(p => {
+                const pNorm = (p || '').toUpperCase().trim();
+                if (pNorm && pNorm !== prodActNorm && !list.includes(p)) list.push(p);
+            });
+            return list.map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+
+        function ejecutarReclasificacionDesdeSelector(uid) {
+            const sel = document.getElementById('selectNuevoProd_' + uid);
+            if (!sel || !sel.value) return;
+            const nuevoProd = sel.value;
+            reclasificarNovedadInmediata(uid, nuevoProd);
+        }
+
+        async function reclasificarNovedadInmediata(uid, nuevoProducto) {
+            const nov = mapaNovedadesPorUid[uid];
+            if (!nov) {
+                alert('No se encontró la información del registro para reclasificar.');
+                return;
+            }
+
+            const prodOrig = nov.productoAnterior || nov.producto;
+            const kilosStr = (nov.kilosSistema || nov.kg || nov.kilosProveedor || 0).toLocaleString('es-CO');
+            const fechaStr = nov.fecha || '';
+            const confirmMsg = `¿Deseas reclasificar de inmediato en Google Sheets?\n\n• Fecha: ${fechaStr}\n• Materia actual: "${prodOrig}"\n• Nueva materia: "${nuevoProducto}"\n• Peso: ${kilosStr} Kg\n• Proveedor: ${nov.proveedor || ''}\n\nSe actualizará el precio según la hoja Tarifas y se recalculará el valor total automáticamente.`;
+
+            if (!confirm(confirmMsg)) return;
+
+            const novReclasif = {
+                ...nov,
+                tipoNovedad: 'RECLASIFICAR',
+                productoAnterior: prodOrig,
+                productoNuevo: nuevoProducto,
+                kilos: nov.kilosSistema || nov.kg || nov.kilosProveedor || 0
+            };
+
+            mostrarToastNotificacion(`⏳ Reclasificando "${prodOrig}" ➔ "${nuevoProducto}" en Google Sheets...`, 'info');
+
+            try {
+                const respuesta = await enviarNovedadesConciliacionASheets([novReclasif]);
+                if (respuesta && respuesta.result === 'success') {
+                    actualizarEstadoLocalTrasSincronizacion([novReclasif], respuesta);
+                    mostrarToastNotificacion(`✅ Reclasificado con éxito en Google Sheets: "${prodOrig}" ➔ "${nuevoProducto}" (${kilosStr} Kg).`, 'success');
+                } else {
+                    throw new Error((respuesta && respuesta.error) || 'Respuesta inesperada del servidor');
+                }
+            } catch (err) {
+                alert(`Error al reclasificar en Google Sheets: ${err.message || err.toString()}`);
+            }
+        }
+
+        async function confirmarYEliminarNovedadInmediata(uid) {
+            const nov = mapaNovedadesPorUid[uid];
+            if (!nov) {
+                alert('No se encontró la información del registro para eliminar.');
+                return;
+            }
+
+            const prodOrig = nov.producto;
+            const kilosStr = (nov.kilosSistema || nov.kg || 0).toLocaleString('es-CO');
+            const fechaStr = nov.fecha || '';
+            const idStr = nov.id ? ` [ID: ${nov.id}]` : '';
+            const confirmMsg = `⚠️ ¿Seguro que deseas ELIMINAR definitivamente de Google Sheets este registro erróneo?\n\n• Fecha: ${fechaStr}\n• Materia: "${prodOrig}"\n• Peso: ${kilosStr} Kg${idStr}\n• Proveedor: ${nov.proveedor || ''}\n\nEsta acción borrará la fila de la hoja Recolecciones y no se puede deshacer.`;
+
+            if (!confirm(confirmMsg)) return;
+
+            const novElim = {
+                ...nov,
+                tipoNovedad: 'ELIMINAR',
+                producto: prodOrig,
+                kilos: nov.kilosSistema || nov.kg || 0
+            };
+
+            mostrarToastNotificacion(`⏳ Eliminando "${prodOrig}" (${kilosStr} Kg) de Google Sheets...`, 'info');
+
+            try {
+                const respuesta = await enviarNovedadesConciliacionASheets([novElim]);
+                if (respuesta && respuesta.result === 'success') {
+                    actualizarEstadoLocalTrasSincronizacion([novElim], respuesta);
+                    mostrarToastNotificacion(`✅ Registro de "${prodOrig}" (${kilosStr} Kg) eliminado con éxito de Google Sheets.`, 'success');
+                } else {
+                    throw new Error((respuesta && respuesta.error) || 'Respuesta inesperada del servidor');
+                }
+            } catch (err) {
+                alert(`Error al eliminar de Google Sheets: ${err.message || err.toString()}`);
+            }
+        }
+
         function confirmarYAplicarNovedadIndividual(uid) {
             const nov = mapaNovedadesPorUid[uid];
             if (!nov) {
@@ -5281,11 +5385,25 @@
 
             let filasHtml = listaNovedades.map((nov) => {
                 const esFalt = nov.tipoNovedad === 'FALTANTE';
-                const color = esFalt ? '#ea580c' : '#d97706';
-                const icono = esFalt ? '➕ FALTANTE' : '⚖️ AJUSTE';
-                const detalle = esFalt
-                    ? `Se creará nuevo registro por <strong>${nov.kilosProveedor.toLocaleString('es-CO')} Kg</strong> en Recolecciones.`
-                    : `Se ajustará peso de <strong>${nov.kilosSistema.toLocaleString()} Kg</strong> ➔ <strong>${nov.kilosProveedor.toLocaleString()} Kg</strong> (Δ ${nov.diffKilos > 0 ? '+' : ''}${nov.diffKilos.toFixed(1)} Kg).`;
+                const esReclasif = nov.tipoNovedad === 'RECLASIFICAR';
+                const esElim = nov.tipoNovedad === 'ELIMINAR';
+                let color = esFalt ? '#ea580c' : '#d97706';
+                let icono = esFalt ? '➕ FALTANTE' : '⚖️ AJUSTE';
+                let detalle = '';
+
+                if (esFalt) {
+                    detalle = `Se creará nuevo registro por <strong>${nov.kilosProveedor.toLocaleString('es-CO')} Kg</strong> en Recolecciones.`;
+                } else if (esReclasif) {
+                    color = '#2563eb';
+                    icono = '🔄 RECLASIFICAR';
+                    detalle = `Se cambiará materia de <strong>${nov.productoAnterior || nov.producto}</strong> a <strong>${nov.productoNuevo}</strong> (${(nov.kilosSistema || nov.kg || 0).toLocaleString()} Kg) recalculando precio y total en Sheets.`;
+                } else if (esElim) {
+                    color = '#dc2626';
+                    icono = '🗑️ ELIMINAR';
+                    detalle = `Se eliminará definitivamente de Google Sheets el registro erróneo de <strong>${nov.producto}</strong> (${(nov.kilosSistema || nov.kg || 0).toLocaleString()} Kg).`;
+                } else {
+                    detalle = `Se ajustará peso de <strong>${nov.kilosSistema.toLocaleString()} Kg</strong> ➔ <strong>${nov.kilosProveedor.toLocaleString()} Kg</strong> (Δ ${nov.diffKilos > 0 ? '+' : ''}${nov.diffKilos.toFixed(1)} Kg).`;
+                }
 
                 return `
                     <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px;">
@@ -5429,6 +5547,51 @@
                             recExistente.KG = kgTarget;
                             if (recExistente.PRECIO > 0) recExistente.VALOR = kgTarget * recExistente.PRECIO;
                         }
+                    }
+                } else if (nov.tipoNovedad === 'RECLASIFICAR') {
+                    const prodNuevo = det.productoNuevo || nov.productoNuevo;
+                    const precioFinal = Number(det.precio !== undefined && det.precio !== '' ? det.precio : (det.nuevoPrecio || 0));
+                    let encontrado = false;
+                    if (nov.id) {
+                        const recExistente = rawData.find(r => r.ID === nov.id && (productosCoinciden(r.MATERIA, nov.productoAnterior || nov.producto) || !nov.productoAnterior));
+                        if (recExistente) {
+                            recExistente.MATERIA = prodNuevo;
+                            if (precioFinal > 0) {
+                                recExistente.PRECIO = precioFinal;
+                                recExistente.VALOR = (recExistente.KG || 0) * precioFinal;
+                            }
+                            encontrado = true;
+                        }
+                    }
+                    if (!encontrado) {
+                        const dNov = parsearFechaCeldaUniversal(nov.fecha);
+                        const recExistente = rawData.find(r => {
+                            const dR = parsearFechaCeldaUniversal(r.FECHA);
+                            return dR && dNov && dR.dia === dNov.dia && dR.mes === dNov.mes && dR.anio === dNov.anio && productosCoinciden(r.MATERIA, nov.productoAnterior || nov.producto);
+                        });
+                        if (recExistente) {
+                            recExistente.MATERIA = prodNuevo;
+                            if (precioFinal > 0) {
+                                recExistente.PRECIO = precioFinal;
+                                recExistente.VALOR = (recExistente.KG || 0) * precioFinal;
+                            }
+                        }
+                    }
+                } else if (nov.tipoNovedad === 'ELIMINAR') {
+                    const targetProd = nov.producto || nov.materia;
+                    let idx = -1;
+                    if (nov.id) {
+                        idx = rawData.findIndex(r => r.ID === nov.id && (!targetProd || productosCoinciden(r.MATERIA, targetProd)));
+                    }
+                    if (idx === -1) {
+                        const dNov = parsearFechaCeldaUniversal(nov.fecha);
+                        idx = rawData.findIndex(r => {
+                            const dR = parsearFechaCeldaUniversal(r.FECHA);
+                            return dR && dNov && dR.dia === dNov.dia && dR.mes === dNov.mes && dR.anio === dNov.anio && (!targetProd || productosCoinciden(r.MATERIA, targetProd));
+                        });
+                    }
+                    if (idx !== -1) {
+                        rawData.splice(idx, 1);
                     }
                 }
             });
@@ -6643,7 +6806,7 @@
                 const dInfo = recMeta[rKey] || { dia: Number(rFecha.split('/')[0]) || 1, sortKey: 0 };
                 const precio = recPreciosDia[rKey] || preciosExcelGlobal[rProd] || preciosPlataforma[rProd] || 0;
 
-                sobrantes.push({
+                const novSob = crearObjetoNovedad('SOBRANTE', {
                     dia: dInfo.dia, sortKey: dInfo.sortKey, fecha: rFecha, producto: rProd,
                     kg_proveedor: 0, kg_recoleccion: kgRec,
                     delta_kg: kgRec, precio_unit: precio,
@@ -6651,8 +6814,14 @@
                     delta_valor: kgRec * precio, estado: '🔵 Sobrante en Plataforma',
                     puntoDoc: (recMeta[rKey] ? recMeta[rKey].punto : '') || sucursalActivaLabel || autoInfo.docPunto || '',
                     facturaDoc: '',
-                    obs: 'Registrado en recolecciones pero no aparece cobrado en el Excel del proveedor.'
+                    obs: 'Registrado en recolecciones pero no aparece cobrado en el Excel del proveedor.',
+                    id: (recMeta[rKey] ? recMeta[rKey].id : '') || '',
+                    rKey: rKey,
+                    ruta: (recMeta[rKey] ? recMeta[rKey].ruta : '') || '',
+                    conductor: (recMeta[rKey] ? recMeta[rKey].conductor : '') || '',
+                    proveedor: (recMeta[rKey] ? recMeta[rKey].proveedor : '') || nombreProveedorDisplay
                 });
+                sobrantes.push(novSob);
             }
 
             const mesLabel = mesObjetivo ? `${MESES_NOMBRES_CONC[mesObjetivo]} ${anioObjetivo}` : `Año ${anioObjetivo}`;
@@ -6788,7 +6957,7 @@
                     };
                 }
                 const rowObj = mapPorFecha[fKey];
-                if (it._uid && (it.tipoNovedad === 'FALTANTE' || it.tipoNovedad === 'DESVIACION')) {
+                if (it._uid && (it.tipoNovedad === 'FALTANTE' || it.tipoNovedad === 'DESVIACION' || it.tipoNovedad === 'SOBRANTE')) {
                     if (!rowObj.novedades.some(n => n._uid === it._uid)) {
                         rowObj.novedades.push(it);
                     }
@@ -6974,6 +7143,7 @@
 
                     dRow.novedades.forEach(nov => {
                         const esFaltante = nov.tipoNovedad === 'FALTANTE';
+                        const esSobrante = nov.tipoNovedad === 'SOBRANTE';
                         if (esFaltante) {
                             accionesNovedadesHtml += `
                                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; padding: 4px 8px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px;">
@@ -6983,14 +7153,91 @@
                                     </button>
                                 </div>
                             `;
+                        } else if (esSobrante) {
+                            const candidatas = Object.keys(dRow.celdasPorProducto || {}).filter(prod => {
+                                if (prod === nov.producto) return false;
+                                const c = dRow.celdasPorProducto[prod];
+                                return (c.kg_proveedor > (c.kg_recoleccion || 0)) || (c.estado && (c.estado.includes('Faltante') || c.estado.includes('Pendiente')));
+                            });
+
+                            let btnSmartMatchHtml = '';
+                            if (candidatas.length > 0) {
+                                let mejorCand = candidatas[0];
+                                let menorDelta = Infinity;
+                                candidatas.forEach(cand => {
+                                    const c = dRow.celdasPorProducto[cand];
+                                    const deltaKg = Math.abs((c.kg_proveedor - (c.kg_recoleccion || 0)) - (nov.kilosSistema || nov.kg || 0));
+                                    if (deltaKg < menorDelta) {
+                                        menorDelta = deltaKg;
+                                        mejorCand = cand;
+                                    }
+                                });
+                                const candEsc = mejorCand.replace(/'/g, "\\'");
+                                btnSmartMatchHtml = `
+                                    <button type="button" class="btn-accion-novedad btn-accion-smart-match" onclick="reclasificarNovedadInmediata('${nov._uid}', '${candEsc}')" style="background: #16a34a; color: #ffffff; border: none; padding: 4px 9px; border-radius: 5px; font-size: 0.80em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); white-space: nowrap; transition: transform 0.1s;" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='none'" title="Cambiar '${nov.producto}' por '${mejorCand}' en Google Sheets y cuadrar el día">
+                                        <span>⚡ Reclasificar a "${mejorCand}"</span>
+                                    </button>
+                                `;
+                            }
+
+                            accionesNovedadesHtml += `
+                                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 5px; padding: 6px 8px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                                        <span style="color: #1d4ed8; font-weight: 700; font-size: 0.84em;">🔵 Sobrante: ${(nov.kilosSistema || nov.kg || 0).toLocaleString('es-CO')} Kg ${nov.producto} (no cobrado)</span>
+                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                            ${btnSmartMatchHtml}
+                                            <button type="button" class="btn-accion-novedad btn-accion-reclasificar" onclick="toggleSelectorReclasificar('${nov._uid}')" style="background: #2563eb; color: #ffffff; border: none; padding: 4px 8px; border-radius: 5px; font-size: 0.80em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); white-space: nowrap;" title="Cambiar materia prima en Google Sheets">
+                                                <span>🔄 Reclasificar</span>
+                                            </button>
+                                            <button type="button" class="btn-accion-novedad btn-accion-eliminar" onclick="confirmarYEliminarNovedadInmediata('${nov._uid}')" style="background: #dc2626; color: #ffffff; border: none; padding: 4px 8px; border-radius: 5px; font-size: 0.80em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); white-space: nowrap;" title="Eliminar este registro erróneo de Google Sheets">
+                                                <span>🗑️ Eliminar</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="selectorReclasificar_${nov._uid}" style="display: none; margin-top: 4px; padding: 6px 8px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 5px; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                        <span style="font-size: 0.80em; font-weight: 600; color: #334155;">Reclasificar a:</span>
+                                        <select id="selectNuevoProd_${nov._uid}" style="padding: 3px 6px; font-size: 0.82em; border: 1px solid #94a3b8; border-radius: 4px; background: #fff; font-weight: 600;">
+                                            ${generarOpcionesProductosReclasificar(nov.producto, products)}
+                                        </select>
+                                        <button type="button" onclick="ejecutarReclasificacionDesdeSelector('${nov._uid}')" style="background: #1d4ed8; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.80em; font-weight: 700; cursor: pointer;">
+                                            ✓ Guardar en Sheets
+                                        </button>
+                                        <button type="button" onclick="toggleSelectorReclasificar('${nov._uid}')" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 4px 6px; border-radius: 4px; font-size: 0.78em; cursor: pointer;">
+                                            ✕ Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
                         } else {
                             const sign = nov.diffKilos > 0 ? '+' : '';
                             accionesNovedadesHtml += `
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; padding: 4px 8px; background: #fefce8; border: 1px solid #fef08a; border-radius: 6px;">
-                                    <span style="color: #b45309; font-weight: 700; font-size: 0.84em;">🟡 Dif ${sign}${nov.diffKilos.toFixed(1)} Kg ${nov.producto} (Sis: ${nov.kilosSistema.toLocaleString()} ↔ Prov: ${nov.kilosProveedor.toLocaleString()})</span>
-                                    <button type="button" class="btn-accion-novedad btn-accion-ajustar" onclick="confirmarYAplicarNovedadIndividual('${nov._uid}')" style="background: #d97706; color: #ffffff; border: none; padding: 4px 9px; border-radius: 5px; font-size: 0.80em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); white-space: nowrap; transition: transform 0.1s;" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='none'">
-                                        <span>⚖️ Igualar a Proveedor</span>
-                                    </button>
+                                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 5px; padding: 6px 8px; background: #fefce8; border: 1px solid #fef08a; border-radius: 6px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                                        <span style="color: #b45309; font-weight: 700; font-size: 0.84em;">🟡 Dif ${sign}${nov.diffKilos.toFixed(1)} Kg ${nov.producto} (Sis: ${nov.kilosSistema.toLocaleString()} ↔ Prov: ${nov.kilosProveedor.toLocaleString()})</span>
+                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                            <button type="button" class="btn-accion-novedad btn-accion-ajustar" onclick="confirmarYAplicarNovedadIndividual('${nov._uid}')" style="background: #d97706; color: #ffffff; border: none; padding: 4px 9px; border-radius: 5px; font-size: 0.80em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); white-space: nowrap; transition: transform 0.1s;" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='none'">
+                                                <span>⚖️ Igualar a Proveedor</span>
+                                            </button>
+                                            <button type="button" class="btn-accion-novedad btn-accion-reclasificar" onclick="toggleSelectorReclasificar('${nov._uid}')" style="background: #2563eb; color: #ffffff; border: none; padding: 4px 8px; border-radius: 5px; font-size: 0.80em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); white-space: nowrap;" title="Cambiar materia prima en Google Sheets">
+                                                <span>🔄 Reclasificar</span>
+                                            </button>
+                                            <button type="button" class="btn-accion-novedad btn-accion-eliminar" onclick="confirmarYEliminarNovedadInmediata('${nov._uid}')" style="background: #dc2626; color: #ffffff; border: none; padding: 4px 8px; border-radius: 5px; font-size: 0.80em; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); white-space: nowrap;" title="Eliminar este registro de Google Sheets">
+                                                <span>🗑️ Eliminar</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="selectorReclasificar_${nov._uid}" style="display: none; margin-top: 4px; padding: 6px 8px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 5px; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                        <span style="font-size: 0.80em; font-weight: 600; color: #334155;">Reclasificar a:</span>
+                                        <select id="selectNuevoProd_${nov._uid}" style="padding: 3px 6px; font-size: 0.82em; border: 1px solid #94a3b8; border-radius: 4px; background: #fff; font-weight: 600;">
+                                            ${generarOpcionesProductosReclasificar(nov.producto, products)}
+                                        </select>
+                                        <button type="button" onclick="ejecutarReclasificacionDesdeSelector('${nov._uid}')" style="background: #1d4ed8; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.80em; font-weight: 700; cursor: pointer;">
+                                            ✓ Guardar en Sheets
+                                        </button>
+                                        <button type="button" onclick="toggleSelectorReclasificar('${nov._uid}')" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 4px 6px; border-radius: 4px; font-size: 0.78em; cursor: pointer;">
+                                            ✕ Cancelar
+                                        </button>
+                                    </div>
                                 </div>
                             `;
                         }
