@@ -3919,6 +3919,9 @@ async function enviarAGoogleSheets(data) {
     if (dataLight.fotoFactura && dataLight.fotoFactura.length > 300 && !dataLight.fotoFactura.startsWith('http')) {
         dataLight.fotoFactura = "Foto Factura Registrada";
     }
+    if (dataLight.fotoSoporte && dataLight.fotoSoporte.length > 300 && !dataLight.fotoSoporte.startsWith('http')) {
+        dataLight.fotoSoporte = "Foto Soporte Registrada";
+    }
 
     if (dataLight.ruta) {
         dataLight.ruta = homologarRuta(dataLight.ruta);
@@ -3951,6 +3954,9 @@ async function enviarAGoogleSheets(data) {
             const dataLightGet = { ...dataLight };
             if (dataLightGet.fotoFactura && dataLightGet.fotoFactura.length > 300 && !dataLightGet.fotoFactura.startsWith('http')) {
                 dataLightGet.fotoFactura = "Foto Factura Registrada";
+            }
+            if (dataLightGet.fotoSoporte && dataLightGet.fotoSoporte.length > 300 && !dataLightGet.fotoSoporte.startsWith('http')) {
+                dataLightGet.fotoSoporte = "Foto Soporte Registrada";
             }
             const payloadParamGet = encodeURIComponent(JSON.stringify(dataLightGet));
             const getUrl = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=${actionType}&payload=${payloadParamGet}`;
