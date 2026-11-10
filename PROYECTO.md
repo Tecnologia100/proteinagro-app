@@ -1071,3 +1071,20 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - En Google Sheets (`Code.gs`), `guardarRecoleccionSheet` incorpora automáticamente el prefijo `[Entregó: [Nombre]]` en la columna *Observaciones*, garantizando trazabilidad sin alterar la cuadrícula de fórmulas contables M:N.
 - **Actualización de Service Worker:**
   - Bumping a `proteinagro-v1.9.7` en `sw.js` e `index.html`.
+
+---
+
+### 42. Reclasificación y Eliminación Inmediata de Materias Primas en Conciliador Universal (Opción D - `v1.9.8`)
+- **Problema Abordado:**
+  En campo, los conductores en ocasiones registran un producto con un nombre diferente al facturado por el comercio (ej. registran *Gordana* pero el proveedor factura *Sebo en Rama*). Esto generaba en el Conciliador un sobrante huérfano azul y un faltante naranja en la misma fecha sin herramientas para corregirlo, y registros creados por error en Sheets no podían eliminarse desde la interfaz.
+- **Solución Implementada (Opción D Híbrida con Sincronización Inmediata):**
+  1. *Smart Match 1-Clic para Coincidencias del Mismo Día:*
+     - Si en la misma fecha existe un sobrante de una materia y un faltante/desviación de otra, el sistema despliega el botón inteligente: `⚡ Reclasificar a "[Materia]"`.
+  2. *Selector Rápido de Reclasificación:*
+     - Botón `🔄 Reclasificar` con menú desplegable interactivo que lista primero los productos activos en la factura y a continuación el catálogo oficial de materias primas.
+  3. *Eliminación Directa y Segura de Sheets:*
+     - Botón `🗑️ Eliminar` con diálogo de confirmación detallado que invoca `eliminarRecoleccionSheet` por ID y producto específico, depurando la fila de Google Sheets de inmediato sin tocar otros productos del mismo viaje.
+  4. *Sincronización Inmediata Bidireccional:*
+     - Al confirmar cualquier reclasificación o eliminación, se envía de inmediato al Webhook de Google Apps Script (`aplicarNovedadesConciliacionSheet` / `deleteRecoleccion`).
+     - El backend recalcula el Precio Unitario consultando la pestaña `Tarifas` en memoria, actualiza el Valor Total y añade nota de auditoría en la columna *Observaciones*.
+     - El cliente local actualiza `rawData` y re-ejecuta `ejecutarConciliacionUniversal(false)` sin recargar la página, cuadrando la matriz al instante con notificación toast flotante.

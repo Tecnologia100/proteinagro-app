@@ -751,6 +751,25 @@ i.fecha), consolidándose directamente en la fila de ese día.
 
 ---
 
+### 42. Reclasificación y Eliminación Inmediata de Materias Primas en Conciliador Universal (Opción D - `v1.9.8`)
+- **Problema Diagnosticado:**
+  - En campo, los conductores en ocasiones registran un producto con un nombre diferente al facturado por el comercio (ej. registran *Gordana* pero el proveedor factura *Sebo en Rama*, o *Hueso Blanco* vs *Hueso de Cerdo*).
+  - Esto generaba en el Conciliador un sobrante huérfano azul y un faltante naranja en la misma fecha sin herramientas prácticas para corregirlo.
+  - Asimismo, registros creados por error o pruebas previas en Google Sheets no podían eliminarse desde la interfaz del Conciliador.
+- **Solución Implementada (Opción D Híbrida con Sincronización Inmediata):**
+  1. *Smart Match 1-Clic para Coincidencias del Mismo Día:*
+     - Si en la misma fecha existe un sobrante de una materia y un faltante/desviación de otra, el sistema despliega el botón inteligente: `⚡ Reclasificar a "[Materia]"`.
+  2. *Selector Rápido de Reclasificación:*
+     - Botón `🔄 Reclasificar` con menú desplegable interactivo que lista primero los productos activos en la factura y a continuación el catálogo oficial de materias primas.
+  3. *Eliminación Directa y Segura de Sheets:*
+     - Botón `🗑️ Eliminar` con diálogo de confirmación detallado que invoca `eliminarRecoleccionSheet` por ID y producto específico, depurando la fila de Google Sheets de inmediato sin tocar otros productos del mismo viaje.
+  4. *Sincronización Inmediata Bidireccional:*
+     - Al confirmar cualquier reclasificación o eliminación, se envía de inmediato al Webhook de Google Apps Script (`aplicarNovedadesConciliacionSheet` / `deleteRecoleccion`).
+     - El backend recalcula el Precio Unitario consultando la pestaña `Tarifas` en memoria, actualiza el Valor Total y añade nota de auditoría en la columna *Observaciones*.
+     - El cliente local actualiza `rawData` y re-ejecuta `ejecutarConciliacionUniversal(false)` sin recargar la página, cuadrando la matriz al instante con notificación toast flotante.
+
+---
+
 ## 📦 3. Procedimientos de Respaldo y Despliegue
 
 1. **Despliegue Web:** Cualquier cambio en `app.js`, `index.html`, `styles.css` o `sw.js` se sube con `git add .`, `git commit` y `git push origin main`. Vercel compila y publica en menos de 10 segundos.
