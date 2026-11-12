@@ -4948,6 +4948,11 @@
 
             currentConcWorkbook = wb;
 
+            if (ws.rowCount <= 1 || allLines.length === 0) {
+                alert("⚠️ ATENCIÓN: El archivo PDF \"" + file.name + "\" es una imagen escaneada o fotografía sin capa de texto digital.\n\nEl navegador no puede extraer texto de imágenes escaneadas. Los registros que ves en pantalla provienen únicamente de Google Sheets (Sistema).\n\n👉 Para conciliar este proveedor, arrastra el archivo Excel generado (.xlsx) con los datos del estado de cuenta.");
+                updateStatus("⚠️ PDF escaneado sin texto digital (\"" + file.name + "\"). Arrastre el archivo .xlsx.", "error");
+            }
+
             const selHoja = document.getElementById('concSelectHoja');
             if (selHoja) {
                 selHoja.innerHTML = `<option value="AUTO">✨ Auto-seleccionar pestaña</option>`;
