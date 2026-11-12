@@ -312,9 +312,19 @@ function obtenerRecoleccionesHttp(ss, fechaFiltro, rutaFiltro) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // Desactivar filtros de interfaz que puedan truncar o bloquear GViz/TSV
+    try {
+      var activeFilter = sheet.getFilter();
+      if (activeFilter) {
+        activeFilter.remove();
+      }
+    } catch (eFilt) {
+      Logger.log("Aviso al remover filtro: " + eFilt);
+    }
+
     var lastRow = sheet.getLastRow();
-    // Leer columnas A hasta Q (ID..Observaciones + Numero_Factura, Valor_Factura, Foto_Factura en O, P, Q)
-    var numCols = Math.min(sheet.getLastColumn(), 17);
+    // Leer columnas A hasta T (ID..Observaciones, Precio, Valor, Factura, Soporte)
+    var numCols = Math.min(sheet.getLastColumn(), 21);
     var data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
     var resultado = [];
 
@@ -379,6 +389,11 @@ function obtenerRecoleccionesHttp(ss, fechaFiltro, rutaFiltro) {
         numKg = parseFloat(String(rawKg).replace(/\./g, '').replace(',', '.')) || 0;
       }
 
+      var rawPrecio = row.length > 10 ? row[10] : 0;
+      var numPrecio = typeof rawPrecio === 'number' ? rawPrecio : (parseFloat(String(rawPrecio).replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0);
+      var rawValor = row.length > 11 ? row[11] : 0;
+      var numValor = typeof rawValor === 'number' ? rawValor : (parseFloat(String(rawValor).replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0);
+
       resultado.push({
         id: String(row[0] || ''),
         fechaHora: rawFecha instanceof Date ? Utilities.formatDate(rawFecha, "GMT-5", "d/M/yyyy HH:mm:ss") : String(rawFecha || ''),
@@ -389,9 +404,14 @@ function obtenerRecoleccionesHttp(ss, fechaFiltro, rutaFiltro) {
         materia: String(row[6] || ''),
         totalKilos: numKg,
         observaciones: String(row[8] || ''),
+        precio: numPrecio,
+        valor: numValor,
         numeroFactura: row.length > 14 ? String(row[14] || '').trim() : '',
         valorFactura: row.length > 15 && row[15] !== '' ? (parseFloat(String(row[15]).replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0) : 0,
-        fotoFactura: row.length > 16 ? String(row[16] || '').trim() : ''
+        fotoFactura: row.length > 16 ? String(row[16] || '').trim() : '',
+        tipoSoporte: row.length > 17 ? String(row[17] || '').trim() : '',
+        fotoSoporte: row.length > 18 ? String(row[18] || '').trim() : '',
+        entregadoPor: row.length > 19 ? String(row[19] || '').trim() : ''
       });
     }
 

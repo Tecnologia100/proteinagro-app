@@ -1561,20 +1561,95 @@
             }
         }
 
+        async function fetchDataViaWebhook(btn) {
+            if (cargaDatosCompletada && rawData && rawData.length > 500) return true;
+            updateStatus('⚡ Conectando al Webhook de Google Sheets (Garantía Anti-Filtros)...', 'normal');
+            try {
+                const resp = await fetchWithTimeout(GOOGLE_SHEETS_WEBHOOK_URL + '?action=getRecolecciones&_t=' + Date.now(), 12000);
+                if (resp.ok) {
+                    const json = await resp.json();
+                    if (json && json.result === 'success' && Array.isArray(json.recolecciones) && json.recolecciones.length > 0) {
+                        procesarRecoleccionesWebhook(json.recolecciones, btn, 'Webhook Anti-Filtros');
+                        return true;
+                    }
+                }
+            } catch (eWh) {
+                console.warn("Fallo fetchDataViaWebhook:", eWh);
+            }
+            return false;
+        }
+
+        function procesarRecoleccionesWebhook(recs, btn, origen) {
+            if (timerWatchdogJSONP) { clearTimeout(timerWatchdogJSONP); timerWatchdogJSONP = null; }
+            if (timerSeguridadJSONP) { clearTimeout(timerSeguridadJSONP); timerSeguridadJSONP = null; }
+
+            let data = [];
+            (recs || []).forEach(r => {
+                if (!r) return;
+                const rawProv = String(r.proveedor || '').trim();
+                let fechaRaw = String(r.fechaHora || '').trim();
+                const matRaw = String(r.materia || '').trim();
+                if (!rawProv && !fechaRaw && !matRaw) return;
+
+                const provClean = homologarProveedorCliente(rawProv);
+                const matClean = homologarMateriaCliente(matRaw);
+                const kg = Number(r.totalKilos) || 0;
+                let precio = Number(r.precio) || 0;
+                if (precio > 0 && precio < 20) precio = Math.round(precio * 1000);
+                let val = Number(r.valor) || 0;
+                if ((!val || val < kg * 50) && kg > 0 && precio > 0) val = kg * precio;
+
+                let obsVal = String(r.observaciones || '').trim();
+                let entregadoVal = String(r.entregadoPor || '').trim();
+                let tipoSopVal = String(r.tipoSoporte || '').trim();
+                if (!entregadoVal && obsVal.indexOf('[Entregó:') !== -1) {
+                    const mEnt = obsVal.match(/\[Entregó:\s*([^\]]+)\]/i);
+                    if (mEnt) entregadoVal = mEnt[1].trim();
+                }
+                if (!tipoSopVal && obsVal.indexOf('[Soporte:') !== -1) {
+                    const mSop = obsVal.match(/\[Soporte:\s*([^\]]+)\]/i);
+                    if (mSop) tipoSopVal = mSop[1].trim();
+                }
+
+                data.push({
+                    FECHA: fechaRaw.split(' ')[0],
+                    PROVEEDOR: provClean,
+                    PUNTO: String(r.sucursal || r.punto || '').trim(),
+                    MATERIA: matClean,
+                    KG: kg,
+                    PRECIO: precio,
+                    VALOR: val,
+                    ID: String(r.id || '').trim(),
+                    RUTA: String(r.ruta || '').trim(),
+                    CONDUCTOR: String(r.conductor || '').trim(),
+                    OBSERVACIONES: obsVal,
+                    NUMERO_FACTURA: String(r.numeroFactura || '').trim(),
+                    VALOR_FACTURA: Number(r.valorFactura) || 0,
+                    FOTO_FACTURA: String(r.fotoFactura || '').trim(),
+                    TIPO_SOPORTE: tipoSopVal,
+                    FOTO_SOPORTE: String(r.fotoSoporte || '').trim(),
+                    ENTREGADO_POR: entregadoVal
+                });
+            });
+
+            rawData = filtrarFilasFantasmaTotales(data);
+            depurarYSincronizarProveedores(rawData);
+            applyFilters();
+
+            cargaDatosCompletada = true;
+            isLoading = false;
+            if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Actualizar'; }
+            const now = new Date();
+            updateStatus(`✅ Conexión establecida con Sheets (${origen}): ${now.toLocaleTimeString('es-CO')} | ${rawData.length.toLocaleString('es-CO')} registros`, 'success');
+        }
+
         async function fetchDataDirecto(btn) {
-            if (cargaDatosCompletada && rawData && rawData.length > 0) return;
+            if (cargaDatosCompletada && rawData && rawData.length > 500) return;
             updateStatus('🌐 Conectando directamente con Google Sheets (Modo Sin Filtros)...', 'normal');
 
             const sheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
             const exportTsvUrl = 'https:' + '/' + '/docs.google.com/spreadsheets/d/' + sheetId + '/export?format=tsv&sheet=Recolecciones&_t=' + Date.now();
             const gvizBase = 'https:' + '/' + '/docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?sheet=Recolecciones';
-
-            // Lanzar respaldo JSONP en paralelo tras 1.2s si aún no ha respondido fetch (ideal para iframes de Google Sheets)
-            setTimeout(() => {
-                if (!cargaDatosCompletada && (!rawData || rawData.length === 0)) {
-                    fetchDataViaJSONP(btn, gvizBase);
-                }
-            }, 1200);
 
             // 1. Prioridad 1: Fetch GViz CORS Directo (Ultrarrápido y compatible con iframes)
             try {
@@ -1586,14 +1661,16 @@
                     const end = text.lastIndexOf('}') + 1;
                     if (start !== -1 && end > start) {
                         const json = JSON.parse(text.substring(start, end));
-                        if (json && json.table && json.table.rows && json.table.rows.length > 0) {
+                        if (json && json.table && json.table.rows && json.table.rows.length >= 500) {
                             procesarTablaGviz(json.table, btn, 'CORS Directo');
                             return;
+                        } else if (json && json.table && json.table.rows && json.table.rows.length > 0) {
+                            console.warn("GViz devolvió solo " + json.table.rows.length + " filas (filtro activo en Sheets). Recurriendo al Webhook anti-filtros...");
                         }
                     }
                 }
             } catch(eFetch) {
-                console.warn("fetch() GViz CORS falló o tardó, probando TSV / JSONP...", eFetch);
+                console.warn("fetch() GViz CORS falló o tardó, probando TSV / Webhook...", eFetch);
             }
 
             // 2. Prioridad 2: Exportación TSV Directa
@@ -1602,33 +1679,46 @@
                 if (respTsv.ok) {
                     const tsvText = await respTsv.text();
                     const tableTsv = convertirTsvATablaGviz(tsvText);
-                    if (tableTsv && tableTsv.rows && tableTsv.rows.length > 0) {
+                    if (tableTsv && tableTsv.rows && tableTsv.rows.length >= 500) {
                         procesarTablaGviz(tableTsv, btn, 'Directo Sin Filtros');
                         return;
+                    } else if (tableTsv && tableTsv.rows && tableTsv.rows.length > 0) {
+                        console.warn("TSV devolvió solo " + tableTsv.rows.length + " filas. Recurriendo al Webhook anti-filtros...");
                     }
                 }
             } catch(eTsv) {
-                console.info("Exportación TSV directa no disponible, usando JSONP...");
+                console.info("Exportación TSV directa no disponible, probando Webhook...");
             }
 
-            // 3. Fallback a JSONP
+            // 3. Prioridad 3: Webhook Anti-Filtros (Garantía de lectura total en Sheets)
+            const webhookExitoso = await fetchDataViaWebhook(btn);
+            if (webhookExitoso) return;
+
+            // 4. Fallback a JSONP
             fetchDataViaJSONP(btn, gvizBase);
         }
 
         function fetchDataViaJSONP(btn, gvizBase) {
-            if (cargaDatosCompletada && rawData && rawData.length > 0) return;
+            if (cargaDatosCompletada && rawData && rawData.length > 500) return;
 
             if (timerWatchdogJSONP) clearTimeout(timerWatchdogJSONP);
             timerWatchdogJSONP = setTimeout(() => {
                 if (!cargaDatosCompletada && (!rawData || rawData.length === 0)) {
                     mostrarErrorCarga("Tiempo de espera agotado al conectar con Google Sheets.", btn);
                 }
-            }, 4000);
+            }, 5000);
 
             window.handleGvizData = function(response) {
                 try {
                     if (!response || !response.table) throw new Error("Respuesta inválida de Google Sheets");
-                    procesarTablaGviz(response.table, btn, 'JSONP');
+                    if (response.table.rows && response.table.rows.length >= 500) {
+                        procesarTablaGviz(response.table, btn, 'JSONP');
+                    } else {
+                        console.warn("JSONP devolvió solo " + (response.table.rows ? response.table.rows.length : 0) + " filas. Verificando Webhook...");
+                        fetchDataViaWebhook(btn).then(ok => {
+                            if (!ok) procesarTablaGviz(response.table, btn, 'JSONP (Filas parciales)');
+                        });
+                    }
                 } catch (err) {
                     console.error("Error procesando JSONP:", err);
                     mostrarErrorCarga(err.message, btn);

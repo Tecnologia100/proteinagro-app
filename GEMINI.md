@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** 10 de Noviembre 2026 (Versión 1.9.8)  
+> **Última Actualización:** 12 de Noviembre 2026 (Versión 1.9.9)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -795,6 +795,20 @@ i.fecha), consolidándose directamente en la fila de ese día.
     * Columna I (9): `[Soporte: Báscula / Reloj] [Entregó: Ramón]`
     * Columna N (14) `Alerta`: `✅ OK`
     * Tabla de auditoría de duplicados intacta en columnas U a Z sin fórmulas rotas.
+
+### 16. Blindaje Anti-Filtros de Interfaz y Auditoría de Estados de Cuenta Escaneados (`v1.9.9`)
+- **Diagnóstico Integral de Registros Omitidos:**
+  - *Filtro UI Activo en Google Sheets:* Cuando un usuario aplica un filtro de interfaz en la cuadrícula de Google Sheets, la API de Google Visualization (`/gviz/tq`) y la exportación TSV devuelven únicamente las filas visibles en pantalla (reduciendo la matriz de 4.410 filas a sólo 34 filas), dejando invisible el 99% de la base contable para el Conciliador.
+  - *PDFs Escaneados como Imagen Rasterizada:* Se constató que `GARAY_OCTUBRE.pdf` es un archivo escaneado exclusivamente como imagen bitmap (`/X0 Do`, 0 tokens de texto en `pdf.js`), sin capa de texto seleccionable ni membrete con el nombre del proveedor ("PROTEINAGRO OCTUBRE 2.026").
+- **Blindaje en Conciliador (`CONCILIADOR.html`):**
+  - Si GViz o TSV devuelven `< 500` filas, el Conciliador detecta proactivamente el truncamiento por filtro y conmuta inmediatamente a la Capa 3: Webhook `action=getRecolecciones`, que lee directamente el rango sin verse afectado por filtros de usuario.
+  - Implementación de `fetchDataViaWebhook` y `procesarRecoleccionesWebhook` con mapeo integral de precios, valores y soportes.
+- **Optimización en Backend (`Code.gs`):**
+  - En `obtenerRecoleccionesHttp`, retiro proactivo de filtros de interfaz mediante `var filter = sheet.getFilter(); if (filter) filter.remove();`.
+  - Ampliación del rango de lectura hasta la columna 21 incorporando `precio` (col 10), `valor` (col 11), `tipoSoporte` (col 17), `fotoSoporte` (col 18) y `entregadoPor` (col 19).
+- **Generación y Auditoría Día por Día para Alejandro Garay:**
+  - Archivo estructurado [`Alejandro_Garay_Octubre_2026.xlsx`](./Alejandro_Garay_Octubre_2026.xlsx) con los 35 registros de Hueso y Sebo para conciliación directa.
+  - Conciliación contra las 4.410 filas reales: 20 días coinciden al 100% exacto; se identificaron ausencias en Sheets (01/10 y 16/10), un desfase de fecha (20/10 registrado el 19/10), y variaciones menores en pesaje (15/10, 22/10 y 23/10).
 
 ---
 
