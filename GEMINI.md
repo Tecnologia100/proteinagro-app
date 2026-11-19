@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** 18 de Noviembre 2026 (Versión 1.9.10)  
+> **Última Actualización:** 19 de Noviembre 2026 (Versión 1.9.10)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -829,6 +829,7 @@ i.fecha), consolidándose directamente en la fila de ese día.
   - Corregido `parsePrecioMonedaCliente` (`"$1.300" -> 1300`) y `TARIFAS_REFERENCIA_CARIBE` con cambio automático el `2026-11-23` y separación de `Cavasa`.
   - Protegido `RELOAD_PAGE` / `controllerchange` (`tieneCapturaActivaSinGuardar()`) para no recargar el celular si el conductor tiene productos, fotos o firma sin guardar.
   - Verificado con suite E2E automatizada (`24/24 PASS`) y bumping de caché PWA a `proteinagro-v1.9.10`.
+  - **Fix Tabla Detalle de Registros en `CONCILIADOR.html` (`v1.9.10`):** Definida la función `escapeHtml` faltante en `CONCILIADOR.html` (usada al renderizar badges de `ENTREGADO_POR` / `TIPO_SOPORTE` en `applyFilters`), cuya ausencia lanzaba `ReferenceError` después de actualizar los KPIs (`Total KG`, `Registros Filtrados`) dejando `#tableBody` vacío y el estado bloqueado cuando el filtro incluía registros de noviembre con soporte.
 
 ---
 
