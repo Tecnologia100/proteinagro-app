@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía Tutorial Completa — PWA ProteinAgro (v1.9.9)</title>
+    <style>
+        :root {
+            --emerald-50: #ecfdf5;
+            --emerald-100: #d1fae5;
+            --emerald-200: #a7f3d0;
+            --emerald-600: #059669;
+            --emerald-700: #047857;
+            --emerald-900: #064e3b;
+            --sky-50: #f0f9ff;
+            --sky-100: #e0f2fe;
+            --sky-200: #bae6fd;
+            --sky-600: #0284c7;
+            --sky-800: #075985;
+            --amber-50: #fffbeb;
+            --amber-100: #fef3c7;
+            --amber-200: #fde68a;
+            --amber-600: #d97706;
+            --amber-800: #92400e;
+            --purple-50: #f5f3ff;
+            --purple-100: #ede9fe;
+            --purple-200: #ddd6fe;
+            --purple-600: #7c3aed;
+            --rose-50: #fff1f2;
+            --rose-200: #fecdd3;
+            --rose-600: #e11d48;
+            --rose-800: #9f1239;
+            --slate-50: #f8fafc;
+            --slate-100: #f1f5f9;
+            --slate-200: #e2e8f0;
+            --slate-300: #cbd5e1;
+            --slate-500: #64748b;
+            --slate-700: #334155;
+            --slate-900: #0f172a;
+            --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+            --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
+            --radius: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 84px;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--slate-50);
+            color: var(--slate-900);
+            line-height: 1.65;
+            font-size: 16px;
+        }
+
+        /* Barra Superior Fija */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--slate-200);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .topbar-inner {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .brand-mini {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            font-size: 0.98rem;
+            color: var(--emerald-900);
+            white-space: nowrap;
+        }
+
+        .brand-mini .badge-v {
+            background: var(--emerald-100);
+            color: var(--emerald-700);
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--emerald-200);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 2px 0;
+            scrollbar-width: none;
+        }
+
+        .nav-links::-webkit-scrollbar { display: none; }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--slate-700);
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 8px;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            background: var(--emerald-50);
+            color: var(--emerald-700);
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: none;
+            border-radius: 9px;
+            padding: 8px 13px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.12s, opacity 0.15s, background 0.15s;
+            font-family: inherit;
+        }
+
+        .btn-action:active { transform: scale(0.97); }
+
+        .btn-print {
+            background: var(--emerald-600);
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+        }
+
+        .btn-print:hover { background: var(--emerald-700); }
+
+        .btn-download {
+            background: var(--sky-50);
+            color: var(--sky-800);
+            border: 1px solid var(--sky-200);
+        }
+
+        .btn-download:hover { background: var(--sky-100); }
+
+        /* Contenedor Principal */
+        .container {
+            max-width: 1020px;
+            margin: 0 auto;
+            padding: 28px 18px 64px;
+        }
+
+        section {
+            margin-bottom: 44px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--slate-200);
+        }
+
+        .section-num {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: var(--emerald-600);
+            color: #ffffff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--slate-900);
+            line-height: 1.25;
+        }
+
+        .section-subtitle {
+            font-size: 0.92rem;
+            color: var(--slate-500);
+            margin-top: 2px;
+        }
+
+        /* Portada */
+        .hero {
+            background: linear-gradient(135deg, #064e3b 0%, #059669 65%, #10b981 100%);
+            color: #ffffff;
+            border-radius: 20px;
+            padding: 36px 32px;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 1.35fr 0.9fr;
+            gap: 24px;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.16);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            color: #ecfdf5;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+
+        .hero h1 {
+            font-size: 2.15rem;
+            font-weight: 900;
+            line-height: 1.15;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .hero p.lead {
+            font-size: 1.05rem;
+            color: #ecfdf5;
+            margin-bottom: 18px;
+            opacity: 0.96;
+        }
+
+        .hero-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 0.82rem;
+            color: #d1fae5;
+        }
+
+        .hero-meta span {
+            background: rgba(0, 0, 0, 0.18);
+            padding: 4px 10px;
+            border-radius: 8px;
+        }
+
+        .hero-illustration {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        /* Tarjetas y Grillas */
+        .card {
+            background: #ffffff;
+            border: 1px solid var(--slate-200);
+            border-radius: var(--radius);
+            padding: 22px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 18px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .key-point-card {
+            background: #ffffff;
+            border: 1px solid var(--slate-200);
+            border-top: 4px solid var(--emerald-600);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .key-point-icon {
+            font-size: 1.9rem;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        .key-point-card h3 {
+            font-size: 1.05rem;
+            font-weight: 800;
+            margin-bottom: 6px;
+            color: var(--slate-900);
+        }
+
+        .key-point-card p {
+            font-size: 0.92rem;
+            color: var(--slate-700);
+        }
+
+        /* Callouts: Analogías, Tips, Ejemplos, Advertencias */
+        .callout {
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin: 14px 0;
+            font-size: 0.93rem;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .callout-icon {
+            font-size: 1.35rem;
+            line-height: 1.2;
+            flex-shrink: 0;
+        }
+
+        .callout-analogy {
+            background: var(--sky-50);
+            border: 1px solid var(--sky-200);
+            color: var(--sky-800);
+        }
+
+        .callout-tip {
+            background: var(--emerald-50);
+            border: 1px solid var(--emerald-200);
+            color: var(--emerald-900);
+        }
+
+        .callout-example {
+            background: var(--amber-50);
+            border: 1px solid var(--amber-200);
+            color: var(--amber-800);
+        }
+
+        .callout-warn {
+            background: var(--rose-50);
+            border: 1px solid var(--rose-200);
+            color: var(--rose-800);
+        }
+
+        .callout-purple {
+            background: var(--purple-50);
+            border: 1px solid var(--purple-200);
+            color: #4c1d95;
+        }
+
+        /* Diagrama SVG y Flujo */
+        .diagram-box {
+            background: #ffffff;
+            border: 1px solid var(--slate-200);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            overflow-x: auto;
+        }
+
+        /* Mockups de Interfaz */
+        .phone-mockup {
+            background: var(--slate-50);
+            border: 2px solid var(--slate-300);
+            border-radius: 18px;
+            padding: 14px;
+            font-size: 0.85rem;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        .mock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid var(--slate-200);
+            padding: 8px 12px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 999px;
+        }
+
+        .badge-green { background: var(--emerald-100); color: var(--emerald-700); border: 1px solid var(--emerald-200); }
+        .badge-red { background: var(--rose-50); color: var(--rose-600); border: 1px solid var(--rose-200); }
+        .badge-amber { background: var(--amber-100); color: var(--amber-800); border: 1px solid var(--amber-200); }
+        .badge-blue { background: var(--sky-100); color: var(--sky-800); border: 1px solid var(--sky-200); }
+        .badge-purple { background: var(--purple-100); color: var(--purple-600); border: 1px solid var(--purple-200); }
+
+        .mock-btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .mock-prod-btn {
+            background: #ffffff;
+            border: 2px solid var(--slate-200);
+            border-radius: 10px;
+            padding: 9px 8px;
+            font-weight: 700;
+            font-size: 0.78rem;
+            text-align: center;
+            color: var(--slate-900);
+        }
+
+        .mock-prod-btn.frecuente {
+            border-color: #10b981;
+            background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+        }
+
+        .mock-prod-btn.active {
+            background: var(--emerald-600);
+            border-color: var(--emerald-700);
+            color: #ffffff;
+        }
+
+        .quick-atados-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .quick-atado-pill {
+            flex: 1;
+            text-align: center;
+            padding: 8px 0;
+            border-radius: 8px;
+            border: 2px solid var(--amber-200);
+            background: var(--amber-50);
+            color: var(--amber-800);
+            font-weight: 800;
+        }
+
+        .quick-atado-pill.sel {
+            background: var(--amber-600);
+            border-color: var(--amber-600);
+            color: #ffffff;
+        }
+
+        /* Pasos Numerados */
+        .step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .step-item {
+            display: flex;
+            gap: 16px;
+            background: #ffffff;
+            border: 1px solid var(--slate-200);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            align-items: flex-start;
+        }
+
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--emerald-600);
+            color: #ffffff;
+            font-weight: 900;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .step-body h3 {
+            font-size: 1.08rem;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        /* Filtro por Rol en Funciones */
+        .role-filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .role-tab {
+            border: 2px solid var(--slate-200);
+            background: #ffffff;
+            color: var(--slate-700);
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 0.88rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s ease;
+        }
+
+        .role-tab.active {
+            background: var(--emerald-600);
+            border-color: var(--emerald-600);
+            color: #ffffff;
+        }
+
+        .role-divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 24px 0 14px;
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--slate-900);
+        }
+
+        .role-divider span.tag {
+            font-size: 0.78rem;
+            padding: 3px 10px;
+            border-radius: 8px;
+        }
+
+        /* Tabla Comparativa */
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--slate-200);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .compare-table th {
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 0.95rem;
+            font-weight: 800;
+        }
+
+        .compare-table th.do-col {
+            background: var(--emerald-50);
+            color: var(--emerald-900);
+            border-bottom: 2px solid var(--emerald-200);
+            width: 50%;
+        }
+
+        .compare-table th.dont-col {
+            background: var(--rose-50);
+            color: var(--rose-800);
+            border-bottom: 2px solid var(--rose-200);
+            width: 50%;
+        }
+
+        .compare-table td {
+            padding: 13px 16px;
+            border-bottom: 1px solid var(--slate-100);
+            vertical-align: top;
+            font-size: 0.92rem;
+        }
+
+        .compare-table tr:last-child td { border-bottom: none; }
+
+        /* Acordeón FAQ */
+        .faq-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        details.faq-item {
+            background: #ffffff;
+            border: 1px solid var(--slate-200);
+            border-radius: 12px;
+            padding: 14px 18px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        details.faq-item summary {
+            font-weight: 800;
+            font-size: 0.98rem;
+            color: var(--slate-900);
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        details.faq-item summary::-webkit-details-marker { display: none; }
+
+        details.faq-item summary::after {
+            content: '+';
+            font-size: 1.3rem;
+            color: var(--emerald-600);
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        details.faq-item[open] summary::after {
+            content: '−';
+        }
+
+        details.faq-item .faq-answer {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--slate-100);
+            color: var(--slate-700);
+            font-size: 0.93rem;
+        }
+
+        /* Glosario compacto */
+        .glossary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .glossary-card {
+            background: var(--slate-50);
+            border: 1px solid var(--slate-200);
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .glossary-card strong {
+            display: block;
+            color: var(--emerald-700);
+            margin-bottom: 4px;
+            font-size: 0.95rem;
+        }
+
+        .glossary-card p {
+            font-size: 0.88rem;
+            color: var(--slate-700);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            color: var(--slate-500);
+            font-size: 0.85rem;
+            padding: 24px 18px 40px;
+            border-top: 1px solid var(--slate-200);
+            max-width: 1020px;
+            margin: 0 auto;
+        }
+
+        /* Responsivo */
+        @media (max-width: 820px) {
+            .hero-grid, .grid-3, .grid-2 {
+                grid-template-columns: 1fr;
+            }
+            .hero { padding: 26px 20px; }
+            .hero h1 { font-size: 1.7rem; }
+            .compare-table, .compare-table thead, .compare-table tbody, .compare-table tr, .compare-table th, .compare-table td {
+                display: block;
+                width: 100% !important;
+            }
+            .compare-table th.dont-col { display: none; }
+            .compare-table td:last-child { background: #fffafa; }
+        }
+
+        /* Estilos de Impresión / Guardar como PDF */
+        @media print {
+            body {
+                background: #ffffff;
+                font-size: 11pt;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .container {
+                max-width: 100%;
+                padding: 0;
+            }
+            .hero {
+                background: #065f46 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .card, .step-item, .key-point-card, details.faq-item, .callout, .diagram-box {
+                break-inside: avoid;
+                box-shadow: none !important;
+            }
+            .feature-block {
+                display: block !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Barra Superior de Navegación y Descarga / PDF -->
+    <header class="topbar no-print">
+        <div class="topbar-inner">
+            <div class="brand-mini">
+                <span>🌿 ProteinAgro PWA</span>
+                <span class="badge-v">Guía v1.9.9</span>
+            </div>
+
+            <nav class="nav-links" aria-label="Índice rápido">
+                <a href="#portada">Inicio</a>
+                <a href="#como-funciona">Cómo funciona</a>
+                <a href="#primeros-pasos">Primeros pasos</a>
+                <a href="#funciones">Funciones</a>
+                <a href="#consejos">Qué hacer / evitar</a>
+                <a href="#faq">Dudas</a>
+            </nav>
+
+            <div class="topbar-actions">
+                <button type="button" class="btn-action btn-print" onclick="imprimirGuiaPDF()">
+                    🖨️ Imprimir / Guardar PDF
+                </button>
+                <button type="button" class="btn-action btn-download" onclick="descargarGuiaHTML()">
+                    ⬇️ Descargar HTML5
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- 1. PORTADA E INTRODUCCIÓN RÁPIDA -->
+        <section id="portada">
+            <div class="hero">
+                <div class="hero-grid">
+                    <div>
+                        <div class="hero-pill">📘 Manual Práctico Actualizado · Versión 1.9.9</div>
+                        <h1>Cómo usar la App de Recolección ProteinAgro</h1>
+                        <p class="lead">
+                            Tu libreta digital en el celular para registrar recolecciones en carnicerías, supermercados y plantas, entregar comprobantes al instante y llevar cuentas claras en la oficina, incluso cuando se va el internet.
+                        </p>
+                        <div class="hero-meta">
+                            <span>📅 Vigente al: 18 de noviembre de 2026</span>
+                            <span>🌐 Web: proteinagro-app.vercel.app</span>
+                            <span>👥 Para Conductores y Oficina</span>
+                        </div>
+                    </div>
+
+                    <div class="hero-illustration" aria-hidden="true">
+                        <!-- Ilustración SVG autocontenida -->
+                        <svg viewBox="0 0 260 190" width="100%" height="170" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Camión -->
+                            <rect x="18" y="88" width="94" height="52" rx="8" fill="#ffffff" fill-opacity="0.95"/>
+                            <path d="M112 102 H142 L152 120 V140 H112 Z" fill="#d1fae5"/>
+                            <rect x="120" y="108" width="20" height="14" rx="3" fill="#065f46"/>
+                            <circle cx="44" cy="144" r="12" fill="#0f172a"/>
+                            <circle cx="44" cy="144" r="5" fill="#cbd5e1"/>
+                            <circle cx="130" cy="144" r="12" fill="#0f172a"/>
+                            <circle cx="130" cy="144" r="5" fill="#cbd5e1"/>
+                            <text x="65" y="119" text-anchor="middle" font-size="11" font-weight="800" fill="#059669" font-family="sans-serif">RUTA</text>
+                            <!-- Ondas de conexión -->
+                            <path d="M158 76 Q170 64 182 76" stroke="#fde68a" stroke-width="3" fill="none" stroke-linecap="round"/>
+                            <path d="M152 66 Q170 48 188 66" stroke="#fde68a" stroke-width="3" fill="none" stroke-linecap="round"/>
+                            <!-- Celular / Tabla -->
+                            <rect x="182" y="34" width="62" height="114" rx="12" fill="#0f172a" stroke="#a7f3d0" stroke-width="2"/>
+                            <rect x="188" y="46" width="50" height="88" rx="6" fill="#ffffff"/>
+                            <rect x="194" y="54" width="38" height="10" rx="3" fill="#059669"/>
+                            <rect x="194" y="70" width="38" height="8" rx="3" fill="#e2e8f0"/>
+                            <rect x="194" y="83" width="26" height="8" rx="3" fill="#e2e8f0"/>
+                            <rect x="194" y="98" width="38" height="22" rx="5" fill="#ecfdf5" stroke="#10b981"/>
+                            <text x="213" y="113" text-anchor="middle" font-size="10" font-weight="800" fill="#059669" font-family="sans-serif">✓ LISTO</text>
+                        </svg>
+                        <div style="font-size: 0.8rem; color: #ecfdf5; font-weight: 600;">Del camión a la oficina en segundos</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 18px;">
+                <h2 style="font-size: 1.15rem; font-weight: 800; margin-bottom: 8px;">¿Qué problema resuelve ProteinAgro?</h2>
+                <p style="color: var(--slate-700); margin-bottom: 10px;">
+                    Antes, el conductor anotaba los kilos en una planilla de papel que podía mojarse, perderse o quedar con letra poco clara, y luego alguien en oficina tenía que volver a digitar todo en el computador.
+                    <strong>La PWA de ProteinAgro elimina el papel y la doble digitación.</strong>
+                </p>
+
+                <div class="callout callout-analogy">
+                    <span class="callout-icon">💡</span>
+                    <div>
+                        <strong>¿Qué significa “PWA”? (En palabras simples):</strong>
+                        Es una página web diseñada para comportarse como una aplicación instalada en tu celular. Es como tener una <em>libreta inteligente</em> en la pantalla de inicio: casi no ocupa espacio y cuando hay mejoras, se actualiza sin tener que ir a la tienda de aplicaciones.
+                    </div>
+                </div>
+
+                <div class="grid-3" style="margin-top: 16px;">
+                    <div class="key-point-card">
+                        <span class="key-point-icon">🚚</span>
+                        <h3>1. Registro fácil en campo</h3>
+                        <p>Eliges la tienda, tocas el producto con botones grandes, anotas kilos o atados, tomas foto de soporte y el encargado firma en tu pantalla.</p>
+                    </div>
+                    <div class="key-point-card" style="border-top-color: var(--sky-600);">
+                        <span class="key-point-icon">📲</span>
+                        <h3>2. Recibo inmediato al cliente</h3>
+                        <p>Apenas guardas, se genera un comprobante digital con número único que puedes enviar al instante por WhatsApp o imprimir.</p>
+                    </div>
+                    <div class="key-point-card" style="border-top-color: var(--purple-600);">
+                        <span class="key-point-icon">📊</span>
+                        <h3>3. Cuentas y cierres al día</h3>
+                        <p>La oficina ve las recolecciones en vivo, revisa el Cierre Diario de cada ruta y liquida precios automáticamente en Google Sheets.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. CÓMO FUNCIONA (VISIÓN GENERAL) -->
+        <section id="como-funciona">
+            <div class="section-header">
+                <span class="section-num">2</span>
+                <div>
+                    <h2 class="section-title">Cómo funciona (Visión General)</h2>
+                    <p class="section-subtitle">El viaje completo de cada recolección: desde que pesas en la tienda hasta la contabilidad</p>
+                </div>
+            </div>
+
+            <div class="diagram-box">
+                <svg viewBox="0 0 880 230" width="100%" style="min-width: 640px;" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Bloque 1: ENTRADA -->
+                    <rect x="10" y="20" width="250" height="190" rx="14" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+                    <text x="135" y="48" text-anchor="middle" font-size="14" font-weight="800" fill="#065f46" font-family="sans-serif">1. ENTRADA (Conductor)</text>
+                    <text x="28" y="78" font-size="12.5" fill="#334155" font-family="sans-serif">• Elige Ruta, Proveedor y Punto</text>
+                    <text x="28" y="102" font-size="12.5" fill="#334155" font-family="sans-serif">• Toca el material (Kg o Atados)</text>
+                    <text x="28" y="126" font-size="12.5" fill="#334155" font-family="sans-serif">• Toma foto de báscula / factura</text>
+                    <text x="28" y="150" font-size="12.5" fill="#334155" font-family="sans-serif">• Firma y confirma quien entrega</text>
+                    <rect x="28" y="168" width="214" height="26" rx="6" fill="#059669"/>
+                    <text x="135" y="185" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff" font-family="sans-serif">O reporta Visita Fallida (0 Kg)</text>
+
+                    <!-- Flecha 1 -->
+                    <path d="M266 115 H304" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>
+                    <polygon points="302,108 315,115 302,122" fill="#64748b"/>
+
+                    <!-- Bloque 2: PROCESO -->
+                    <rect x="318" y="20" width="246" height="190" rx="14" fill="#f0f9ff" stroke="#0284c7" stroke-width="2"/>
+                    <text x="441" y="48" text-anchor="middle" font-size="14" font-weight="800" fill="#075985" font-family="sans-serif">2. PROCESO (Automático)</text>
+                    <text x="334" y="78" font-size="12.5" fill="#334155" font-family="sans-serif">• Guarda copia en el celular</text>
+                    <text x="334" y="102" font-size="12.5" fill="#334155" font-family="sans-serif">• Si hay señal, sube a la Nube</text>
+                    <text x="334" y="126" font-size="12.5" fill="#334155" font-family="sans-serif">• Revisa alertas (kg altos / atados)</text>
+                    <text x="334" y="150" font-size="12.5" fill="#334155" font-family="sans-serif">• Oficina calcula tarifas en Sheets</text>
+                    <rect x="334" y="168" width="214" height="26" rx="6" fill="#0284c7"/>
+                    <text x="441" y="185" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff" font-family="sans-serif">🔒 Conductor nunca ve precios</text>
+
+                    <!-- Flecha 2 -->
+                    <path d="M570 115 H608" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>
+                    <polygon points="606,108 619,115 606,122" fill="#64748b"/>
+
+                    <!-- Bloque 3: RESULTADO -->
+                    <rect x="622" y="20" width="248" height="190" rx="14" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2"/>
+                    <text x="746" y="48" text-anchor="middle" font-size="14" font-weight="800" fill="#4c1d95" font-family="sans-serif">3. RESULTADO (Beneficios)</text>
+                    <text x="638" y="78" font-size="12.5" fill="#334155" font-family="sans-serif">• Recibo digital y WhatsApp</text>
+                    <text x="638" y="102" font-size="12.5" fill="#334155" font-family="sans-serif">• Panel en vivo para oficina</text>
+                    <text x="638" y="126" font-size="12.5" fill="#334155" font-family="sans-serif">• Cierre Diario con semáforo</text>
+                    <text x="638" y="150" font-size="12.5" fill="#334155" font-family="sans-serif">• Hoja contable lista sin digitar</text>
+                    <rect x="638" y="168" width="216" height="26" rx="6" fill="#7c3aed"/>
+                    <text x="746" y="185" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff" font-family="sans-serif">✓ Cero pérdida de datos</text>
+                </svg>
+            </div>
+
+            <div class="callout callout-tip" style="margin-top: 16px;">
+                <span class="callout-icon">🔒</span>
+                <div>
+                    <strong>Regla de Oro sobre los precios:</strong> En la pantalla del conductor <strong>no aparecen precios ni valores en pesos</strong>. El conductor solo registra pesos, atados y evidencias; los precios por kilo y los totales en dinero los calcula automáticamente el sistema interno en Google Sheets según las tarifas oficiales de la empresa. <em>(La única excepción es en Supermercados Caribe, donde se digita el valor de la factura impresa que entrega la tienda para poder compararla en oficina).</em>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="font-size: 1.05rem; font-weight: 800; margin-bottom: 6px;">🗣️ Palabras clave explicadas sin enredos</h3>
+                <div class="glossary-grid">
+                    <div class="glossary-card">
+                        <strong>📶 Modo Offline (Sin conexión)</strong>
+                        <p>Es como anotar un pedido en tu libreta cuando entras a un sótano sin señal: no se pierde nada. Apenas sales a la calle y vuelve el internet, el celular entrega los datos solo.</p>
+                    </div>
+                    <div class="glossary-card">
+                        <strong>🔄 Sincronizar</strong>
+                        <p>Es el momento en que tu celular “pone al día” a la oficina, enviando lo que guardaste mientras estabas sin señal y bajando listas nuevas de rutas o productos.</p>
+                    </div>
+                    <div class="glossary-card">
+                        <strong>☁️ La Nube / Google Sheets</strong>
+                        <p>Es como una carpeta mágica compartida: lo que guardas desde la ruta en tu teléfono aparece al instante en las tablas del computador de oficina.</p>
+                    </div>
+                    <div class="glossary-card">
+                        <strong>🔄 Caché (Botón de versión v1.9.9)</strong>
+                        <p>El celular guarda una copia rápida de la app para abrir veloz. Si hubo cambios hoy, tocar <strong>🔄 v1.9.9</strong> es como cambiar el folleto viejo de la guantera por el nuevo.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. PRIMEROS PASOS -->
+        <section id="primeros-pasos">
+            <div class="section-header">
+                <span class="section-num">3</span>
+                <div>
+                    <h2 class="section-title">Primeros pasos (Desde cero)</h2>
+                    <p class="section-subtitle">Lo que debes hacer la primera vez y cada mañana antes de arrancar</p>
+                </div>
+            </div>
+
+            <div class="step-list">
+                <div class="step-item">
+                    <div class="step-circle">1</div>
+                    <div class="step-body" style="flex: 1;">
+                        <h3>Abre el enlace e instala el ícono en tu celular</h3>
+                        <p>Entra desde el navegador de tu teléfono (Google Chrome o Safari) a la dirección oficial de ProteinAgro. En la pantalla inicial verás el botón <strong>📲 Instalar App en el Celular</strong>: tócalo para que quede como un ícono directo en tu pantalla de inicio.</p>
+                        <div class="callout callout-tip" style="margin-bottom: 0;">
+                            <span class="callout-icon">📱</span>
+                            <div><strong>Si usas iPhone (Safari):</strong> Toca el botón de compartir (cuadro con flecha hacia arriba) y elige <em>"Agregar a pantalla de inicio"</em>.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-item">
+                    <div class="step-circle">2</div>
+                    <div class="step-body" style="flex: 1;">
+                        <h3>Verifica que estés en la versión actual (<span class="badge badge-green">v1.9.9</span>)</h3>
+                        <p>En la parte de arriba de la app aparece el botoncito verde/azul con el número de versión (por ejemplo, <strong>🔄 v1.9.9</strong>). Si te avisan en oficina que hubo una mejora y no la ves todavía, toca ese botón (o el texto <em>“¿En PC o celular y no ves cambios? Clic aquí”</em> en la entrada) y la app se refrescará al instante.</p>
+                    </div>
+                </div>
+
+                <div class="step-item">
+                    <div class="step-circle">3</div>
+                    <div class="step-body" style="flex: 1;">
+                        <h3>Inicia sesión según tu trabajo</h3>
+                        <div class="grid-2" style="margin-top: 10px;">
+                            <div class="phone-mockup">
+                                <div style="font-weight: 800; color: var(--emerald-700); margin-bottom: 6px;">🚚 Si eres Conductor</div>
+                                <p style="margin-bottom: 6px;">1. En <strong>Conductor</strong>, busca y elige tu nombre.</p>
+                                <p style="margin-bottom: 6px;">2. Escribe tu <strong>PIN / Contraseña</strong> personal.</p>
+                                <p style="margin-bottom: 8px;">3. Toca <strong>Ingresar a Ruta</strong>.</p>
+                                <span class="badge badge-green">🔒 Tu nombre queda fijado por seguridad</span>
+                            </div>
+                            <div class="phone-mockup">
+                                <div style="font-weight: 800; color: var(--sky-800); margin-bottom: 6px;">👑 Si eres de Oficina / Admin</div>
+                                <p style="margin-bottom: 6px;">1. Toca <strong>🔐 Acceso Administrativo</strong>.</p>
+                                <p style="margin-bottom: 6px;">2. Deja el usuario <code>admin</code> (o tu correo autorizado).</p>
+                                <p style="margin-bottom: 8px;">3. Ingresa la clave de oficina y toca <strong>Ingresar al Panel</strong>.</p>
+                                <span class="badge badge-blue">📊 Abre gráficas, cierres y tabla en vivo</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-item">
+                    <div class="step-circle">4</div>
+                    <div class="step-body" style="flex: 1;">
+                        <h3>Revisa el semáforo de señal y la ruta del día</h3>
+                        <p>Arriba verás el indicador de internet: <span class="badge badge-green">● Conectado</span> si tienes datos o Wi-Fi, o <span class="badge badge-red">● Sin conexión (Guardado Local)</span> si estás en una zona sin cobertura. Justo debajo verás el cuadro azul <strong>📅 Hoy es [Día]</strong> recordándote las rutas habituales de esa jornada.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. FUNCIONES PRINCIPALES ILUSTRADAS -->
+        <section id="funciones">
+            <div class="section-header">
+                <span class="section-num">4</span>
+                <div>
+                    <h2 class="section-title">Funciones principales ilustradas</h2>
+                    <p class="section-subtitle">Guía visual de cada herramienta cotidiana tanto en ruta como en oficina</p>
+                </div>
+            </div>
+
+            <!-- Filtro interactivo de rol -->
+            <div class="role-filter-bar no-print">
+                <button type="button" class="role-tab active" data-filter="all" onclick="filtrarRol('all', this)">👀 Ver Todas las Funciones</button>
+                <button type="button" class="role-tab" data-filter="driver" onclick="filtrarRol('driver', this)">🚚 Solo Conductor en Ruta</button>
+                <button type="button" class="role-tab" data-filter="admin" onclick="filtrarRol('admin', this)">🖥️ Solo Oficina / Administrador</button>
+            </div>
+
+            <!-- BLOQUE A: CONDUCTORES -->
+            <div class="feature-block" data-role="driver">
+                <div class="role-divider">
+                    <span>🚚 En la Ruta (Para Conductores)</span>
+                    <span class="tag badge-green">Paso a paso en el punto</span>
+                </div>
+
+                <!-- A1: Ruta, Proveedor y Punto -->
+                <div class="card">
+                    <h3 style="font-size: 1.12rem; font-weight: 800; margin-bottom: 8px;">A. Seleccionar Ruta, Proveedor y el Punto Obligatorio</h3>
+                    <p style="color: var(--slate-700);">
+                        Al elegir tu <strong>Ruta de Recolección</strong> (Rutas 1 a 7 o Planta San Joaquín), la lista de proveedores se ordena automáticamente para mostrarte primero los de tu ruta marcados con estrella (<strong>⭐ EN TU RUTA PROGRAMADA</strong>) y debajo el resto del catálogo. Si la ruta tiene horarios sugeridos (6:00 AM a 3:30 PM), aparece la guía de paradas con botón <strong>Seleccionar</strong>.
+                    </p>
+                    <div class="callout callout-example">
+                        <span class="callout-icon">📌</span>
+                        <div>
+                            <strong>Ejemplo práctico (Cavasa o Santa Elena):</strong> Si un proveedor tiene una sola sede, la app la elige sola para ahorrarte un toque. Si tiene varias (por ejemplo, <em>Supermercados Caribe</em> tiene Jamundí Centro, Principal, Terranova, etc.), debes elegir exactamente en cuál estás. <strong>Si no eliges el Punto / Lugar, la app no te dejará tocar productos ni guardar</strong>: así se evita que los kilos de una sucursal se le cobren a otra.
+                        </div>
+                    </div>
+                    <p style="font-size: 0.9rem; color: var(--slate-700);">
+                        ¿Llegaste a un cliente o sede nueva que no está en la lista? Elige <strong>➕ Otro Proveedor No Listado...</strong> o <strong>➕ Otro Punto / Sucursal...</strong> y escribe el nombre a mano.
+                    </p>
+                </div>
+
+                <!-- A2: Catálogo Inteligente por Proveedor y Alta Rápida -->
+                <div class="card">
+                    <div class="grid-2" style="align-items: center;">
+                        <div>
+                            <h3 style="font-size: 1.12rem; font-weight: 800; margin-bottom: 8px;">B. Productos Filtrados por Proveedor y Alta Rápida</h3>
+                            <p style="color: var(--slate-700); margin-bottom: 10px;">
+                                En lugar de obligarte a buscar entre 22 botones cada vez, apenas eliges el proveedor la app muestra arriba sus <strong>materias primas frecuentes</strong> resaltadas con borde verde y estrella <strong>⭐</strong>.
+                            </p>
+                            <p style="color: var(--slate-700); margin-bottom: 10px;">
+                                • ¿Necesitas otro producto que ya existe en ProteinAgro? Toca <strong>Ver todo el catálogo (22) ▾</strong>.<br>
+                                • ¿El cliente te entregó un material que nunca había entregado antes? Toca <strong>➕ Otro Material / Nuevo</strong>: escribes o eliges el nombre, marcas si es en <strong>KG</strong> o <strong>Atados</strong>, y queda listo para usar al instante (sin pedirte ningún precio).
+                            </p>
+                        </div>
+                        <div class="phone-mockup">
+                            <div class="mock-header">
+                                <span>Producto Recolectado</span>
+                                <span class="badge badge-green">➕ Otro Material / Nuevo</span>
+                            </div>
+                            <div style="background: #ffffff; border: 1px solid var(--slate-200); border-radius: 8px; padding: 6px 10px; font-size: 0.76rem; display: flex; justify-content: space-between; align-items: center;">
+                                <span>⭐ <strong>5 materias primas de Caribe</strong></span>
+                                <span style="color: var(--sky-600); font-weight: 700;">Ver todo (22) ▾</span>
+                            </div>
+                            <div class="mock-btn-grid">
+                                <div class="mock-prod-btn frecuente active">🗑️ DESPERDICIO ⭐</div>
+                                <div class="mock-prod-btn frecuente">🦴 HUESO BLANCO ⭐</div>
+                                <div class="mock-prod-btn frecuente">🐷 HUESO CERDO ⭐</div>
+                                <div class="mock-prod-btn frecuente">🐔 PIEL POLLO ⭐</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- A3: Kilos vs Atados de Leña -->
+                <div class="card">
+                    <div class="grid-2" style="align-items: center;">
+                        <div>
+                            <h3 style="font-size: 1.12rem; font-weight: 800; margin-bottom: 8px;">C. Pesar por Kilos (<span class="badge badge-blue">KG</span>) vs Leña (<span class="badge badge-amber">ATADOS</span>)</h3>
+                            <p style="color: var(--slate-700); margin-bottom: 10px;">
+                                Cada material usa su unidad correcta y <strong>nunca se mezclan kilos de carne con atados de leña</strong>:
+                            </p>
+                            <ul style="padding-left: 18px; color: var(--slate-700); font-size: 0.92rem;">
+                                <li style="margin-bottom: 6px;"><strong>Productos normales (KG):</strong> Escribe el peso (acepta decimales, como <code>66,5</code>) y toca <strong>➕ Registrar producto</strong>. Si escribes más de <strong>2.500 kg</strong> en un ítem (o <strong>10.000 kg</strong> en el viaje), la app te preguntará <em>“¿Estás seguro?”</em> para atrapar errores de dedo (como escribir <code>40.000</code> en vez de <code>40</code>).</li>
+                                <li><strong>🪵 LEÑA (Atados):</strong> La pantalla cambia a color ámbar y muestra botones del <strong>1 al 5</strong> para tocar con un dedo sin abrir el teclado. Por regla operativa, <strong>el máximo permitido es 5 atados por viaje</strong>.</li>
+                            </ul>
+                        </div>
+                        <div class="phone-mockup">
+                            <div style="font-weight: 700; margin-bottom: 6px;">Cantidad (Atados) — 🪵 LEÑA</div>
+                            <div style="background: #ffffff; border: 2px solid var(--amber-200); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 1.4rem; font-weight: 900;">2</span>
+                                <span class="badge badge-amber">ATADOS</span>
+                            </div>
+                            <div style="font-size: 0.74rem; color: var(--slate-500); margin-top: 8px; font-weight: 700;">Selección Rápida de Atados:</div>
+                            <div class="quick-atados-row">
+                                <div class="quick-atado-pill">1</div>
+                                <div class="quick-atado-pill sel">2</div>
+                                <div class="quick-atado-pill">3</div>
+                                <div class="quick-atado-pill">4</div>
+                                <div class="quick-atado-pill">5</div>
+                            </div>
+                            <div style="margin-top: 10px; background: var(--amber-100); color: var(--amber-800); padding: 6px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 600;">
+                                🪵 Equivale a 1 viaje completo de camión (Máx. 5).
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- A4: Caribe + Evidencia + Firma + Visto Bueno + Voucher -->
+                <div class="card">
+                    <h3 style="font-size: 1.12rem; font-weight: 800; margin-bottom: 8px;">D. Evidencia Obligatoria, Factura Caribe, Firma y Visto Bueno</h3>
+                    <div class="grid-2" style="margin-top: 10px;">
+                        <div style="background: var(--sky-50); border: 1px solid var(--sky-200); border-radius: 12px; padding: 14px;">
+                            <strong style="color: var(--sky-800); display: block; margin-bottom: 6px;">🧾 Solo en Supermercados Caribe</strong>
+                            <p style="font-size: 0.88rem; color: var(--slate-700);">
+                                Aparece un cuadro azul obligatorio para anotar el <strong>N° de Factura / Tiquete</strong>, el <strong>Valor Total ($ COP)</strong> del papel y tomar <strong>Foto de la Factura</strong>.
+                            </p>
+                            <div style="margin-top: 8px; background: var(--amber-100); border: 1px solid var(--amber-200); padding: 8px; border-radius: 8px; font-size: 0.8rem; color: var(--amber-800);">
+                                ⚠️ Si sale aviso amarillo de <em>“Diferencia detectada”</em>, revisa que los kilos estén bien digitados; pero <strong>sí te deja guardar</strong> para que la oficina concilie el tiquete después.
+                            </div>
+                        </div>
+                        <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; padding: 14px;">
+                            <strong style="color: var(--slate-900); display: block; margin-bottom: 6px;">⚖️ Foto de Soporte en Sitio (Todos los puntos)</strong>
+                            <p style="font-size: 0.88rem; color: var(--slate-700); margin-bottom: 8px;">
+                                Antes de guardar debes elegir qué estás fotografiando (<strong>⚖️ Báscula / Reloj</strong>, <strong>📝 Cuaderno / Apuntes</strong> o <strong>🧾 Recibo / Remisión</strong>) y tomar la foto con la cámara.
+                            </p>
+                            <p style="font-size: 0.88rem; color: var(--slate-700);">
+                                Luego el encargado firma con el dedo en el recuadro blanco, tocas <strong>Guardar Recolección</strong> y en la ventana final de <strong>Visto Bueno</strong> anotas el nombre de <strong>¿Quién entrega en carnicería?</strong>.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="callout callout-tip" style="margin-top: 14px; margin-bottom: 0;">
+                        <span class="callout-icon">📲</span>
+                        <div>
+                            <strong>Comprobante inmediato:</strong> Al confirmar, ves el recibo oficial (<code>REC-...</code>) con los productos y la firma. Toca <strong>📲 Compartir por WhatsApp</strong> para mandárselo al encargado del punto en un toque.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- A5: Visita Fallida y Offline -->
+                <div class="grid-2">
+                    <div class="card" style="border-left: 5px solid var(--amber-600);">
+                        <h3 style="font-size: 1.05rem; font-weight: 800; margin-bottom: 8px;">E. ¿No hubo recolección? (Visita Fallida 0 Kg)</h3>
+                        <p style="font-size: 0.9rem; color: var(--slate-700); margin-bottom: 8px;">
+                            Si el local está cerrado, no sacaron materia prima o el camión ya va lleno, elige Ruta, Proveedor y Punto, y toca el botón amarillo <strong>⚠️ Reportar Novedad</strong>.
+                        </p>
+                        <p style="font-size: 0.88rem; color: var(--slate-700);">
+                            Eliges el motivo entre 11 causales (ej. <em>Establecimiento Cerrado</em>, <em>Sin Materia Prima</em>, <em>Cliente Cancela Servicio</em>), tomas la <strong>foto de constancia</strong> (la app guarda la ubicación GPS) y pulsas <strong>💾 Registrar Novedad (0 Kg)</strong>.
+                        </p>
+                        <div class="callout callout-warn" style="margin-top: 10px; margin-bottom: 0; font-size: 0.82rem;">
+                            <span class="callout-icon">🛡️</span>
+                            <div>La app bloquea marcar <em>“Cliente Cancela Servicio”</em> si ese mismo día ya registraste pesaje de carga en ese punto.</div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="border-left: 5px solid var(--sky-600);">
+                        <h3 style="font-size: 1.05rem; font-weight: 800; margin-bottom: 8px;">F. ¿Qué pasa si se va el internet en la ruta?</h3>
+                        <p style="font-size: 0.9rem; color: var(--slate-700); margin-bottom: 8px;">
+                            No te preocupes ni cierres la pantalla. Sigue trabajando normal: la app guarda la recolección o novedad de forma segura dentro de tu celular (capacidad local para hasta 50 respaldos).
+                        </p>
+                        <p style="font-size: 0.88rem; color: var(--slate-700);">
+                            Apenas vuelvas a tener señal, la app intenta subir automáticamente los registros pendientes (y revisa cada <strong>5 minutos</strong>). Cuando termina, verás un aviso verde abajo a la derecha confirmando que ya llegaron a Google Sheets.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BLOQUE B: OFICINA / ADMINISTRADOR -->
+            <div class="feature-block" data-role="admin">
+                <div class="role-divider">
+                    <span>🖥️ En la Oficina (Para Administración y Control)</span>
+                    <span class="tag badge-purple">Cierres, Soportes y Liquidación</span>
+                </div>
+
+                <!-- B1: Cierre Diario y caso Jueves vs Miércoles -->
+                <div class="card">
+                    <h3 style="font-size: 1.12rem; font-weight: 800; margin-bottom: 8px;">G. 📊 Cierre Diario y Cobertura de Rutas</h3>
+                    <p style="color: var(--slate-700); margin-bottom: 10px;">
+                        Sirve para revisar al final del día si el camión visitó todos los puntos programados de una ruta. Eliges <strong>Fecha a auditar</strong>, <strong>Ruta</strong> y pulsas <strong>Generar Cierre</strong>. Para que nunca falle aunque falle una conexión, el sistema consulta en cascada hasta 4 fuentes (Webhook, Google Sheets en vivo, Nube Firebase y memoria local) y te muestra de dónde leyó los datos.
+                    </p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                        <span class="badge badge-green">✅ ÉXITO: Recolectado hoy</span>
+                        <span class="badge badge-amber">⚠️ NOVEDAD: Visita fallida (0 kg)</span>
+                        <span class="badge badge-red">🚫 CANCELADO: Cliente canceló</span>
+                        <span class="badge badge-red">❌ PENDIENTE: No ha llegado a la data</span>
+                    </div>
+                    <div class="callout callout-purple" style="margin-bottom: 0;">
+                        <span class="callout-icon">📅</span>
+                        <div>
+                            <strong>Caso práctico — Cuando una ruta se hace otro día (ej. ruta de Miércoles hecha el Jueves):</strong><br>
+                            Por defecto viene marcada la casilla <strong>“Filtrar únicamente puntos programados para el día auditado”</strong> (para no exigir puntos de otros días). Si el jueves hicieron una ruta que normalmente es de miércoles, los puntos visitados aparecerán como <code>⚡ Visita Adicional (Prog: Miércoles)</code> y los no visitados quedarán ocultos. <strong>Solución en 1 clic:</strong> simplemente <strong>desmarca esa casilla</strong> y verás la lista completa de todos los puntos de esa ruta para detectar cuáles faltaron.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- B2: Tabla en vivo, Gráficas y Botones Admin -->
+                <div class="card">
+                    <h3 style="font-size: 1.12rem; font-weight: 800; margin-bottom: 10px;">H. Tablero en Vivo, Gráficas y Herramientas de Control</h3>
+                    <div class="grid-2">
+                        <div>
+                            <p style="font-size: 0.92rem; color: var(--slate-700); margin-bottom: 8px;">
+                                En la parte superior ves dos gráficas: <strong>Kilos por Proveedor</strong> (suma solo carne en kg para no inflar toneladas con atados de leña) y <strong>Kilos por Producto</strong>.
+                            </p>
+                            <p style="font-size: 0.92rem; color: var(--slate-700); margin-bottom: 8px;">
+                                En <strong>Recolecciones en Vivo</strong> ves los últimos 200 registros con enlaces al mapa GPS, foto de pesaje, foto de factura Caribe y firma. Cada fila permite:
+                            </p>
+                            <ul style="padding-left: 18px; font-size: 0.9rem; color: var(--slate-700);">
+                                <li><strong>📄 Soporte:</strong> Ver o reenviar el comprobante.</li>
+                                <li><strong>✏️ Editar:</strong> Corregir kilos, producto, proveedor o fecha (actualiza nube y Google Sheets).</li>
+                                <li><strong>🗑️ Eliminar:</strong> Borrar un registro erróneo en ambos lados.</li>
+                            </ul>
+                        </div>
+                        <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; padding: 14px;">
+                            <strong style="display: block; margin-bottom: 8px; color: var(--slate-900);">Botones de acción rápida en la tabla:</strong>
+                            <p style="font-size: 0.86rem; margin-bottom: 6px;"><strong>📄 Emitir Soporte Oficial:</strong> Busca por fecha, proveedor y punto si te piden copia de un recibo anterior. Incluye botón <em>🔄 Refrescar Sheets</em>.</p>
+                            <p style="font-size: 0.86rem; margin-bottom: 6px;"><strong>🔄 Re-sincronizar Sheets:</strong> Revisa primero qué falta en Google Sheets y sube solo los faltantes (anti-duplicados).</p>
+                            <p style="font-size: 0.86rem; margin-bottom: 6px;"><strong>💰 Liquidar Precios Vacíos:</strong> Crea copia de seguridad en Sheets y rellena automáticamente precios/valores pendientes según la hoja <em>Tarifas</em>.</p>
+                            <p style="font-size: 0.86rem; margin-bottom: 0;"><strong>📊 Abrir Google Sheets / 📥 Exportar CSV:</strong> Abre la base contable o descarga archivo para Excel.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- B3: Nota transparente sobre el Conciliador Universal -->
+                <div class="callout callout-analogy" style="margin-top: 0;">
+                    <span class="callout-icon">🔎</span>
+                    <div>
+                        <strong>Módulo complementario de oficina — Conciliador Universal (<code>CONCILIADOR.html</code>):</strong>
+                        Es como puntear con resaltador el estado de cuenta de un cliente contra lo que anotaste en tu cuaderno. Funciona como una página independiente de oficina (no tiene botón dentro del panel principal del administrador, se abre desde su propio enlace o desde el menú de Google Sheets) y permite subir el Excel o PDF del proveedor —incluso marcando varios proveedores a la vez— para comparar kilo por kilo y corregir diferencias o faltantes con un clic.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. CONSEJOS PRÁCTICOS Y ERRORES COMUNES -->
+        <section id="consejos">
+            <div class="section-header">
+                <span class="section-num">5</span>
+                <div>
+                    <h2 class="section-title">Consejos prácticos y errores comunes</h2>
+                    <p class="section-subtitle">Comparativa rápida para evitar reprocesos en ruta y en contabilidad</p>
+                </div>
+            </div>
+
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th class="do-col">✅ Qué hacer (Buenas prácticas)</th>
+                        <th class="dont-col">❌ Qué evitar (Errores frecuentes)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Verifica siempre el Punto / Sucursal</strong> antes de tocar los botones de productos (ej. distinguir entre <em>Jamundí Centro</em> y <em>Jamundí Principal</em>).</td>
+                        <td><strong>No dejar un punto equivocado o genérico</strong> solo por afán; distorsiona el Cierre Diario y la factura de ese cliente.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Toca 🔄 v1.9.9</strong> si te informan de una actualización y aún ves la pantalla anterior.</td>
+                        <td><strong>No borrar datos del navegador</strong> si tienes recolecciones offline pendientes sin sincronizar, porque podrías perder las copias locales aún no subidas.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Usa el botón ➕ Otro Material / Nuevo</strong> si un proveedor entrega algo que no aparece en su lista sugerida.</td>
+                        <td><strong>No registrar un material como otro distinto</strong> (ej. meter <em>Piel Pollo</em> como <em>Desperdicio</em>) porque el precio cambia en contabilidad.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Para 🪵 LEÑA usa únicamente la unidad Atados</strong> (1 a 5) y la botonera rápida.</td>
+                        <td><strong>No intentar meter kilos en Leña</strong> ni digitar más de 5 atados; la app lo bloqueará para proteger las estadísticas de toneladas.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Lee con calma las alertas de pesaje alto</strong> (&gt; 2.500 kg o &gt; 10.000 kg) antes de aceptar.</td>
+                        <td><strong>No escribir puntos de miles sin mirar</strong> (como <code>40.000</code> cuando eran <code>40</code> kg) ni darle “Aceptar” sin revisar el número.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>En Supermercados Caribe</strong>, si sale el aviso amarillo de diferencia, revisa los kilos y guarda normal para que oficina concilie.</td>
+                        <td><strong>No asustarte ni cancelar la recolección</strong> pensando que el aviso amarillo prohíbe guardar; solo es una alerta visual informativa.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>En Cierre Diario</strong>, desmarca <em>“Filtrar únicamente puntos programados para el día auditado”</em> cuando evalúes una ruta corrida a otro día.</td>
+                        <td><strong>No dar por cerrada al 100% una ruta trasladada</strong> (ej. ruta de miércoles hecha el jueves) sin desmarcar primero el filtro de día.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 6. PREGUNTAS FRECUENTES (FAQ) -->
+        <section id="faq">
+            <div class="section-header">
+                <span class="section-num">6</span>
+                <div>
+                    <h2 class="section-title">Preguntas frecuentes (FAQ)</h2>
+                    <p class="section-subtitle">Respuestas directas a las dudas más comunes de quien empieza a usarla</p>
+                </div>
+            </div>
+
+            <div class="faq-list">
+                <details class="faq-item" open>
+                    <summary>1. ¿Qué hago si estoy en un sótano o vereda y se va por completo la señal del celular?</summary>
+                    <div class="faq-answer">
+                        Registra todo normalmente: productos, kilos, foto, firma y guarda. La app guardará todo dentro del teléfono y mostrará arriba el indicador rojo <strong>Sin conexión (Guardado Local)</strong>. Cuando regreses a una zona con señal, el celular enviará la información automáticamente en segundo plano sin que tengas que volver a digitar nada.
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary>2. ¿Por qué como conductor no puedo ver cuánto vale el kilo de cada producto?</summary>
+                    <div class="faq-answer">
+                        Por política de seguridad y privacidad comercial de ProteinAgro, los precios pactados se manejan únicamente en oficina. El conductor solo registra cantidades exactas y evidencias; al llegar los datos a Google Sheets, el sistema cruza automáticamente con la pestaña <em>Tarifas</em> para calcular los valores.
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary>3. ¿Qué pasa si llegué al punto pero el local está cerrado o no había carga?</summary>
+                    <div class="faq-answer">
+                        No lo dejes sin registrar (si no, en el Cierre Diario aparecerás como punto pendiente). Selecciona Ruta, Proveedor y Punto, toca el botón amarillo <strong>⚠️ Reportar Novedad</strong>, elige la causal, toma la foto de constancia y guarda. Así queda tu soporte oficial con GPS en 0 Kg.
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary>4. ¿Qué hago si me equivoqué en los kilos después de haber guardado la recolección?</summary>
+                    <div class="faq-answer">
+                        Si todavía estás en la pantalla de confirmación previa (<em>Visto Bueno</em>), toca <strong>✏️ Modificar / Corregir Kilos</strong>. Si ya la guardaste y enviaste, avisa al Administrador en oficina para que abra el Panel Administrativo, busque la fila en <em>Recolecciones en Vivo</em> y use el botón <strong>✏️ Editar</strong> (esto actualiza tanto la nube como Google Sheets).
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary>5. ¿Por qué al elegir un proveedor solo me salen 4 o 5 productos y no todos los 22?</summary>
+                    <div class="faq-answer">
+                        Es una mejora pensada para tu comodidad en pantalla táctil: la app muestra primero únicamente los productos que ese proveedor suele entregar (marcados con ⭐). Si ese día te entrega otro distinto, solo toca <strong>Ver todo el catálogo ▾</strong> o usa <strong>➕ Otro Material / Nuevo</strong>.
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary>6. En el Cierre Diario de la oficina, ¿por qué a veces dice 5 / 5 (100%) cuando la ruta tiene 10 u 11 puntos?</summary>
+                    <div class="faq-answer">
+                        Eso ocurre cuando la casilla <strong>“Filtrar únicamente puntos programados para el día auditado”</strong> está marcada y auditas una fecha que no coincide con el día habitual de esa ruta (por ejemplo, una ruta de miércoles que el camión hizo un jueves). Al desmarcar esa casilla, el sistema muestra todos los puntos activos de la ruta sin importar el día.
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary>7. ¿Cómo guardo esta guía en PDF o la paso a otro compañero?</summary>
+                    <div class="faq-answer">
+                        En la barra superior tienes dos botones: toca <strong>🖨️ Imprimir / Guardar PDF</strong> y elige <em>“Guardar como PDF”</em> como destino (todas estas preguntas se abrirán solas en el PDF), o toca <strong>⬇️ Descargar HTML5</strong> para bajar una copia completa en un solo archivo que funciona incluso sin internet.
+                    </div>
+                </details>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <strong>Guía Tutorial Oficial — PWA ProteinAgro (Versión de referencia: v1.9.9)</strong><br>
+        Documento verificado con el código vigente al 18 de noviembre de 2026 · Archivo HTML5 autocontenido (sin dependencias externas).
+    </footer>
+
+    <script>
+        // Filtro interactivo por rol (Todos / Conductor / Admin)
+        function filtrarRol(rol, btnElement) {
+            document.querySelectorAll('.role-tab').forEach(b => b.classList.remove('active'));
+            if (btnElement) btnElement.classList.add('active');
+
+            const bloques = document.querySelectorAll('.feature-block');
+            bloques.forEach(bloque => {
+                if (rol === 'all' || bloque.dataset.role === rol) {
+                    bloque.style.display = 'block';
+                } else {
+                    bloque.style.display = 'none';
+                }
+            });
+        }
+
+        // Imprimir o guardar como PDF expandiendo todas las FAQ antes
+        function imprimirGuiaPDF() {
+            const faqs = document.querySelectorAll('details.faq-item');
+            const estadosPrevios = Array.from(faqs).map(d => d.open);
+            faqs.forEach(d => { d.open = true; });
+
+            // Mostrar todos los bloques durante impresión
+            const bloques = document.querySelectorAll('.feature-block');
+            bloques.forEach(b => { b.style.display = 'block'; });
+
+            window.print();
+
+            // Restaurar estado después de imprimir
+            setTimeout(() => {
+                faqs.forEach((d, idx) => { d.open = estadosPrevios[idx]; });
+                const activeTab = document.querySelector('.role-tab.active');
+                if (activeTab && activeTab.dataset.filter) {
+                    filtrarRol(activeTab.dataset.filter, activeTab);
+                }
+            }, 300);
+        }
+
+        // Expandir FAQ automáticamente si el usuario usa Ctrl+P del navegador
+        window.addEventListener('beforeprint', () => {
+            document.querySelectorAll('details.faq-item').forEach(d => { d.open = true; });
+            document.querySelectorAll('.feature-block').forEach(b => { b.style.display = 'block'; });
+        });
+
+        // Descargar este mismo documento como archivo HTML5 único autocontenido
+        function descargarGuiaHTML() {
+            try {
+                const htmlCompleto = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+                const blob = new Blob([htmlCompleto], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const enlace = document.createElement('a');
+                enlace.href = url;
+                enlace.download = 'Guia_Tutorial_PWA_ProteinAgro.html';
+                document.body.appendChild(enlace);
+                enlace.click();
+                document.body.removeChild(enlace);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            } catch (err) {
+                alert('No se pudo descargar automáticamente. Puedes usar Ctrl+S (Guardar página como) en tu navegador.');
+            }
+        }
+
+        // Resaltado simple del enlace activo en barra superior al hacer scroll
+        const navLinks = document.querySelectorAll('.nav-links a');
+        const sections = document.querySelectorAll('main section');
+        window.addEventListener('scroll', () => {
+            let currentId = '';
+            sections.forEach(sec => {
+                const top = sec.offsetTop - 120;
+                if (window.scrollY >= top) {
+                    currentId = sec.getAttribute('id');
+                }
+            });
+            navLinks.forEach(link => {
+                link.classList.toggle('active', link.getAttribute('href') === '#' + currentId);
+            });
+        }, { passive: true });
+    </script>
+</body>
+</html>
