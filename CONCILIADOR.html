@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Materias y Proveedores - v1.9.11</title>
+    <title>Dashboard de Materias y Proveedores - v1.9.12</title>
     <!-- Librerías para exportación avanzada con estilos (ExcelJS y FileSaver) -->
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
@@ -465,13 +465,13 @@
         <div style="display: flex; align-items: center; gap: 12px;">
             <span style="font-size: 1.25em;">⚖️</span>
             <span style="color: #38bdf8; font-weight: 800; letter-spacing: 0.5px; font-size: 1.05em;">CONCILIADOR UNIVERSAL PROTEINAGRO</span>
-            <span style="background: #10b981; color: #ffffff; padding: 3px 12px; border-radius: 999px; font-weight: 800; font-size: 0.9em; box-shadow: 0 1px 4px rgba(16,185,129,0.4); border: 1px solid rgba(255,255,255,0.3);">VERSIÓN 1.9.11</span>
+            <span style="background: #10b981; color: #ffffff; padding: 3px 12px; border-radius: 999px; font-weight: 800; font-size: 0.9em; box-shadow: 0 1px 4px rgba(16,185,129,0.4); border: 1px solid rgba(255,255,255,0.3);">VERSIÓN 1.9.12</span>
         </div>
         <div style="font-size: 0.88em; color: #94a3b8; display: flex; align-items: center; gap: 14px;">
             <span>🛡️ Modo Anti-Filtros (Bypass SQL)</span>
             <span style="color: #64748b;">|</span>
             <span id="topBarLiveIndicator" style="color: #4ade80; font-weight: 700;">● Conectado En Vivo</span>
-            <button onclick="location.reload(true)" style="background: #334155; color: #f8fafc; border: 1px solid #64748b; padding: 4px 12px; border-radius: 6px; font-size: 0.85em; font-weight: 600; cursor: pointer; transition: all 0.2s;" title="Forzar recarga sin caché">🔄 Recargar (F5)</button>
+            <button onclick="recargarVersionConciliador()" style="background: #334155; color: #f8fafc; border: 1px solid #64748b; padding: 4px 12px; border-radius: 6px; font-size: 0.85em; font-weight: 600; cursor: pointer; transition: all 0.2s;" title="Forzar recarga de la última versión sin caché">🔄 Recargar (F5)</button>
         </div>
     </div>
     <div id="debugGlobalErrorBox" style="display:none;background:#fee2e2;color:#991b1b;padding:12px;border-bottom:2px solid #ef4444;font-size:13px;font-weight:600;text-align:center;"></div>
@@ -479,7 +479,7 @@
         <div class="header-top">
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                 <h1>Resumen de Materias y Proveedores</h1>
-                <span id="badgeVersionPill" style="font-size: 0.78em; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 4px 12px; border-radius: 999px; font-weight: 700; box-shadow: 0 2px 6px rgba(16,185,129,0.35); border: 1px solid rgba(255,255,255,0.2); letter-spacing: 0.3px;">v1.9.11 · Modo Anti-Filtros</span>
+                <span id="badgeVersionPill" style="font-size: 0.78em; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 4px 12px; border-radius: 999px; font-weight: 700; box-shadow: 0 2px 6px rgba(16,185,129,0.35); border: 1px solid rgba(255,255,255,0.2); letter-spacing: 0.3px;">v1.9.12 · Modo Anti-Filtros</span>
             </div>
             <a href="https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit" target="_blank" class="btn-sheet-link" title="Abrir la base de datos en Google Sheets">
                 📊 Abrir Hoja en Sheets ↗
@@ -592,7 +592,7 @@
             <footer style="text-align: center; padding: 20px 10px; color: #64748b; font-size: 0.85em; font-weight: 500; border-top: 1px solid #e2e8f0; margin-top: 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>🌿 ProteinAgro &copy; 2026 · Sistema Matriz de Conciliación y Auditoría Universal</div>
                 <div style="display: inline-flex; align-items: center; gap: 8px;">
-                    <span style="background: #e2e8f0; color: #334155; padding: 3px 9px; border-radius: 6px; font-weight: 700; font-size: 0.9em;">Versión 1.9.11</span>
+                    <span style="background: #e2e8f0; color: #334155; padding: 3px 9px; border-radius: 6px; font-weight: 700; font-size: 0.9em;">Versión 1.9.12</span>
                     <span style="color: #10b981; font-weight: 700;">● Modo Anti-Filtros Activo</span>
                 </div>
             </footer>
@@ -602,7 +602,7 @@
     <div class="modal-overlay" id="modalConciliacion">
         <div class="modal-card">
             <div class="modal-header">
-                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; padding:4px 12px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700; box-shadow:0 2px 6px rgba(16,185,129,0.35);">v1.9.11 · Modo Anti-Filtros</span></h2>
+                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; padding:4px 12px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700; box-shadow:0 2px 6px rgba(16,185,129,0.35);">v1.9.12 · Modo Anti-Filtros</span></h2>
                 <button class="modal-close-btn" onclick="cerrarModalConciliacion()" title="Cerrar ventana">✕</button>
             </div>
             <div class="modal-body">
@@ -758,6 +758,9 @@
                             <span id="badgeProveedorTotal" style="margin-left: 8px; color: #64748b; font-size: 0.9em; font-weight: 600;"></span>
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn" id="btnSyncLiveSheetsConc" onclick="sincronizarSheetsYReconciliarEnVivo('Manual')" style="background: #059669; color: #fff; font-weight: 600;" title="Descarga los datos actualizados desde Google Sheets y recalcula esta conciliación sin volver a subir el Excel">
+                                🔄 Actualizar desde Sheets
+                            </button>
                             <button class="btn" id="btnCopiarActaMatriz" onclick="copiarActaConciliacionMatriz()" style="background: #2563eb; color: #fff; font-weight: 600;">
                                 📋 Copiar Acta (Matriz)
                             </button>
@@ -1572,6 +1575,9 @@
             rawData = filtrarFilasFantasmaTotales(data);
             depurarYSincronizarProveedores(rawData);
             applyFilters();
+            if (typeof _syncEnVivoEnCurso !== 'undefined' && !_syncEnVivoEnCurso && typeof currentConcWorkbook !== 'undefined' && currentConcWorkbook && document.getElementById('modalConciliacion')?.classList.contains('active')) {
+                ejecutarConciliacionUniversal(false);
+            }
 
             cargaDatosCompletada = true;
             isLoading = false;
@@ -1670,17 +1676,20 @@
             rawData = filtrarFilasFantasmaTotales(data);
             depurarYSincronizarProveedores(rawData);
             applyFilters();
+            if (typeof _syncEnVivoEnCurso !== 'undefined' && !_syncEnVivoEnCurso && typeof currentConcWorkbook !== 'undefined' && currentConcWorkbook && document.getElementById('modalConciliacion')?.classList.contains('active')) {
+                ejecutarConciliacionUniversal(false);
+            }
 
             cargaDatosCompletada = true;
             isLoading = false;
             if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Actualizar'; }
             const now = new Date();
-            updateStatus(`✅ Conexión establecida con Sheets (${origen} · v1.9.11): ${now.toLocaleTimeString('es-CO')} | ${rawData.length.toLocaleString('es-CO')} registros`, 'success');
+            updateStatus(`✅ Conexión establecida con Sheets (${origen} · v1.9.12): ${now.toLocaleTimeString('es-CO')} | ${rawData.length.toLocaleString('es-CO')} registros`, 'success');
         }
 
         async function fetchDataDirecto(btn) {
             if (cargaDatosCompletada && rawData && rawData.length > 500) return;
-            updateStatus('🌐 Conectando directamente con Google Sheets (Modo Anti-Filtros v1.9.11)...', 'normal');
+            updateStatus('🌐 Conectando directamente con Google Sheets (Modo Anti-Filtros v1.9.12)...', 'normal');
 
             const sheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
             const exportTsvUrl = 'https:' + '/' + '/docs.google.com/spreadsheets/d/' + sheetId + '/export?format=tsv&sheet=Recolecciones&_t=' + Date.now();
@@ -1839,7 +1848,7 @@
                 btn.innerHTML = '⏳ Cargando...';
             }
             
-            updateStatus('Conectando directamente con Google Sheets (v1.9.11 · Modo Anti-Filtros)...', 'normal');
+            updateStatus('Conectando directamente con Google Sheets (v1.9.12 · Modo Anti-Filtros)...', 'normal');
 
             // 0. Sincronizar en paralelo el catálogo maestro desde Puntos_Rutas y pestaña Productos
             cargarCatalogoMaestroPuntosRutas();
@@ -5459,8 +5468,15 @@
             try {
                 const respuesta = await enviarNovedadesConciliacionASheets([novReclasif]);
                 if (respuesta && respuesta.result === 'success') {
-                    actualizarEstadoLocalTrasSincronizacion([novReclasif], respuesta);
-                    mostrarToastNotificacion(`✅ Reclasificado con éxito en Google Sheets: "${prodOrig}" ➔ "${nuevoProducto}" (${kilosStr} Kg).`, 'success');
+                    const noEnc = (respuesta.detalles || []).filter(d => String(d.accion || '').startsWith('NO_ENCONTRADO'));
+                    if (noEnc.length > 0) {
+                        mostrarToastNotificacion(`⚠️ Google Sheets no encontró la fila exacta de "${prodOrig}" para reclasificar. Actualizando desde Sheets...`, 'warning');
+                    } else {
+                        actualizarEstadoLocalTrasSincronizacion([novReclasif], respuesta);
+                        mostrarToastNotificacion(`✅ Reclasificado en Sheets: "${prodOrig}" ➔ "${nuevoProducto}" (${kilosStr} Kg). Sincronizando en vivo...`, 'success');
+                    }
+                    await new Promise(r => setTimeout(r, 400));
+                    await sincronizarSheetsYReconciliarEnVivo('Reclasificación');
                 } else {
                     throw new Error((respuesta && respuesta.error) || 'Respuesta inesperada del servidor');
                 }
@@ -5496,8 +5512,15 @@
             try {
                 const respuesta = await enviarNovedadesConciliacionASheets([novElim]);
                 if (respuesta && respuesta.result === 'success') {
-                    actualizarEstadoLocalTrasSincronizacion([novElim], respuesta);
-                    mostrarToastNotificacion(`✅ Registro de "${prodOrig}" (${kilosStr} Kg) eliminado con éxito de Google Sheets.`, 'success');
+                    const noEnc = (respuesta.detalles || []).filter(d => String(d.accion || '').startsWith('NO_ENCONTRADO'));
+                    if (noEnc.length > 0) {
+                        mostrarToastNotificacion(`⚠️ Google Sheets no encontró la fila de "${prodOrig}" para eliminar. Actualizando desde Sheets...`, 'warning');
+                    } else {
+                        actualizarEstadoLocalTrasSincronizacion([novElim], respuesta);
+                        mostrarToastNotificacion(`✅ Eliminado en Sheets: "${prodOrig}" (${kilosStr} Kg). Sincronizando en vivo...`, 'success');
+                    }
+                    await new Promise(r => setTimeout(r, 400));
+                    await sincronizarSheetsYReconciliarEnVivo('Eliminación');
                 } else {
                     throw new Error((respuesta && respuesta.error) || 'Respuesta inesperada del servidor');
                 }
@@ -5626,6 +5649,95 @@
             return await responseGet.json();
         }
 
+        function recargarVersionConciliador() {
+            try {
+                if (typeof google !== 'undefined' && google.script && google.script.run && typeof google.script.run.abrirConciliadorFlotante === 'function') {
+                    mostrarToastNotificacion('🔄 Recargando última versión del Conciliador desde Sheets...', 'info');
+                    google.script.run
+                        .withFailureHandler(() => location.reload(true))
+                        .abrirConciliadorFlotante();
+                    return;
+                }
+                if (location.protocol === 'http:' || location.protocol === 'https:') {
+                    const u = new URL(location.href);
+                    u.searchParams.set('_v', String(Date.now()));
+                    location.replace(u.toString());
+                    return;
+                }
+            } catch (e) {}
+            location.reload(true);
+        }
+
+        let _syncEnVivoEnCurso = false;
+        async function sincronizarSheetsYReconciliarEnVivo(origenTexto = 'Sincronización') {
+            if (_syncEnVivoEnCurso) return false;
+            _syncEnVivoEnCurso = true;
+            const btnLive = document.getElementById('btnSyncLiveSheetsConc');
+            const btnMain = document.getElementById('btnRefresh');
+            const origBtnHtml = btnLive ? btnLive.innerHTML : '';
+            if (btnLive) {
+                btnLive.disabled = true;
+                btnLive.innerHTML = '⏳ Sincronizando Sheets...';
+            }
+            updateStatus(`🔄 Sincronizando en vivo desde Google Sheets (${origenTexto})...`, 'normal');
+
+            const sheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+            const gvizUrl = 'https:' + '/' + '/docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?sheet=Recolecciones&tq=' + encodeURIComponent('select *') + '&tqx=out:json&_t=' + Date.now();
+            let sincronizado = false;
+
+            try {
+                // 1. Intento ultrarrápido GViz SQL 'select *' (sin caché)
+                try {
+                    const resp = await fetchWithTimeout(gvizUrl, 6000);
+                    if (resp.ok) {
+                        const text = await resp.text();
+                        const start = text.indexOf('{');
+                        const end = text.lastIndexOf('}') + 1;
+                        if (start !== -1 && end > start) {
+                            const json = JSON.parse(text.substring(start, end));
+                            if (json && json.table && json.table.rows && json.table.rows.length >= 500) {
+                                procesarTablaGviz(json.table, btnMain, 'En Vivo Post-Cambio');
+                                sincronizado = true;
+                            }
+                        }
+                    }
+                } catch (eGviz) {
+                    console.warn('Re-sync GViz falló, intentando Webhook:', eGviz);
+                }
+
+                // 2. Fallback Webhook directo de Apps Script
+                if (!sincronizado) {
+                    const respWh = await fetchWithTimeout(GOOGLE_SHEETS_WEBHOOK_URL + '?action=getRecolecciones&_t=' + Date.now(), 15000);
+                    if (respWh.ok) {
+                        const jsonWh = await respWh.json();
+                        if (jsonWh && jsonWh.result === 'success' && Array.isArray(jsonWh.recolecciones) && jsonWh.recolecciones.length > 0) {
+                            procesarRecoleccionesWebhook(jsonWh.recolecciones, btnMain, 'Webhook Post-Cambio');
+                            sincronizado = true;
+                        }
+                    }
+                }
+
+                if (sincronizado) {
+                    if (currentConcWorkbook) {
+                        ejecutarConciliacionUniversal(false);
+                    }
+                    mostrarToastNotificacion(`🔄 Sincronizado y verificado con Google Sheets (${rawData.length.toLocaleString('es-CO')} registros). Cambios reflejados en pantalla.`, 'success');
+                } else {
+                    mostrarToastNotificacion('⚠️ No se pudo refrescar automáticamente desde Sheets. Usa "🔄 Actualizar desde Sheets" para reintentar.', 'warning');
+                }
+            } catch (errSync) {
+                console.warn('Error en sincronizarSheetsYReconciliarEnVivo:', errSync);
+                mostrarToastNotificacion('⚠️ Cambio guardado en Sheets, pero falló la verificación en vivo. Pulsa "🔄 Actualizar desde Sheets".', 'warning');
+            } finally {
+                _syncEnVivoEnCurso = false;
+                if (btnLive) {
+                    btnLive.disabled = false;
+                    btnLive.innerHTML = origBtnHtml || '🔄 Actualizar desde Sheets';
+                }
+            }
+            return sincronizado;
+        }
+
         async function ejecutarSincronizacionNovedades(listaNovedades) {
             const btnSync = document.getElementById('btnEjecutarSyncNovedades');
             if (btnSync) {
@@ -5637,9 +5749,16 @@
                 const respuesta = await enviarNovedadesConciliacionASheets(listaNovedades);
                 if (respuesta && respuesta.result === 'success') {
                     cerrarModalConfirmarNovedades();
+                    const noEnc = (respuesta.detalles || []).filter(d => String(d.accion || '').startsWith('NO_ENCONTRADO'));
                     actualizarEstadoLocalTrasSincronizacion(listaNovedades, respuesta);
-                    mostrarToastNotificacion(`✅ ${listaNovedades.length} novedad${listaNovedades.length > 1 ? 'es' : ''} sincronizada${listaNovedades.length > 1 ? 's' : ''} con éxito en Google Sheets`);
+                    if (noEnc.length > 0) {
+                        mostrarToastNotificacion(`⚠️ ${noEnc.length} registro(s) no se encontraron en Sheets; refrescando base real...`, 'warning');
+                    } else {
+                        mostrarToastNotificacion(`✅ ${listaNovedades.length} novedad${listaNovedades.length > 1 ? 'es' : ''} aplicada${listaNovedades.length > 1 ? 's' : ''} en Sheets. Verificando en vivo...`, 'success');
+                    }
                     deseleccionarTodasNovedades();
+                    await new Promise(r => setTimeout(r, 450));
+                    await sincronizarSheetsYReconciliarEnVivo('Verificación de cambios');
                 } else {
                     throw new Error((respuesta && respuesta.error) || 'Respuesta desconocida del servidor');
                 }
@@ -5658,8 +5777,18 @@
             const detallesPorUid = {};
             detalles.forEach(d => { if (d._uid) detallesPorUid[d._uid] = d; });
 
+            const coincideProvYSucLocal = (r, nov) => {
+                const provNov = String(nov.proveedor || '').trim();
+                const sucNov = String(nov.sucursal || nov.punto || '').trim();
+                if (provNov && !coincideProveedorConFiltro(r.PROVEEDOR, provNov)) return false;
+                if (sucNov && !coincideRegistroConSucursal(r, sucNov)) return false;
+                return true;
+            };
+
             novedadesAplicadas.forEach(nov => {
                 const det = detallesPorUid[nov._uid] || {};
+                if (String(det.accion || '').startsWith('NO_ENCONTRADO')) return;
+
                 if (nov.tipoNovedad === 'FALTANTE') {
                     const nuevoId = det.id || ('REC-' + Date.now());
                     const precioFinal = Number(det.precio !== undefined && det.precio !== '' ? det.precio : (nov.precio || 0));
@@ -5669,9 +5798,9 @@
                     rawData.push({
                         ID: nuevoId,
                         FECHA: nov.fecha,
-                        PROVEEDOR: nov.proveedor,
+                        PROVEEDOR: homologarProveedorCliente(nov.proveedor),
                         PUNTO: nov.sucursal || '',
-                        MATERIA: det.producto || nov.producto,
+                        MATERIA: homologarMateriaCliente(det.producto || nov.producto),
                         KG: kgFinal,
                         PRECIO: precioFinal,
                         VALOR: valorFinal,
@@ -5684,9 +5813,10 @@
                     });
                 } else if (nov.tipoNovedad === 'DESVIACION') {
                     const kgTarget = Number(det.kgNuevo !== undefined ? det.kgNuevo : nov.kilosProveedor);
+                    const targetId = det.id || nov.id;
                     let encontrado = false;
-                    if (nov.id) {
-                        const recExistente = rawData.find(r => r.ID === nov.id && (productosCoinciden(r.MATERIA, nov.producto) || !nov.producto));
+                    if (targetId) {
+                        const recExistente = rawData.find(r => r.ID === targetId && (productosCoinciden(r.MATERIA, nov.producto) || !nov.producto));
                         if (recExistente) {
                             recExistente.KG = kgTarget;
                             if (recExistente.PRECIO > 0) recExistente.VALOR = kgTarget * recExistente.PRECIO;
@@ -5697,7 +5827,8 @@
                         const dNov = parsearFechaCeldaUniversal(nov.fecha);
                         const recExistente = rawData.find(r => {
                             const dR = parsearFechaCeldaUniversal(r.FECHA);
-                            return dR && dNov && dR.dia === dNov.dia && dR.mes === dNov.mes && dR.anio === dNov.anio && productosCoinciden(r.MATERIA, nov.producto);
+                            return dR && dNov && dR.dia === dNov.dia && dR.mes === dNov.mes && dR.anio === dNov.anio &&
+                                productosCoinciden(r.MATERIA, nov.producto) && coincideProvYSucLocal(r, nov);
                         });
                         if (recExistente) {
                             recExistente.KG = kgTarget;
@@ -5705,11 +5836,12 @@
                         }
                     }
                 } else if (nov.tipoNovedad === 'RECLASIFICAR') {
-                    const prodNuevo = det.productoNuevo || nov.productoNuevo;
+                    const prodNuevo = homologarMateriaCliente(det.productoNuevo || nov.productoNuevo);
                     const precioFinal = Number(det.precio !== undefined && det.precio !== '' ? det.precio : (det.nuevoPrecio || 0));
+                    const targetId = det.id || nov.id;
                     let encontrado = false;
-                    if (nov.id) {
-                        const recExistente = rawData.find(r => r.ID === nov.id && (productosCoinciden(r.MATERIA, nov.productoAnterior || nov.producto) || !nov.productoAnterior));
+                    if (targetId) {
+                        const recExistente = rawData.find(r => r.ID === targetId && (productosCoinciden(r.MATERIA, nov.productoAnterior || nov.producto) || !nov.productoAnterior));
                         if (recExistente) {
                             recExistente.MATERIA = prodNuevo;
                             if (precioFinal > 0) {
@@ -5723,7 +5855,8 @@
                         const dNov = parsearFechaCeldaUniversal(nov.fecha);
                         const recExistente = rawData.find(r => {
                             const dR = parsearFechaCeldaUniversal(r.FECHA);
-                            return dR && dNov && dR.dia === dNov.dia && dR.mes === dNov.mes && dR.anio === dNov.anio && productosCoinciden(r.MATERIA, nov.productoAnterior || nov.producto);
+                            return dR && dNov && dR.dia === dNov.dia && dR.mes === dNov.mes && dR.anio === dNov.anio &&
+                                productosCoinciden(r.MATERIA, nov.productoAnterior || nov.producto) && coincideProvYSucLocal(r, nov);
                         });
                         if (recExistente) {
                             recExistente.MATERIA = prodNuevo;
@@ -5735,16 +5868,22 @@
                     }
                 } else if (nov.tipoNovedad === 'ELIMINAR') {
                     const targetProd = nov.producto || nov.materia;
+                    const targetId = det.id || nov.id;
                     let idx = -1;
-                    if (nov.id) {
-                        idx = rawData.findIndex(r => r.ID === nov.id && (!targetProd || productosCoinciden(r.MATERIA, targetProd)));
+                    if (targetId) {
+                        idx = rawData.findIndex(r => r.ID === targetId && (!targetProd || productosCoinciden(r.MATERIA, targetProd)));
                     }
                     if (idx === -1) {
                         const dNov = parsearFechaCeldaUniversal(nov.fecha);
-                        idx = rawData.findIndex(r => {
+                        for (let ri = rawData.length - 1; ri >= 0; ri--) {
+                            const r = rawData[ri];
                             const dR = parsearFechaCeldaUniversal(r.FECHA);
-                            return dR && dNov && dR.dia === dNov.dia && dR.mes === dNov.mes && dR.anio === dNov.anio && (!targetProd || productosCoinciden(r.MATERIA, targetProd));
-                        });
+                            if (dR && dNov && dR.dia === dNov.dia && dR.mes === dNov.mes && dR.anio === dNov.anio &&
+                                (!targetProd || productosCoinciden(r.MATERIA, targetProd)) && coincideProvYSucLocal(r, nov)) {
+                                idx = ri;
+                                break;
+                            }
+                        }
                     }
                     if (idx !== -1) {
                         rawData.splice(idx, 1);
@@ -5752,7 +5891,8 @@
                 }
             });
 
-            // Re-ejecutar conciliación en memoria
+            // Refrescar tabla principal detrás del modal + re-ejecutar conciliación en memoria
+            applyFilters();
             ejecutarConciliacionUniversal(false);
         }
 

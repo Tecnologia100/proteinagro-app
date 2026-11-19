@@ -1149,3 +1149,10 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Detección de Matrices sin Etiqueta de Fecha (`ejecutarConciliacionUniversal`):** Si la columna de fechas tiene encabezado vacío (ej. `[vacío | hueso | gordana]` seguido de `8-oct-26`), `foundFechaCol` permanecía en `-1` y descartaba todo el Excel. Se agregó detección *lookahead* sobre las filas siguientes (`rowNumber + 1 .. +6`) buscando fechas reales junto a columnas de producto conocidas.
 - **Corte Seguro de Filas Resumen Sin Etiqueta:** Detectadas filas de suma (`formula` `SUM`/`SUBTOTAL`, o fila sin fecha ni mes inmediatamente posterior a despachos con fecha real) y filas `FACTURA` / `X FACTURAR` activando `resumenBoletinAlcanzado = true`, evitando que totales (`4143,2`), saldos por facturar o tarifas (`$350`, `$2.000`) entren como falsos lotes.
 - **Endurecimiento Auxiliar:** `getExcelCellNum` rechaza cadenas alfanuméricas (`"01EA-532"`, `"8-oct-26"`), `parsearFechaCeldaUniversal` acepta abreviaturas con punto (`"8-oct.-26"`), y `autodetectarProveedorYPeriodo` escanea columnas `1..6` desde fila 2.
+
+---
+
+### 47. Re-Sincronización Automática en Vivo Post-Cambio (`CONCILIADOR.html v1.9.12`)
+- **Verificación en Vivo tras Guardar Cambios (`sincronizarSheetsYReconciliarEnVivo`):** Luego de ejecutar cualquier cambio (`Eliminar`, `Reclasificar`, `Igualar a Proveedor`, `Registrar en Sheets`), aplica parche local estricto por proveedor/sucursal + `applyFilters()` y re-descarga automáticamente la base real desde Google Sheets (GViz `select *` / Webhook) recalculando la matriz en vivo sin perder el Excel cargado.
+- **Botón Manual en Conciliación:** Botón `🔄 Actualizar desde Sheets` (`#btnSyncLiveSheetsConc`) en `#reconcileResults` para refrescar desde Sheets en 1 clic sin volver a cargar el archivo.
+- **Recarga Inteligente (`recargarVersionConciliador`):** El botón superior `🔄 Recargar (F5)` invoca `abrirConciliadorFlotante()` en Sheets o recarga con *cache-buster* `?_v=...` en navegador.

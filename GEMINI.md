@@ -836,6 +836,11 @@ i.fecha), consolidándose directamente en la fila de ese día.
 - **Corte Seguro de Filas Resumen Sin Etiqueta:** Detectadas filas de suma (`formula` `SUM`/`SUBTOTAL`, o fila sin fecha ni mes inmediatamente posterior a despachos con fecha real) y filas `FACTURA` / `X FACTURAR` activando `resumenBoletinAlcanzado = true`, evitando que totales (`4143,2`), saldos por facturar o tarifas (`$350`, `$2.000`) entren como falsos lotes.
 - **Endurecimiento Auxiliar:** `getExcelCellNum` rechaza cadenas alfanuméricas (`"01EA-532"`, `"8-oct-26"`), `parsearFechaCeldaUniversal` acepta abreviaturas con punto (`"8-oct.-26"`), y `autodetectarProveedorYPeriodo` escanea columnas `1..6` desde fila 2.
 
+### 47. Re-Sincronización Automática en Vivo Post-Cambio (`CONCILIADOR.html v1.9.12`)
+- **Verificación en Vivo tras Guardar Cambios (`sincronizarSheetsYReconciliarEnVivo`):** Luego de ejecutar cualquier cambio desde el Conciliador (`Eliminar`, `Reclasificar`, `Igualar a Proveedor`, `Registrar en Sheets`, individual o masivo), además de aplicar el parche inmediato en memoria (ahora filtrado por proveedor/sucursal y actualizando también `applyFilters()`), el sistema re-descarga automáticamente la base real desde Google Sheets (GViz `select *` con fallback a Webhook), refresca la tabla principal y recalcula la matriz del Conciliador mostrando el estado real confirmado.
+- **Botón Manual en Conciliación:** Agregado botón `🔄 Actualizar desde Sheets` (`#btnSyncLiveSheetsConc`) en la barra de resultados para refrescar datos desde Sheets sin perder el Excel cargado; si `procesarTablaGviz` / `procesarRecoleccionesWebhook` corren con el modal abierto, también recalculan la conciliación.
+- **Recarga Inteligente de Versión (`recargarVersionConciliador`):** El botón superior `🔄 Recargar (F5)` invoca `google.script.run.abrirConciliadorFlotante()` en Google Sheets o recarga con *cache-buster* `?_v=...` en navegador.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
