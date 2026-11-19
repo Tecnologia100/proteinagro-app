@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Materias y Proveedores - v1.9.10</title>
+    <title>Dashboard de Materias y Proveedores - v1.9.11</title>
     <!-- Librerías para exportación avanzada con estilos (ExcelJS y FileSaver) -->
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
@@ -465,7 +465,7 @@
         <div style="display: flex; align-items: center; gap: 12px;">
             <span style="font-size: 1.25em;">⚖️</span>
             <span style="color: #38bdf8; font-weight: 800; letter-spacing: 0.5px; font-size: 1.05em;">CONCILIADOR UNIVERSAL PROTEINAGRO</span>
-            <span style="background: #10b981; color: #ffffff; padding: 3px 12px; border-radius: 999px; font-weight: 800; font-size: 0.9em; box-shadow: 0 1px 4px rgba(16,185,129,0.4); border: 1px solid rgba(255,255,255,0.3);">VERSIÓN 1.9.10</span>
+            <span style="background: #10b981; color: #ffffff; padding: 3px 12px; border-radius: 999px; font-weight: 800; font-size: 0.9em; box-shadow: 0 1px 4px rgba(16,185,129,0.4); border: 1px solid rgba(255,255,255,0.3);">VERSIÓN 1.9.11</span>
         </div>
         <div style="font-size: 0.88em; color: #94a3b8; display: flex; align-items: center; gap: 14px;">
             <span>🛡️ Modo Anti-Filtros (Bypass SQL)</span>
@@ -479,7 +479,7 @@
         <div class="header-top">
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                 <h1>Resumen de Materias y Proveedores</h1>
-                <span id="badgeVersionPill" style="font-size: 0.78em; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 4px 12px; border-radius: 999px; font-weight: 700; box-shadow: 0 2px 6px rgba(16,185,129,0.35); border: 1px solid rgba(255,255,255,0.2); letter-spacing: 0.3px;">v1.9.10 · Modo Anti-Filtros</span>
+                <span id="badgeVersionPill" style="font-size: 0.78em; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 4px 12px; border-radius: 999px; font-weight: 700; box-shadow: 0 2px 6px rgba(16,185,129,0.35); border: 1px solid rgba(255,255,255,0.2); letter-spacing: 0.3px;">v1.9.11 · Modo Anti-Filtros</span>
             </div>
             <a href="https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit" target="_blank" class="btn-sheet-link" title="Abrir la base de datos en Google Sheets">
                 📊 Abrir Hoja en Sheets ↗
@@ -592,7 +592,7 @@
             <footer style="text-align: center; padding: 20px 10px; color: #64748b; font-size: 0.85em; font-weight: 500; border-top: 1px solid #e2e8f0; margin-top: 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>🌿 ProteinAgro &copy; 2026 · Sistema Matriz de Conciliación y Auditoría Universal</div>
                 <div style="display: inline-flex; align-items: center; gap: 8px;">
-                    <span style="background: #e2e8f0; color: #334155; padding: 3px 9px; border-radius: 6px; font-weight: 700; font-size: 0.9em;">Versión 1.9.10</span>
+                    <span style="background: #e2e8f0; color: #334155; padding: 3px 9px; border-radius: 6px; font-weight: 700; font-size: 0.9em;">Versión 1.9.11</span>
                     <span style="color: #10b981; font-weight: 700;">● Modo Anti-Filtros Activo</span>
                 </div>
             </footer>
@@ -602,7 +602,7 @@
     <div class="modal-overlay" id="modalConciliacion">
         <div class="modal-card">
             <div class="modal-header">
-                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; padding:4px 12px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700; box-shadow:0 2px 6px rgba(16,185,129,0.35);">v1.9.10 · Modo Anti-Filtros</span></h2>
+                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; padding:4px 12px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700; box-shadow:0 2px 6px rgba(16,185,129,0.35);">v1.9.11 · Modo Anti-Filtros</span></h2>
                 <button class="modal-close-btn" onclick="cerrarModalConciliacion()" title="Cerrar ventana">✕</button>
             </div>
             <div class="modal-body">
@@ -1675,12 +1675,12 @@
             isLoading = false;
             if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Actualizar'; }
             const now = new Date();
-            updateStatus(`✅ Conexión establecida con Sheets (${origen} · v1.9.10): ${now.toLocaleTimeString('es-CO')} | ${rawData.length.toLocaleString('es-CO')} registros`, 'success');
+            updateStatus(`✅ Conexión establecida con Sheets (${origen} · v1.9.11): ${now.toLocaleTimeString('es-CO')} | ${rawData.length.toLocaleString('es-CO')} registros`, 'success');
         }
 
         async function fetchDataDirecto(btn) {
             if (cargaDatosCompletada && rawData && rawData.length > 500) return;
-            updateStatus('🌐 Conectando directamente con Google Sheets (Modo Anti-Filtros v1.9.10)...', 'normal');
+            updateStatus('🌐 Conectando directamente con Google Sheets (Modo Anti-Filtros v1.9.11)...', 'normal');
 
             const sheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
             const exportTsvUrl = 'https:' + '/' + '/docs.google.com/spreadsheets/d/' + sheetId + '/export?format=tsv&sheet=Recolecciones&_t=' + Date.now();
@@ -1839,7 +1839,7 @@
                 btn.innerHTML = '⏳ Cargando...';
             }
             
-            updateStatus('Conectando directamente con Google Sheets (v1.9.10 · Modo Anti-Filtros)...', 'normal');
+            updateStatus('Conectando directamente con Google Sheets (v1.9.11 · Modo Anti-Filtros)...', 'normal');
 
             // 0. Sincronizar en paralelo el catálogo maestro desde Puntos_Rutas y pestaña Productos
             cargarCatalogoMaestroPuntosRutas();
@@ -4429,7 +4429,7 @@
             if (typeof v === 'number') return isNaN(v) ? 0 : v;
             if (!v || v instanceof Date) return 0;
             let s = String(v).replace(/[$copCOP\s]/g, '');
-            if (!s) return 0;
+            if (!s || /[A-Za-z]/.test(s) || !/^-?\d+(?:[.,]\d+)*$/.test(s)) return 0;
             if (s.includes('.') && s.includes(',')) {
                 if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.');
                 else s = s.replace(/,/g, '');
@@ -4518,8 +4518,8 @@
                     };
                 }
             }
-            // Formato DD-mmm o DD-mmm-YYYY o DD-mmm-YY (ej. "31-ago", "01-sep", "15-sep-2026", "07-oct-26")
-            const mText = s.match(/^(\d{1,2})[-/\s.]([A-Za-z]{3,10})(?:[-/\s.](\d{1,4}))?$/);
+            // Formato DD-mmm o DD-mmm-YYYY o DD-mmm-YY (ej. "31-ago", "01-sep", "15-sep-2026", "07-oct-26", "8-oct.-26")
+            const mText = s.match(/^(\d{1,2})[-/\s.]([A-Za-z]{3,10})\.?(?:[-/\s.](\d{1,4}))?$/);
             if (mText) {
                 const d = Number(mText[1]);
                 const m = detectarMesDeTexto(mText[2]);
@@ -5073,8 +5073,8 @@
             if (ws) {
                 const conteoMeses = {};
                 ws.eachRow((row, rNum) => {
-                    if (rNum <= 2) return;
-                    for (let c = 1; c <= 3; c++) {
+                    if (rNum <= 1 && ws.rowCount > 2) return;
+                    for (let c = 1; c <= 6; c++) {
                         const v = getExcelCellVal(row.getCell(c));
                         const d = parsearFechaCeldaUniversal(v, null, anioDet || 2026);
                         if (d && d.hasExplicitMonth) {
@@ -5091,7 +5091,7 @@
                         mesMayorFecha = Number(m);
                     }
                 }
-                if (maxCount >= 3 && (!mesDet || !/DATA|CONSOLIDADO|ANUAL|TODOS/i.test(ws.name))) {
+                if ((maxCount >= 3 || (maxCount >= 1 && !mesDet)) && (!mesDet || !/DATA|CONSOLIDADO|ANUAL|TODOS/i.test(ws.name))) {
                     mesDet = mesMayorFecha;
                 }
             }
@@ -6003,10 +6003,48 @@
                 }
 
                 let foundFechaCol = -1;
-                for (let c = 1; c <= Math.min(5, maxCol); c++) {
+                for (let c = 1; c <= Math.min(8, maxCol); c++) {
                     if (cellTexts[c] === 'FECHA' || cellTexts[c] === 'DIA' || cellTexts[c] === 'DÍA') {
                         foundFechaCol = c;
                         break;
+                    }
+                }
+
+                // Fallback para matrices Excel cuya columna de fechas no tiene encabezado "FECHA" (ej. [vacío | hueso | gordana])
+                if (foundFechaCol === -1 && !mode) {
+                    let firstKnownProdCol = -1;
+                    let knownProdCount = 0;
+                    for (let c = 2; c <= maxCol; c++) {
+                        const h = cellTexts[c];
+                        if (!h || IGNORE_COL_HEADERS.has(h)) continue;
+                        const rawClean = limpiarNombreProductoCrudo(h);
+                        if (rawClean && esProductoConocidoEnDiccionarioBase(rawClean)) {
+                            if (firstKnownProdCol === -1) firstKnownProdCol = c;
+                            knownProdCount++;
+                        }
+                    }
+                    if (knownProdCount >= 1 && firstKnownProdCol >= 2) {
+                        const maxLookahead = Math.min(targetSheet.rowCount || rowNumber + 6, rowNumber + 6);
+                        for (let fc = 1; fc < firstKnownProdCol && foundFechaCol === -1; fc++) {
+                            for (let lr = rowNumber + 1; lr <= maxLookahead; lr++) {
+                                const nextRow = targetSheet.getRow(lr);
+                                const rawCand = getExcelCellVal(nextRow.getCell(fc));
+                                const dCand = parsearFechaCeldaUniversal(rawCand, currentMesDetectado, anioObjetivo);
+                                if (dCand && (dCand.hasExplicitMonth || rawCand instanceof Date)) {
+                                    let hasProdNum = false;
+                                    for (let pcCol = firstKnownProdCol; pcCol <= maxCol; pcCol++) {
+                                        if (cellTexts[pcCol] && getExcelCellNum(nextRow.getCell(pcCol)) > 0) {
+                                            hasProdNum = true;
+                                            break;
+                                        }
+                                    }
+                                    if (hasProdNum) {
+                                        foundFechaCol = fc;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -6077,11 +6115,6 @@
                         return;
                     }
 
-                    if (/^TOTAL|TOTALES|SUBTOTAL|PROMEDIO|CANTIDAD|FACTURAR|DOMINGO|FESTIVO/.test(firstLabels)) {
-                        if (/^TOTAL|CANTIDAD|FACTURAR/.test(firstLabels)) resumenBoletinAlcanzado = true;
-                        return;
-                    }
-
                     const rawFechaCell = getExcelCellVal(row.getCell(colFechaIdx));
                     // Si la celda de fecha contiene nombre de mes (ej. "AGOSTO PDTE", "SEPTIEMBRE"), actualizar mes activo
                     const mesEnCelda = detectarMesDeTexto(rawFechaCell) || detectarMesDeTexto(firstLabels);
@@ -6089,10 +6122,25 @@
 
                     let dInfo = parsearFechaCeldaUniversal(rawFechaCell, currentMesDetectado, anioObjetivo);
 
+                    if (!dInfo && (/^TOTAL|TOTALES|SUBTOTAL|PROMEDIO|CANTIDAD|FACTURAR|DOMINGO|FESTIVO/.test(firstLabels) || /\b(?:X\s*FACTURAR|FACTURA)\b/.test(firstLabels))) {
+                        if (/^TOTAL|SUBTOTAL|CANTIDAD|FACTURAR|FACTURA/.test(firstLabels)) resumenBoletinAlcanzado = true;
+                        return;
+                    }
+
                     // Si no tiene fecha parseable pero la fila contiene cantidades numéricas positivas de producto (despacho por lotes / liquidación)
                     const hasProductValues = productCols.some(pc => getExcelCellNum(row.getCell(pc.colIdx)) > 0);
+                    const hasSumFormula = productCols.some(pc => {
+                        const cv = row.getCell(pc.colIdx)?.value;
+                        return cv && typeof cv === 'object' && /SUM|SUBTOTAL|SUMA/i.test(String(cv.formula || cv.sharedFormula || ''));
+                    });
+                    const fechaStrRawTrim = String(rawFechaCell === null || rawFechaCell === undefined ? '' : rawFechaCell).trim();
+                    const esTotalSinEtiqueta = !fechaStrRawTrim && !mesEnCelda && currentBlock.some(it => !it.esLoteSinDia);
                     const fechaVaciaOPeriodo = (rawFechaCell === '' || rawFechaCell === null || rawFechaCell === undefined) || !!mesEnCelda;
                     const filaEsTotal = /\bTOTAL\b|FACTURA/.test(cellTexts.filter(Boolean).join(' '));
+                    if (!dInfo && hasProductValues && (hasSumFormula || esTotalSinEtiqueta || filaEsTotal)) {
+                        resumenBoletinAlcanzado = true;
+                        return;
+                    }
                     if (!dInfo && hasProductValues && fechaVaciaOPeriodo && !filaEsTotal && !resumenBoletinAlcanzado) {
                         currentBatchNum++;
                         const mNum = currentMesDetectado;

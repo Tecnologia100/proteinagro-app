@@ -831,6 +831,11 @@ i.fecha), consolidándose directamente en la fila de ese día.
   - Verificado con suite E2E automatizada (`24/24 PASS`) y bumping de caché PWA a `proteinagro-v1.9.10`.
   - **Fix Tabla Detalle de Registros en `CONCILIADOR.html` (`v1.9.10`):** Definida la función `escapeHtml` faltante en `CONCILIADOR.html` (usada al renderizar badges de `ENTREGADO_POR` / `TIPO_SOPORTE` en `applyFilters`), cuya ausencia lanzaba `ReferenceError` después de actualizar los KPIs (`Total KG`, `Registros Filtrados`) dejando `#tableBody` vacío y el estado bloqueado cuando el filtro incluía registros de noviembre con soporte.
 
+### 46. Parser Excel para Cabeceras sin Texto `FECHA`, Corte de Resumen Sin Etiqueta y Auditoría Caribe Cavasa (`CONCILIADOR.html v1.9.11`)
+- **Detección de Matrices sin Etiqueta de Fecha (`ejecutarConciliacionUniversal`):** Si la columna de fechas tiene encabezado vacío (ej. `[vacío | hueso | gordana]` seguido de `8-oct-26`), `foundFechaCol` permanecía en `-1` y descartaba el 100% del Excel. Se agregó detección *lookahead* sobre las filas siguientes (`rowNumber + 1 .. +6`) buscando fechas reales junto a columnas de producto conocidas.
+- **Corte Seguro de Filas Resumen Sin Etiqueta:** Detectadas filas de suma (`formula` `SUM`/`SUBTOTAL`, o fila sin fecha ni mes inmediatamente posterior a despachos con fecha real) y filas `FACTURA` / `X FACTURAR` activando `resumenBoletinAlcanzado = true`, evitando que totales (`4143,2`), saldos por facturar o tarifas (`$350`, `$2.000`) entren como falsos lotes.
+- **Endurecimiento Auxiliar:** `getExcelCellNum` rechaza cadenas alfanuméricas (`"01EA-532"`, `"8-oct-26"`), `parsearFechaCeldaUniversal` acepta abreviaturas con punto (`"8-oct.-26"`), y `autodetectarProveedorYPeriodo` escanea columnas `1..6` desde fila 2.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
