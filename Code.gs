@@ -18,7 +18,7 @@ function doGet(e) {
     }
 
     // 0.1 Si viene una petición de guardado vía GET (Garantía 100% anti-bloqueos)
-    if (e && e.parameter && (e.parameter.action === 'saveRecoleccion' || e.parameter.action === 'saveNovedad' || (e.parameter.payload && !e.parameter.t))) {
+    if (e && e.parameter && (e.parameter.action === 'saveRecoleccion' || e.parameter.action === 'saveNovedad' || (!e.parameter.action && e.parameter.payload && !e.parameter.t))) {
       return guardarRecoleccionSheet(ss, e.parameter.payload);
     }
 
@@ -90,6 +90,18 @@ function doGet(e) {
       var resCrear = crearProductoTarifaSheet(ss, pData);
       return ContentService.createTextOutput(JSON.stringify(resCrear))
         .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 0.16 Gestor Rápido de Tarifas y Vigencia Temporal (v2.0.0)
+    if (e && e.parameter && e.parameter.action === 'getTarifas') {
+      return obtenerTarifasHttp_(ss);
+    }
+    if (e && e.parameter && e.parameter.action === 'actualizarTarifasMasivo') {
+      var payloadTar = e.parameter.payload || e.parameter.data || e.parameter;
+      return actualizarTarifasMasivoSheet_(ss, payloadTar);
+    }
+    if (e && e.parameter && e.parameter.action === 'aplicarListaPreciosNov23') {
+      return aplicarListaPreciosNov23Sheet_(ss);
     }
 
     // 1. Obtener Productos (filtrando Inactivos)
@@ -256,17 +268,34 @@ function doGet(e) {
       return a.localeCompare(b, 'es', { sensitivity: 'base' });
     });
 
-    // Mapa dinámico de productos por proveedor desde Tarifas (v1.9.6)
+    // Mapa dinámico de productos por proveedor desde Tarifas (v2.0.0 con Vigente_Desde)
     var sheetTarifas = ss.getSheetByName("Tarifas");
     var mapaProveedorProductos = {};
     if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
-      var tData = sheetTarifas.getRange(2, 1, sheetTarifas.getLastRow() - 1, 6).getValues();
+      var lastRowT = sheetTarifas.getLastRow();
+      var lastColT = Math.min(sheetTarifas.getMaxColumns(), Math.max(6, sheetTarifas.getLastColumn()));
+      var headersT = sheetTarifas.getRange(1, 1, 1, lastColT).getValues()[0];
+      var colIdxT = { prov: 1, punto: 2, prod: 3, estado: 5, vigenteDesde: (lastColT >= 8 ? 7 : -1) };
+      for (var hc = 0; hc < headersT.length; hc++) {
+        var hh = normalizarTexto(headersT[hc]);
+        if (hh.indexOf('proveedor') !== -1) colIdxT.prov = hc;
+        else if (hh.indexOf('punto') !== -1 || hh.indexOf('sucursal') !== -1) colIdxT.punto = hc;
+        else if (hh.indexOf('producto') !== -1 || hh.indexOf('materia') !== -1) colIdxT.prod = hc;
+        else if (hh.indexOf('estado') !== -1) colIdxT.estado = hc;
+        else if (hh.indexOf('vigente') !== -1 || hh.indexOf('vigencia') !== -1) colIdxT.vigenteDesde = hc;
+      }
+      var hoyIso = obtenerFechaHoyIsoColombia_();
+      var tData = sheetTarifas.getRange(2, 1, lastRowT - 1, lastColT).getValues();
       for (var ti = 0; ti < tData.length; ti++) {
-        var tProv = homologarProveedor(tData[ti][1]);
-        var tPunto = homologarPunto(tData[ti][2]);
-        var tProd = String(tData[ti][3] || '').trim().toUpperCase();
-        var tEst = String(tData[ti][5] || 'Activo').trim().toLowerCase();
+        var tProv = homologarProveedor(tData[ti][colIdxT.prov]);
+        var tPunto = homologarPunto(tData[ti][colIdxT.punto]);
+        var tProd = String(tData[ti][colIdxT.prod] || '').trim().toUpperCase();
+        var tEst = String(tData[ti][colIdxT.estado] || 'Activo').trim().toLowerCase();
         if (!tProv || !tProd || tEst === 'inactivo') continue;
+
+        var rawVigT = (colIdxT.vigenteDesde !== -1 && colIdxT.vigenteDesde < tData[ti].length) ? tData[ti][colIdxT.vigenteDesde] : '';
+        var tVigIso = normalizarFechaIso_(rawVigT, '2026-01-01');
+        if (tVigIso > hoyIso) continue;
         
         var keyPunto = tProv + '|' + tPunto;
         if (!mapaProveedorProductos[keyPunto]) mapaProveedorProductos[keyPunto] = [];
@@ -282,7 +311,7 @@ function doGet(e) {
     }
 
     var output = {
-      version: "1.9.6-catalogo-dinamico-proveedor",
+      version: "2.0.0-vigencia-tarifas",
       productos: productos,
       conductores: conductores,
       conductores_detalle: conductoresDetalle,
@@ -458,15 +487,18 @@ function productosCoinciden(prod1, prod2) {
   return false;
 }
 
-function guardarRecoleccionSheet(ss, rawPayload) {
-  var lock = LockService.getScriptLock();
+function guardarRecoleccionSheet(ss, rawPayload, skipLock) {
+  var lock = null;
   var lockAcquired = false;
   try {
     // 1. Bloqueo de concurrencia: evitar que sincronizaciones simultáneas sobreescriban filas o colisionen
-    try {
-      lockAcquired = lock.tryLock(20000); // 20 segundos máx de espera
-    } catch (eLock) {
-      Logger.log("Aviso LockService: " + eLock.toString());
+    if (!skipLock) {
+      lock = LockService.getScriptLock();
+      try {
+        lockAcquired = lock.tryLock(20000); // 20 segundos máx de espera
+      } catch (eLock) {
+        Logger.log("Aviso LockService: " + eLock.toString());
+      }
     }
 
     var sheet = ss.getSheetByName("Recolecciones");
@@ -615,6 +647,7 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     // 2. Optimización O(1): Cargar Tarifas una sola vez en memoria antes del bucle de productos
     var catalogoTarifas = cargarCatalogoTarifas(ss);
     var catalogoHistorico = null; // Carga perezosa si algún producto lo requiere
+    var preciosPreservados = (data._preciosPreservados && typeof data._preciosPreservados === 'object') ? data._preciosPreservados : null;
 
     var filasNuevas = [];
     var filasFactura = [];
@@ -653,7 +686,7 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         continue;
       }
 
-      // Búsqueda inteligente en memoria (Tarifas primero, fallback a histórico si hace falta)
+      // Búsqueda inteligente en memoria (Precio preservado en edición -> Tarifas por fecha -> Histórico)
       var precio = '';
       var valor = '';
       if (esNovedad) {
@@ -661,15 +694,33 @@ function guardarRecoleccionSheet(ss, rawPayload) {
         precio = 0;
         valor = 0;
       } else {
-        var pTarifa = buscarPrecioEnCatalogoTarifas(catalogoTarifas, proveedor, punto, prodNombre);
-        if (pTarifa !== null && pTarifa > 0) {
-          precio = pTarifa;
-        } else {
-          // Si no está en Tarifas, consultar histórico de Recolecciones (cargado a lo sumo 1 vez)
-          if (!catalogoHistorico) {
-            catalogoHistorico = cargarHistoricoRecolecciones(ss);
+        var precioPreservado = null;
+        if (preciosPreservados && prodNombre) {
+          var prodNormPres = normalizarTexto(prodNombre);
+          if (preciosPreservados[prodNormPres] && preciosPreservados[prodNormPres] > 0) {
+            precioPreservado = preciosPreservados[prodNormPres];
+          } else {
+            for (var pk in preciosPreservados) {
+              if (preciosPreservados[pk] > 0 && productosCoinciden(pk, prodNombre)) {
+                precioPreservado = preciosPreservados[pk];
+                break;
+              }
+            }
           }
-          precio = buscarPrecioEnHistorico(catalogoHistorico, proveedor, punto, prodNombre);
+        }
+        if (precioPreservado !== null) {
+          precio = precioPreservado;
+        } else {
+          var pTarifa = buscarPrecioEnCatalogoTarifas(catalogoTarifas, proveedor, punto, prodNombre, fecha);
+          if (pTarifa !== null && pTarifa > 0) {
+            precio = pTarifa;
+          } else {
+            // Si no está en Tarifas, consultar histórico de Recolecciones (cargado a lo sumo 1 vez)
+            if (!catalogoHistorico) {
+              catalogoHistorico = cargarHistoricoRecolecciones(ss);
+            }
+            precio = buscarPrecioEnHistorico(catalogoHistorico, proveedor, punto, prodNombre);
+          }
         }
         if (precio !== '' && !isNaN(parseFloat(precio)) && prodKilos > 0) {
           valor = Math.round(parseFloat(precio) * prodKilos * 100) / 100;
@@ -761,7 +812,7 @@ function guardarRecoleccionSheet(ss, rawPayload) {
     return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": errMsg}))
       .setMimeType(ContentService.MimeType.JSON);
   } finally {
-    if (lockAcquired) {
+    if (lockAcquired && lock) {
       try { lock.releaseLock(); } catch(eRel) {}
     }
   }
@@ -949,9 +1000,22 @@ function habilitarColumnasSoporteHttp(ss) {
 }
 
 // ==============================================================================
-// ACTUALIZAR / CORREGIR RECOLECCIÓN EXISTENTE EN HOJA RECOLECCIONES (v1.4.4)
+// ACTUALIZAR / CORREGIR RECOLECCIÓN EXISTENTE EN HOJA RECOLECCIONES (v2.0.0)
+// Blindado con LockService y preservación de precios históricos y soportes
 // ==============================================================================
 function actualizarRecoleccionSheet(ss, rawPayload) {
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
+  try {
+    lock.waitLock(20000);
+    lockAcquired = true;
+  } catch (eLock) {
+    return ContentService.createTextOutput(JSON.stringify({
+      "result": "error",
+      "error": "El servidor está ocupado procesando otra actualización. Intente en unos segundos."
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   try {
     var sheet = ss.getSheetByName("Recolecciones");
     if (!sheet) throw new Error("No existe la pestaña Recolecciones.");
@@ -966,13 +1030,76 @@ function actualizarRecoleccionSheet(ss, rawPayload) {
 
     var idTarget = String(data.id).trim();
     var lastRow = sheet.getLastRow();
+    var preciosHistoricosPorProd = {};
+    var prevMeta = {
+      fecha: '',
+      proveedor: '',
+      ubicacionGps: '',
+      numeroFactura: '',
+      valorFactura: '',
+      fotoFactura: '',
+      tipoSoporte: '',
+      fotoSoporte: '',
+      entregadoPor: ''
+    };
+
     if (lastRow > 1) {
-      var idColData = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      var colsToRead = Math.min(sheet.getLastColumn(), 20);
+      var allRowsData = sheet.getRange(2, 1, lastRow - 1, colsToRead).getValues();
       var rowsToDelete = [];
-      for (var r = idColData.length - 1; r >= 0; r--) {
-        var currentId = String(idColData[r][0] || '').trim();
+      for (var r = allRowsData.length - 1; r >= 0; r--) {
+        var row = allRowsData[r];
+        var currentId = String(row[0] || '').trim();
         if (currentId === idTarget) {
           rowsToDelete.push(r + 2); // Índice base 1
+
+          // Preservar precios históricos por producto (> 0)
+          var oldProd = colsToRead > 6 ? normalizarTexto(row[6]) : '';
+          var oldPrecio = colsToRead > 10 ? parsePrecioMoneda(row[10]) : null;
+          if (oldProd && oldPrecio !== null && oldPrecio > 0 && !preciosHistoricosPorProd[oldProd]) {
+            preciosHistoricosPorProd[oldProd] = oldPrecio;
+          }
+
+          // Preservar metadatos existentes si el payload no los trae
+          if (!prevMeta.fecha && colsToRead > 1 && row[1]) {
+            prevMeta.fecha = (row[1] instanceof Date)
+              ? Utilities.formatDate(row[1], "GMT-5", "d/M/yyyy HH:mm:ss")
+              : String(row[1]).trim();
+          }
+          if (!prevMeta.proveedor && colsToRead > 4 && row[4]) {
+            prevMeta.proveedor = String(row[4]).trim();
+          }
+          if (colsToRead > 9) {
+            var gpsVal = String(row[9] || '').trim();
+            if (gpsVal && gpsVal !== '0' && !prevMeta.ubicacionGps) prevMeta.ubicacionGps = gpsVal;
+          }
+          if (colsToRead > 14 && !prevMeta.numeroFactura) {
+            var nfVal = String(row[14] || '').trim();
+            if (nfVal) prevMeta.numeroFactura = nfVal;
+          }
+          if (colsToRead > 15 && prevMeta.valorFactura === '') {
+            var vfVal = row[15];
+            var vfNum = parsePrecioMoneda(vfVal);
+            if (vfNum !== null && vfNum > 0) {
+              prevMeta.valorFactura = vfNum;
+            }
+          }
+          if (colsToRead > 16 && !prevMeta.fotoFactura) {
+            var ffVal = String(row[16] || '').trim();
+            if (ffVal) prevMeta.fotoFactura = ffVal;
+          }
+          if (colsToRead > 17 && !prevMeta.tipoSoporte) {
+            var tsVal = String(row[17] || '').trim();
+            if (tsVal) prevMeta.tipoSoporte = tsVal;
+          }
+          if (colsToRead > 18 && !prevMeta.fotoSoporte) {
+            var fsVal = String(row[18] || '').trim();
+            if (fsVal) prevMeta.fotoSoporte = fsVal;
+          }
+          if (colsToRead > 19 && !prevMeta.entregadoPor) {
+            var epVal = String(row[19] || '').trim();
+            if (epVal) prevMeta.entregadoPor = epVal;
+          }
         }
       }
       for (var d = 0; d < rowsToDelete.length; d++) {
@@ -980,11 +1107,47 @@ function actualizarRecoleccionSheet(ss, rawPayload) {
       }
     }
 
-    // Re-insertar filas corregidas con cálculo de precio/valor automático
-    return guardarRecoleccionSheet(ss, data);
+    // Completar metadatos preservados solo si el payload entrante no los envía
+    if (!data.fecha && prevMeta.fecha) data.fecha = prevMeta.fecha;
+    if ((!data.ubicacionGps || String(data.ubicacionGps).trim() === '' || String(data.ubicacionGps).trim() === '0') && prevMeta.ubicacionGps) {
+      data.ubicacionGps = prevMeta.ubicacionGps;
+    }
+    if (!String(data.numeroFactura || data.numero_factura || '').trim() && prevMeta.numeroFactura) {
+      data.numeroFactura = prevMeta.numeroFactura;
+    }
+    var incValFact = (data.valorFactura !== undefined && data.valorFactura !== null && data.valorFactura !== '')
+      ? data.valorFactura
+      : data.valor_factura;
+    var incValFactNum = parsePrecioMoneda(incValFact);
+    if ((incValFactNum === null || incValFactNum <= 0) && prevMeta.valorFactura !== '') {
+      data.valorFactura = prevMeta.valorFactura;
+    }
+    if (!String(data.fotoFactura || data.foto_factura || '').trim() && prevMeta.fotoFactura) {
+      data.fotoFactura = prevMeta.fotoFactura;
+    }
+    if (!String(data.tipoSoporte || data.tipo_soporte || '').trim() && prevMeta.tipoSoporte) {
+      data.tipoSoporte = prevMeta.tipoSoporte;
+    }
+    if (!String(data.fotoSoporte || data.foto_soporte || '').trim() && prevMeta.fotoSoporte) {
+      data.fotoSoporte = prevMeta.fotoSoporte;
+    }
+    if (!String(data.entregadoPor || data.entregado_por || '').trim() && prevMeta.entregadoPor) {
+      data.entregadoPor = prevMeta.entregadoPor;
+    }
+    var mismoProveedor = !prevMeta.proveedor || !data.proveedor || (normalizarTexto(data.proveedor) === normalizarTexto(prevMeta.proveedor));
+    if (mismoProveedor && Object.keys(preciosHistoricosPorProd).length > 0) {
+      data._preciosPreservados = preciosHistoricosPorProd;
+    }
+
+    // Re-insertar filas corregidas preservando precio histórico (skipLock = true porque ya tenemos ScriptLock)
+    return guardarRecoleccionSheet(ss, data, true);
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    if (lockAcquired) {
+      try { lock.releaseLock(); } catch(eRel) {}
+    }
   }
 }
 
@@ -1065,13 +1228,14 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
       var tipo = String(nov.tipoNovedad || nov.tipo || '').toUpperCase().trim();
       var prodNombre = String(nov.producto || nov.materia || '').trim();
       var kgTarget = parseKilosNumero(nov.kilos !== undefined ? nov.kilos : (nov.kilosProveedor !== undefined ? nov.kilosProveedor : (nov.kg || 0)));
+      var punto = nov.punto || nov.sucursal || '';
       var prov = removerEmojisDecorativos(nov.proveedor || '');
       if (prov.indexOf('/') !== -1) {
         var provParts = prov.split('/').map(function(p) { return p.trim(); }).filter(Boolean);
         if (provParts.length > 0) {
           var mejorProv = provParts[0];
           for (var pp = 0; pp < provParts.length; pp++) {
-            if (buscarPrecioEnCatalogoTarifas(catalogoTarifas, provParts[pp], punto, prodNombre) > 0) {
+            if (buscarPrecioEnCatalogoTarifas(catalogoTarifas, provParts[pp], punto, prodNombre, nov.fechaHora || nov.fecha) > 0) {
               mejorProv = provParts[pp];
               break;
             }
@@ -1079,7 +1243,6 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
           prov = mejorProv;
         }
       }
-      var punto = nov.punto || nov.sucursal || '';
       var ruta = nov.ruta || '';
       var cond = nov.conductor || '';
       var numFactura = String(nov.factura || nov.numeroFactura || nov.numero_factura || '').trim();
@@ -1132,7 +1295,7 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
           var prevPrecio = parsePrecioMoneda(rowData[10]);
 
           if (prevPrecio === null || prevPrecio <= 0) {
-            var pTarifa = buscarPrecioEnCatalogoTarifas(catalogoTarifas, prov || rowData[4], punto || rowData[5], prodNombre);
+            var pTarifa = buscarPrecioEnCatalogoTarifas(catalogoTarifas, prov || rowData[4], punto || rowData[5], prodNombre, rowData[1] || nov.fechaHora || nov.fecha);
             if (pTarifa !== null && pTarifa > 0) {
               prevPrecio = pTarifa;
             } else {
@@ -1232,7 +1395,7 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
         if (rowToUpdate !== -1) {
           var rowData = allData[rowArrIndex];
           var curKg = kgTarget > 0 ? kgTarget : parseKilosNumero(rowData[7]);
-          var nuevoPrecio = buscarPrecioEnCatalogoTarifas(catalogoTarifas, prov || rowData[4], punto || rowData[5], prodNuevo);
+          var nuevoPrecio = buscarPrecioEnCatalogoTarifas(catalogoTarifas, prov || rowData[4], punto || rowData[5], prodNuevo, rowData[1] || nov.fechaHora || nov.fecha);
           if (nuevoPrecio === null || nuevoPrecio <= 0) {
             if (!catalogoHistorico) catalogoHistorico = cargarHistoricoRecolecciones(ss);
             nuevoPrecio = buscarPrecioEnHistorico(catalogoHistorico, prov || rowData[4], punto || rowData[5], prodNuevo) || parsePrecioMoneda(rowData[10]) || 0;
@@ -1360,7 +1523,7 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
         }
 
         var precioItem = '';
-        var pTarifaNew = buscarPrecioEnCatalogoTarifas(catalogoTarifas, prov, punto, prodNombre);
+        var pTarifaNew = buscarPrecioEnCatalogoTarifas(catalogoTarifas, prov, punto, prodNombre, fechaStr);
         if (pTarifaNew !== null && pTarifaNew > 0) {
           precioItem = pTarifaNew;
         } else {
@@ -1445,7 +1608,7 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
       error: err.message || err.toString()
     })).setMimeType(ContentService.MimeType.JSON);
   } finally {
-    if (lockAcquired) {
+    if (lockAcquired && lock) {
       try { lock.releaseLock(); } catch(eRel) {}
     }
   }
@@ -1492,6 +1655,147 @@ function eliminarRecoleccionSheet(ss, idTarget, productoTarget) {
 }
 
 // ==============================================================================
+// HELPERS DE VIGENCIA TEMPORAL EN COLOMBIA (GMT-5) Y ESTRUCTURA TARIFAS (v2.0.0)
+// ==============================================================================
+
+function obtenerFechaHoyIsoColombia_() {
+  return Utilities.formatDate(new Date(), "GMT-5", "yyyy-MM-dd");
+}
+
+function normalizarFechaIso_(val, defaultIso) {
+  var fallback = (defaultIso !== undefined && defaultIso !== null) ? String(defaultIso) : '2026-01-01';
+  if (val === null || val === undefined || val === '') return fallback;
+
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return fallback;
+    return Utilities.formatDate(val, "GMT-5", "yyyy-MM-dd");
+  }
+
+  var s = String(val).trim();
+  if (!s) return fallback;
+
+  var y = 0, m = 0, d = 0;
+  // 1. Formato ISO YYYY-MM-DD o YYYY/MM/DD (con o sin hora/sufijo)
+  var mIso = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?:$|[\sT,;])/);
+  if (mIso) {
+    y = parseInt(mIso[1], 10);
+    m = parseInt(mIso[2], 10);
+    d = parseInt(mIso[3], 10);
+  } else {
+    // 2. Formato Latino DD/MM/YYYY o DD-MM-YYYY (con o sin hora/coma)
+    var mLat = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:$|[\s,;])/);
+    if (mLat) {
+      d = parseInt(mLat[1], 10);
+      m = parseInt(mLat[2], 10);
+      y = parseInt(mLat[3], 10);
+      if (y < 100) y += 2000;
+    } else {
+      // 3. Fallback usando normalizarFechaDia
+      var viaDia = normalizarFechaDia(s);
+      var mDia = viaDia ? viaDia.match(/^(\d{4})-(\d{2})-(\d{2})$/) : null;
+      if (mDia) {
+        y = parseInt(mDia[1], 10);
+        m = parseInt(mDia[2], 10);
+        d = parseInt(mDia[3], 10);
+      }
+    }
+  }
+
+  if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+    return String(y) + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2);
+  }
+  return fallback;
+}
+
+function crearRespaldoSiNoExiste_(ss, sheet, nombreRespaldo) {
+  try {
+    if (!ss || !sheet || !nombreRespaldo) return '';
+    if (!ss.getSheetByName(nombreRespaldo)) {
+      var bak = sheet.copyTo(ss);
+      bak.setName(nombreRespaldo);
+    }
+    return nombreRespaldo;
+  } catch (eBak) {
+    Logger.log("Aviso creando respaldo " + nombreRespaldo + ": " + eBak.toString());
+    return '';
+  }
+}
+
+// Garantiza columna Vigente_Desde estrictamente al final en Columna H (idx 7, col 8)
+// sin tocar ni renombrar columnas A..G (Ruta..Observaciones, conservando Estado)
+function garantizarColumnaVigenciaTarifas_(sheetTarifas) {
+  if (!sheetTarifas) return 7;
+  var lastCol = Math.max(sheetTarifas.getLastColumn(), 1);
+  var headers = sheetTarifas.getRange(1, 1, 1, lastCol).getValues()[0];
+  var vigIdx = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = normalizarTexto(headers[c]);
+    if (h.indexOf('vigente') !== -1 || h.indexOf('vigencia') !== -1) {
+      vigIdx = c;
+      break;
+    }
+  }
+
+  if (vigIdx === -1) {
+    var maxCols = sheetTarifas.getMaxColumns();
+    if (maxCols < 8) {
+      sheetTarifas.insertColumnsAfter(maxCols, 8 - maxCols);
+    }
+    vigIdx = 7; // Columna H (0-based idx 7, 1-based col 8)
+    var hdrCell = sheetTarifas.getRange(1, 8);
+    try {
+      var refCol = (lastCol >= 7 && String(headers[6] || '').trim() !== '') ? 7 : (lastCol >= 6 ? 6 : 1);
+      sheetTarifas.getRange(1, refCol).copyTo(hdrCell, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    } catch (eFmt) {
+      hdrCell.setBackground('#1e293b')
+             .setFontColor('#ffffff')
+             .setFontWeight('bold')
+             .setHorizontalAlignment('center');
+    }
+    hdrCell.setValue('Vigente_Desde').setFontWeight('bold');
+  }
+
+  var lastRow = sheetTarifas.getLastRow();
+  if (lastRow > 1) {
+    var numDataRows = lastRow - 1;
+    var vigCol1 = vigIdx + 1;
+    var coreCols = Math.min(4, Math.max(sheetTarifas.getLastColumn(), 1));
+    var coreData = sheetTarifas.getRange(2, 1, numDataRows, coreCols).getValues();
+    var vigRange = sheetTarifas.getRange(2, vigCol1, numDataRows, 1);
+    var vigVals = vigRange.getValues();
+    var changed = false;
+
+    for (var r = 0; r < numDataRows; r++) {
+      var hasProv = coreCols > 1 && String(coreData[r][1] || '').trim() !== '';
+      var hasProd = coreCols > 3 && String(coreData[r][3] || '').trim() !== '';
+      var curVal = vigVals[r][0];
+      var isEmpty = (curVal === null || curVal === undefined || String(curVal).trim() === '');
+      if ((hasProv || hasProd) && isEmpty) {
+        vigVals[r][0] = '2026-01-01';
+        changed = true;
+      } else if (!isEmpty && curVal instanceof Date) {
+        vigVals[r][0] = normalizarFechaIso_(curVal, '2026-01-01');
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      vigRange.setNumberFormat('@');
+      vigRange.setValues(vigVals);
+    }
+  }
+
+  return vigIdx;
+}
+
+function esMejorTarifaTemporal_(cand, best) {
+  if (!best) return true;
+  if (cand.vigenteDesde > best.vigenteDesde) return true;
+  if (cand.vigenteDesde === best.vigenteDesde && (cand.rowIndex || 0) >= (best.rowIndex || 0)) return true;
+  return false;
+}
+
+// ==============================================================================
 // MOTOR INTELIGENTE DE TARIFA VIGENTE (HOJA TARIFAS + FALLBACK HISTÓRICO)
 // ==============================================================================
 
@@ -1505,14 +1809,15 @@ function cargarCatalogoTarifas(ss) {
     var lastRow = sheetTarifas.getLastRow();
     var lastCol = sheetTarifas.getLastColumn();
     var headers = sheetTarifas.getRange(1, 1, 1, lastCol).getValues()[0];
-    var colIdx = { prov: 1, punto: 2, prod: 3, precio: 4, estado: 5 };
+    var colIdx = { prov: 1, punto: 2, prod: 3, precio: 4, estado: 5, vigenteDesde: (lastCol >= 8 ? 7 : -1) };
     for (var c = 0; c < headers.length; c++) {
       var h = normalizarTexto(headers[c]);
       if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
       else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
       else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
-      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
       else if (h.indexOf('estado') !== -1) colIdx.estado = c;
+      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+      else if (h.indexOf('vigente') !== -1 || h.indexOf('vigencia') !== -1) colIdx.vigenteDesde = c;
     }
     var raw = sheetTarifas.getRange(2, 1, lastRow - 1, lastCol).getValues();
     for (var i = 0; i < raw.length; i++) {
@@ -1520,11 +1825,14 @@ function cargarCatalogoTarifas(ss) {
       if (est === 'inactivo') continue;
       var cleanP = parsePrecioMoneda(raw[i][colIdx.precio]);
       if (cleanP === null || cleanP <= 0) continue;
+      var rawVig = (colIdx.vigenteDesde !== -1 && colIdx.vigenteDesde < raw[i].length) ? raw[i][colIdx.vigenteDesde] : '';
       catalogo.push({
         prov: normalizarTexto(raw[i][colIdx.prov]),
         punto: normalizarTexto(raw[i][colIdx.punto]),
         prod: normalizarTexto(raw[i][colIdx.prod]),
-        precio: cleanP
+        precio: cleanP,
+        vigenteDesde: normalizarFechaIso_(rawVig, '2026-01-01'),
+        rowIndex: i
       });
     }
   } catch(e) {
@@ -1533,70 +1841,92 @@ function cargarCatalogoTarifas(ss) {
   return catalogo;
 }
 
-// Búsqueda en memoria de precio vigente en Tarifas con matching exacto de producto
-function buscarPrecioEnCatalogoTarifas(catalogo, proveedor, punto, producto) {
+// Búsqueda en memoria de precio vigente en Tarifas con vigencia temporal y matching exacto de producto
+function buscarPrecioEnCatalogoTarifas(catalogo, proveedor, punto, producto, fechaRecoleccion) {
   if (!catalogo || catalogo.length === 0) return null;
   var targetProv = normalizarTexto(proveedor);
   var targetPunto = normalizarTexto(punto);
   var targetProd = normalizarTexto(producto);
+  var fechaTarget = normalizarFechaIso_(fechaRecoleccion, obtenerFechaHoyIsoColombia_());
 
-  var precioExactoPunto = null;
-  var precioGeneralProv = null;
-  var precioParcial = null;
+  var bestNivel1 = null; // Prov exacto + Punto exacto/parcial
+  var bestNivel2 = null; // Prov exacto + Punto vacío/todas/general
+  var bestNivel3 = null; // Prov parcial
   var provKeywords = targetProv.split(/[\s\-]+/).filter(function(w) { return w.length > 3; });
 
   for (var i = 0; i < catalogo.length; i++) {
     var row = catalogo[i];
+    var rowVig = row.vigenteDesde || '2026-01-01';
+    // ¡REGLA TEMPORAL!: Solo aplica si vigenteDesde <= fechaRecoleccion
+    if (rowVig > fechaTarget) continue;
+
     // ¡REGLA CRÍTICA!: El producto debe coincidir de forma exacta (o singular/plural idéntico)
     if (!productosCoinciden(row.prod, targetProd)) continue;
 
-    // Nivel 1: Proveedor exacto + Punto exacto
-    if (row.prov === targetProv && targetPunto !== '' && (row.punto === targetPunto || row.punto.indexOf(targetPunto) !== -1)) {
-      precioExactoPunto = row.precio;
-      break;
+    var cand = { precio: row.precio, vigenteDesde: rowVig, rowIndex: (row.rowIndex !== undefined ? row.rowIndex : i) };
+
+    // Nivel 1: Proveedor exacto + Punto exacto/parcial (sin break: elegir mayor vigenteDesde)
+    if (row.prov === targetProv && targetPunto !== '' && (row.punto === targetPunto || (row.punto !== '' && row.punto.indexOf(targetPunto) !== -1))) {
+      if (esMejorTarifaTemporal_(cand, bestNivel1)) bestNivel1 = cand;
     }
 
-    // Nivel 2: Proveedor exacto + Todas las sucursales (o general)
+    // Nivel 2: Proveedor exacto + Todas las sucursales (o general/vacío)
     if (row.prov === targetProv && (row.punto === '' || row.punto.indexOf('todas') !== -1 || row.punto.indexOf('general') !== -1)) {
-      if (precioGeneralProv === null) precioGeneralProv = row.precio;
+      if (esMejorTarifaTemporal_(cand, bestNivel2)) bestNivel2 = cand;
     }
 
     // Nivel 3: Coincidencia parcial de proveedor
-    if (precioParcial === null) {
+    var matchParcial = false;
+    if (row.prov && targetProv) {
       if (targetProv.indexOf(row.prov) !== -1 || row.prov.indexOf(targetProv) !== -1) {
-        precioParcial = row.precio;
+        matchParcial = true;
       } else {
         for (var k = 0; k < provKeywords.length; k++) {
           if (row.prov.indexOf(provKeywords[k]) !== -1) {
-            precioParcial = row.precio;
+            matchParcial = true;
             break;
           }
         }
       }
     }
+    if (matchParcial && esMejorTarifaTemporal_(cand, bestNivel3)) {
+      bestNivel3 = cand;
+    }
   }
 
-  if (precioExactoPunto !== null) return precioExactoPunto;
-  if (precioGeneralProv !== null) return precioGeneralProv;
-  if (precioParcial !== null) return precioParcial;
+  if (bestNivel1 !== null) return bestNivel1.precio;
+  if (bestNivel2 !== null) return bestNivel2.precio;
+  if (bestNivel3 !== null) return bestNivel3.precio;
 
-  // Respaldo histórico específico para comercios de Ruta 1 (Santa Elena / Cavasa)
+  // Nivel 4: Respaldo histórico específico para comercios de Ruta 1 (Santa Elena / Cavasa)
   var esProvSE = (targetProv.indexOf('santa elena') !== -1 || targetProv.indexOf('garay') !== -1 || targetPunto.indexOf('santa elena') !== -1);
   if (esProvSE) {
+    var bestSE = null;
     for (var seI = 0; seI < catalogo.length; seI++) {
-      if (catalogo[seI].prov === 'santa elena' && productosCoinciden(catalogo[seI].prod, targetProd)) {
-        return catalogo[seI].precio;
+      var seRow = catalogo[seI];
+      var seVig = seRow.vigenteDesde || '2026-01-01';
+      if (seVig > fechaTarget) continue;
+      if (seRow.prov === 'santa elena' && productosCoinciden(seRow.prod, targetProd)) {
+        var candSE = { precio: seRow.precio, vigenteDesde: seVig, rowIndex: (seRow.rowIndex !== undefined ? seRow.rowIndex : seI) };
+        if (esMejorTarifaTemporal_(candSE, bestSE)) bestSE = candSE;
       }
     }
+    if (bestSE !== null) return bestSE.precio;
   }
 
   var esPtoCV = (targetPunto.indexOf('cavasa') !== -1 || targetProv.indexOf('cavasa') !== -1);
   if (esPtoCV) {
+    var bestCV = null;
     for (var cvI = 0; cvI < catalogo.length; cvI++) {
-      if (catalogo[cvI].prov === 'cavasa' && productosCoinciden(catalogo[cvI].prod, targetProd)) {
-        return catalogo[cvI].precio;
+      var cvRow = catalogo[cvI];
+      var cvVig = cvRow.vigenteDesde || '2026-01-01';
+      if (cvVig > fechaTarget) continue;
+      if (cvRow.prov === 'cavasa' && productosCoinciden(cvRow.prod, targetProd)) {
+        var candCV = { precio: cvRow.precio, vigenteDesde: cvVig, rowIndex: (cvRow.rowIndex !== undefined ? cvRow.rowIndex : cvI) };
+        if (esMejorTarifaTemporal_(candCV, bestCV)) bestCV = candCV;
       }
     }
+    if (bestCV !== null) return bestCV.precio;
   }
 
   return null;
@@ -1693,11 +2023,11 @@ function buscarPrecioEnHistorico(historico, proveedor, punto, producto) {
 }
 
 // Función fachada para compatibilidad total con llamadas existentes
-function obtenerPrecioTarifa(ss, proveedor, punto, producto) {
+function obtenerPrecioTarifa(ss, proveedor, punto, producto, fechaRecoleccion) {
   try {
     if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
     var catalogo = cargarCatalogoTarifas(ss);
-    var pTarifa = buscarPrecioEnCatalogoTarifas(catalogo, proveedor, punto, producto);
+    var pTarifa = buscarPrecioEnCatalogoTarifas(catalogo, proveedor, punto, producto, fechaRecoleccion);
     if (pTarifa !== null && pTarifa > 0) return pTarifa;
 
     var hist = cargarHistoricoRecolecciones(ss);
@@ -2051,6 +2381,20 @@ function buscarHomologadoGrupoA_(provClean, puntoClean, prodClean) {
   return null;
 }
 
+function resolverTarifaPorFecha_(lista, fechaIso) {
+  if (!lista || lista.length === 0) return null;
+  var best = null;
+  for (var k = 0; k < lista.length; k++) {
+    var e = lista[k];
+    if (e.vigenteDesde <= fechaIso) {
+      if (!best || e.vigenteDesde > best.vigenteDesde || (e.vigenteDesde === best.vigenteDesde && e.order >= best.order)) {
+        best = e;
+      }
+    }
+  }
+  return best ? best.precio : null;
+}
+
 function ejecutarLiquidacionPreciosVacios_(ss) {
   if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetRec = ss.getSheetByName("Recolecciones");
@@ -2059,25 +2403,57 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
   var sheetTarifas = ss.getSheetByName("Tarifas");
   var mapExacto = {};
   var mapPuntoProd = {};
+  var mapProvGeneral = {};
   var mapProvProd = {};
 
-  // 1. Cargar catálogo de Tarifas vigentes (normalizado alfanumérico)
+  // 1. Cargar catálogo de Tarifas con vigencia temporal (listas por clave para resolver por fecha)
   if (sheetTarifas && sheetTarifas.getLastRow() > 1) {
     var lastRowT = sheetTarifas.getLastRow();
     var lastColT = sheetTarifas.getLastColumn();
+    var headersT = sheetTarifas.getRange(1, 1, 1, lastColT).getValues()[0];
+    var colT = { prov: 1, punto: 2, prod: 3, precio: 4, estado: 5, vigenteDesde: (lastColT >= 8 ? 7 : -1) };
+    for (var tc = 0; tc < headersT.length; tc++) {
+      var ht = normalizarTexto(headersT[tc]);
+      if (ht.indexOf('proveedor') !== -1) colT.prov = tc;
+      else if (ht.indexOf('punto') !== -1 || ht.indexOf('sucursal') !== -1) colT.punto = tc;
+      else if (ht.indexOf('producto') !== -1 || ht.indexOf('materia') !== -1) colT.prod = tc;
+      else if (ht.indexOf('estado') !== -1) colT.estado = tc;
+      else if (ht.indexOf('precio') !== -1 || ht.indexOf('tarifa') !== -1) colT.precio = tc;
+      else if (ht.indexOf('vigente') !== -1 || ht.indexOf('vigencia') !== -1) colT.vigenteDesde = tc;
+    }
+
     var dataT = sheetTarifas.getRange(2, 1, lastRowT - 1, lastColT).getValues();
 
     for (var t = 0; t < dataT.length; t++) {
-      var tProv = normalizarClaveAlfanumerica_(dataT[t][1]);
-      var tPunto = normalizarClaveAlfanumerica_(dataT[t][2]);
-      var tProd = normalizarClaveAlfanumerica_(dataT[t][3]);
-      var tPrecio = parsePrecioMoneda(dataT[t][4]);
-      var tEstado = normalizarClaveAlfanumerica_(dataT[t][5]);
+      var tProv = normalizarClaveAlfanumerica_(dataT[t][colT.prov]);
+      var tPunto = normalizarClaveAlfanumerica_(dataT[t][colT.punto]);
+      var tProd = normalizarClaveAlfanumerica_(dataT[t][colT.prod]);
+      var tPrecio = parsePrecioMoneda(dataT[t][colT.precio]);
+      var tEstado = normalizarClaveAlfanumerica_(dataT[t][colT.estado]);
+      var rawVigT = (colT.vigenteDesde !== -1 && colT.vigenteDesde < dataT[t].length) ? dataT[t][colT.vigenteDesde] : '';
+      var tVig = normalizarFechaIso_(rawVigT, '2026-01-01');
 
       if (tPrecio !== null && tPrecio > 0 && tEstado !== 'inactivo') {
-        if (tProv && tPunto && tProd) mapExacto[tProv + '|' + tPunto + '|' + tProd] = tPrecio;
-        if (tPunto && tProd && !mapPuntoProd[tPunto + '|' + tProd]) mapPuntoProd[tPunto + '|' + tProd] = tPrecio;
-        if (tProv && tProd && !mapProvProd[tProv + '|' + tProd]) mapProvProd[tProv + '|' + tProd] = tPrecio;
+        var entry = { precio: tPrecio, vigenteDesde: tVig, order: t };
+        if (tProv && tPunto && tProd) {
+          var kEx = tProv + '|' + tPunto + '|' + tProd;
+          if (!mapExacto[kEx]) mapExacto[kEx] = [];
+          mapExacto[kEx].push(entry);
+        }
+        if (tPunto && tProd) {
+          var kPt = tPunto + '|' + tProd;
+          if (!mapPuntoProd[kPt]) mapPuntoProd[kPt] = [];
+          mapPuntoProd[kPt].push(entry);
+        }
+        if (tProv && tProd) {
+          var kPr = tProv + '|' + tProd;
+          if (!tPunto || tPunto === 'todas' || tPunto === 'general') {
+            if (!mapProvGeneral[kPr]) mapProvGeneral[kPr] = [];
+            mapProvGeneral[kPr].push(entry);
+          }
+          if (!mapProvProd[kPr]) mapProvProd[kPr] = [];
+          mapProvProd[kPr].push(entry);
+        }
       }
     }
   }
@@ -2098,15 +2474,16 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
   }
 
   var headers = sheetRec.getRange(1, 1, 1, lastCol).getValues()[0];
-  var colIdx = { id: 0, prov: 4, punto: 5, prod: 6, kg: 7, precio: 10, valor: 11 };
+  var colIdx = { id: 0, fecha: 1, prov: 4, punto: 5, prod: 6, kg: 7, precio: 10, valor: 11 };
   for (var c = 0; c < Math.min(headers.length, 12); c++) {
     var h = normalizarTexto(headers[c]);
     if (h.indexOf('id') !== -1 && c === 0) colIdx.id = c;
+    else if (h.indexOf('fecha') !== -1) colIdx.fecha = c;
     else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
     else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
     else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
-    else if (h.indexOf('kg') !== -1 || h.indexOf('kilo') !== -1) colIdx.kg = c;
     else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+    else if ((h.indexOf('kg') !== -1 || h.indexOf('kilo') !== -1) && h.indexOf('precio') === -1 && h.indexOf('tarifa') === -1) colIdx.kg = c;
     else if ((h.indexOf('valor') !== -1 || h.indexOf('total') !== -1) && h.indexOf('factura') === -1) colIdx.valor = c;
   }
 
@@ -2154,6 +2531,7 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
   var sinTarifa = [];
   var visitasFallidas0Kg = 0;
   var valorTotalLiquidado = 0;
+  var hoyIsoCol = obtenerFechaHoyIsoColombia_();
 
   for (var i = 0; i < values.length; i++) {
     var rawPrecio = values[i][colIdx.precio];
@@ -2176,6 +2554,7 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
     var rowPunto = normalizarClaveAlfanumerica_(values[i][colIdx.punto]);
     var rowProd = normalizarClaveAlfanumerica_(rowProdRaw);
     var rowKg = parseKilosNumero(values[i][colIdx.kg]);
+    var rowFechaIso = normalizarFechaIso_(values[i][colIdx.fecha], hoyIsoCol);
 
     if (!rowProd) {
       precioValorMatrix.push([rawPrecio, rawValor]);
@@ -2189,10 +2568,10 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
       continue;
     }
 
-    // Cascada de búsqueda de precio:
-    // 1. Tarifas (Prov + Punto + Prod)
-    // 2. Tarifas (Punto + Prod)
-    // 3. Tarifas (Prov + Prod)
+    // Cascada temporal de búsqueda de precio por fecha real de recolección:
+    // 1. Tarifas (Prov + Punto + Prod) vigente a rowFechaIso
+    // 2. Tarifas (Punto + Prod) vigente a rowFechaIso
+    // 3. Tarifas (Prov + Prod general -> Prov + Prod cualquiera) vigente a rowFechaIso
     // 4. Histórico Recolecciones (Prov + Punto + Prod)
     // 5. Histórico Recolecciones (Punto + Prod)
     // 6. Histórico Recolecciones (Prov + Prod)
@@ -2200,15 +2579,23 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
     var foundPrecio = null;
     var origenTarifa = '';
 
-    if (rowProv && rowPunto && mapExacto[rowProv + '|' + rowPunto + '|' + rowProd]) {
-      foundPrecio = mapExacto[rowProv + '|' + rowPunto + '|' + rowProd];
-      origenTarifa = 'Tarifas (Exacta)';
-    } else if (rowPunto && mapPuntoProd[rowPunto + '|' + rowProd]) {
-      foundPrecio = mapPuntoProd[rowPunto + '|' + rowProd];
-      origenTarifa = 'Tarifas (Punto)';
-    } else if (rowProv && mapProvProd[rowProv + '|' + rowProd]) {
-      foundPrecio = mapProvProd[rowProv + '|' + rowProd];
-      origenTarifa = 'Tarifas (Proveedor)';
+    var pEx = (rowProv && rowPunto) ? resolverTarifaPorFecha_(mapExacto[rowProv + '|' + rowPunto + '|' + rowProd], rowFechaIso) : null;
+    var pPt = (pEx === null && rowPunto) ? resolverTarifaPorFecha_(mapPuntoProd[rowPunto + '|' + rowProd], rowFechaIso) : null;
+    var pPrGen = (pEx === null && pPt === null && rowProv) ? resolverTarifaPorFecha_(mapProvGeneral[rowProv + '|' + rowProd], rowFechaIso) : null;
+    var pPr = (pEx === null && pPt === null && pPrGen === null && rowProv) ? resolverTarifaPorFecha_(mapProvProd[rowProv + '|' + rowProd], rowFechaIso) : null;
+
+    if (pEx !== null) {
+      foundPrecio = pEx;
+      origenTarifa = 'Tarifas (Exacta @ ' + rowFechaIso + ')';
+    } else if (pPt !== null) {
+      foundPrecio = pPt;
+      origenTarifa = 'Tarifas (Punto @ ' + rowFechaIso + ')';
+    } else if (pPrGen !== null) {
+      foundPrecio = pPrGen;
+      origenTarifa = 'Tarifas (Proveedor @ ' + rowFechaIso + ')';
+    } else if (pPr !== null) {
+      foundPrecio = pPr;
+      origenTarifa = 'Tarifas (Proveedor @ ' + rowFechaIso + ')';
     } else if (rowProv && rowPunto && histExacto[rowProv + '|' + rowPunto + '|' + rowProd]) {
       foundPrecio = histExacto[rowProv + '|' + rowPunto + '|' + rowProd];
       origenTarifa = 'Histórico Recolecciones (Exacta)';
@@ -2234,6 +2621,7 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
       actualizadas.push({
         fila: i + 2,
         id: rowIdStr,
+        fecha: rowFechaIso,
         proveedor: values[i][colIdx.prov],
         punto: values[i][colIdx.punto],
         producto: rowProdRaw,
@@ -2246,6 +2634,7 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
       precioValorMatrix.push([rawPrecio, rawValor]);
       sinTarifa.push({
         fila: i + 2,
+        fecha: rowFechaIso,
         proveedor: values[i][colIdx.prov],
         punto: values[i][colIdx.punto],
         producto: rowProdRaw,
@@ -2257,21 +2646,7 @@ function ejecutarLiquidacionPreciosVacios_(ss) {
   var backupName = "";
   if (actualizadas.length > 0) {
     // Paso 0 de Seguridad: Crear pestaña de respaldo congelada antes de modificar celdas
-    try {
-      var hoy = new Date();
-      var yyyy = hoy.getFullYear();
-      var mm = String(hoy.getMonth() + 1);
-      if (mm.length < 2) mm = '0' + mm;
-      var dd = String(hoy.getDate());
-      if (dd.length < 2) dd = '0' + dd;
-      backupName = "Recolecciones_Backup_PreLiquidacion_" + yyyy + mm + dd;
-      if (!ss.getSheetByName(backupName)) {
-        var backupSheet = sheetRec.copyTo(ss);
-        backupSheet.setName(backupName);
-      }
-    } catch (eBak) {
-      Logger.log("Aviso creando pestaña de respaldo: " + eBak.toString());
-    }
+    backupName = crearRespaldoSiNoExiste_(ss, sheetRec, "Recolecciones_Backup_PreLiquidacion_" + hoyIsoCol.replace(/-/g, ''));
 
     // Escritura atómica EXCLUSIVA en las 2 columnas Precio (K) y Valor (L) sin tocar fórmulas M:N ni R+
     if (colIdx.valor === colIdx.precio + 1) {
@@ -2519,6 +2894,18 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify(resCrear))
         .setMimeType(ContentService.MimeType.JSON);
     }
+
+    if (action === 'getTarifas') {
+      return obtenerTarifasHttp_(ss);
+    }
+
+    if (action === 'actualizarTarifasMasivo') {
+      return actualizarTarifasMasivoSheet_(ss, payload);
+    }
+
+    if (action === 'aplicarListaPreciosNov23') {
+      return aplicarListaPreciosNov23Sheet_(ss);
+    }
     
     return guardarRecoleccionSheet(ss, payload);
   } catch (error) {
@@ -2551,6 +2938,7 @@ function onOpen() {
       .addSeparator()
       .addItem('📷 Habilitar Columnas de Soporte (R:T)', 'menuHabilitarColumnasSoporte')
       .addItem('💰 Liquidar Precios Vacíos en Recolecciones', 'menuLiquidarPreciosVacios')
+      .addItem('📅 Cargar Lista de Precios 23/Nov/2026 (Idempotente)', 'menuAplicarListaPreciosNov23')
       .addSeparator()
       .addItem('🚀 Abrir Conciliador (Ventana Aparte)', 'abrirConciliadorNuevaVentana')
       .addItem('📋 Descargar Plantilla Oficial (.xlsx)', 'abrirDescargaPlantillaSheets')
@@ -3155,6 +3543,40 @@ function homologarProveedor(nombreOriginal) {
   return aNombrePropio(raw);
 }
 
+var CANONICOS_PUNTOS = {
+  'lantanademorichal': 'La Montaña Morichal',
+  'lamontanamorichal': 'La Montaña Morichal',
+  'lamontanademorichal': 'La Montaña Morichal',
+  'ciudadeladelrio': 'Ciudadela del Río'
+};
+
+function homologarPunto(texto) {
+  if (!texto) return '';
+  var s = String(texto).trim().replace(/\s+/g, ' ');
+  if (!s) return '';
+  var k = normalizarClaveAlfanumerica_(s);
+  if (CANONICOS_PUNTOS[k]) return CANONICOS_PUNTOS[k];
+
+  var conectores = { 'de': true, 'del': true, 'la': true, 'las': true, 'los': true, 'y': true, 'en': true };
+  var siglas = { 'lg': true, 'sas': true, 'ips': true, 'eps': true, 'pwa': true, 'ii': true, 'iii': true, 'iv': true };
+  var tokens = s.toLowerCase().split(/\s+/);
+  var out = [];
+  for (var i = 0; i < tokens.length; i++) {
+    var token = tokens[i];
+    var clean = token.replace(/[^a-záéíóúüñ]/g, '');
+    if (siglas[clean]) {
+      out.push(token.toUpperCase());
+    } else if (i > 0 && conectores[clean]) {
+      out.push(token.toLowerCase());
+    } else {
+      out.push(token.replace(/(?:^|[\(\[\/\-])([a-záéíóúüñ])/g, function(m) {
+        return m.toUpperCase();
+      }));
+    }
+  }
+  return out.join(' ');
+}
+
 
 // ==============================================================================
 // FUNCIONES RPC EXCLUSIVAS DEL CONCILIADOR (google.script.run)
@@ -3340,12 +3762,58 @@ function saveExcelToDriveFolder(base64Data, fileName, optProvName) {
 }
 
 // ==============================================================================
-// ALTA RÁPIDA DE MATERIA PRIMA / PRODUCTO EN TARIFAS Y PRODUCTOS (v1.9.6)
+// HELPER MAESTRO DE PRODUCTOS: ASEGURAR PRODUCTOS ACTIVOS EN HOJA PRODUCTOS
+// ==============================================================================
+function asegurarProductosEnMaestro_(ss, listaProductos) {
+  var agregados = [];
+  if (!ss || !Array.isArray(listaProductos) || listaProductos.length === 0) return agregados;
+
+  var sheetProductos = ss.getSheetByName("Productos");
+  if (!sheetProductos) return agregados;
+
+  var existentes = {};
+  var lastRowProd = sheetProductos.getLastRow();
+  if (lastRowProd > 1) {
+    var prodData = sheetProductos.getRange(2, 1, lastRowProd - 1, 1).getValues();
+    for (var p = 0; p < prodData.length; p++) {
+      var k = normalizarTexto(prodData[p][0]);
+      if (k) existentes[k] = true;
+    }
+  }
+
+  var nuevasFilas = [];
+  for (var i = 0; i < listaProductos.length; i++) {
+    var prodClean = sanitizarParaHoja(String(listaProductos[i] || '').trim().toUpperCase());
+    var prodKey = normalizarTexto(prodClean);
+    if (prodClean && prodKey && !existentes[prodKey]) {
+      nuevasFilas.push([prodClean, 'Activo']);
+      existentes[prodKey] = true;
+      agregados.push(prodClean);
+    }
+  }
+
+  if (nuevasFilas.length > 0) {
+    var maxFilas = sheetProductos.getMaxRows();
+    var targetEnd = sheetProductos.getLastRow() + nuevasFilas.length;
+    if (targetEnd > maxFilas) {
+      sheetProductos.insertRowsAfter(maxFilas, Math.max(targetEnd - maxFilas, 20));
+    }
+    sheetProductos.getRange(sheetProductos.getLastRow() + 1, 1, nuevasFilas.length, 2).setValues(nuevasFilas);
+  }
+
+  return agregados;
+}
+
+// ==============================================================================
+// ALTA RÁPIDA DE MATERIA PRIMA / PRODUCTO EN TARIFAS Y PRODUCTOS (v2.0.0)
+// Soporta Vigente_Desde en Columna H sin sobrescribir vigencias históricas ni sucursales
 // ==============================================================================
 function crearProductoTarifaSheet(ss, payload) {
   var lock = LockService.getScriptLock();
+  var lockAcquired = false;
   try {
     lock.waitLock(20000);
+    lockAcquired = true;
   } catch (e) {
     return { success: false, error: 'Servidor ocupado. Intente nuevamente en unos segundos.' };
   }
@@ -3358,7 +3826,10 @@ function crearProductoTarifaSheet(ss, payload) {
 
     var ruta = sanitizarParaHoja(payload.ruta || 'Ruta General');
     var proveedor = homologarProveedor(payload.proveedor || '');
-    var punto = homologarPunto(payload.punto || proveedor);
+    var puntoRaw = (payload.punto !== undefined && payload.punto !== null) ? String(payload.punto).trim() : '';
+    var punto = (puntoRaw === '' || puntoRaw.toLowerCase() === '(general)' || puntoRaw.toLowerCase() === 'general')
+      ? ''
+      : homologarPunto(puntoRaw);
     var producto = sanitizarParaHoja((payload.producto || '').toString().trim().toUpperCase());
     var precioRaw = payload.precio;
     var precio = (precioRaw !== undefined && precioRaw !== null && String(precioRaw).trim() !== '')
@@ -3366,6 +3837,8 @@ function crearProductoTarifaSheet(ss, payload) {
       : '';
     var tienePrecioValido = precio !== '' && !isNaN(precio) && Number(precio) > 0;
     var estado = tienePrecioValido ? 'Activo' : 'Pendiente Precio';
+    var observaciones = sanitizarParaHoja(String(payload.observaciones || 'Alta rápida desde App').trim());
+    var vigenteDesde = normalizarFechaIso_(payload.vigenteDesde, obtenerFechaHoyIsoColombia_());
 
     if (!proveedor || !producto) {
       return { success: false, error: 'Proveedor y Producto son campos obligatorios.' };
@@ -3376,13 +3849,17 @@ function crearProductoTarifaSheet(ss, payload) {
       return { success: false, error: 'No se encontró la pestaña Tarifas en Google Sheets.' };
     }
 
-    // 1. Revisar si ya existe este producto para este proveedor y punto
+    // Garantizar Columna H Vigente_Desde sin tocar A..G
+    var vigColIdx = garantizarColumnaVigenciaTarifas_(sheetTarifas);
+
+    // 1. Revisar si ya existe este producto para este proveedor, punto EXACTO y MISMA vigencia
     var lastRowTarifas = sheetTarifas.getLastRow();
     var yaExisteEnTarifas = false;
     var filaExistente = -1;
 
     if (lastRowTarifas > 1) {
-      var dataTarifas = sheetTarifas.getRange(2, 1, lastRowTarifas - 1, 6).getValues();
+      var readCols = Math.max(8, sheetTarifas.getLastColumn(), vigColIdx + 1);
+      var dataTarifas = sheetTarifas.getRange(2, 1, lastRowTarifas - 1, readCols).getValues();
       var provNorm = normalizarTexto(proveedor);
       var puntoNorm = normalizarTexto(punto);
       var prodNorm = normalizarTexto(producto);
@@ -3391,9 +3868,12 @@ function crearProductoTarifaSheet(ss, payload) {
         var rowProv = normalizarTexto(dataTarifas[i][1]);
         var rowPunto = normalizarTexto(dataTarifas[i][2]);
         var rowProd = normalizarTexto(dataTarifas[i][3]);
+        var rowVig = normalizarFechaIso_(dataTarifas[i][vigColIdx], '2026-01-01');
 
-        if (rowProv === provNorm && productosCoinciden(rowProd, prodNorm)) {
-          if (!puntoNorm || rowPunto === puntoNorm || !rowPunto) {
+        if (rowProv === provNorm && productosCoinciden(rowProd, prodNorm) && rowVig === vigenteDesde) {
+          // Si punto está vacío, SOLO hacer match con filas de punto vacío (no sobrescribir sucursal específica)
+          var puntoCoincide = (puntoNorm === '') ? (rowPunto === '') : (rowPunto === puntoNorm);
+          if (puntoCoincide) {
             yaExisteEnTarifas = true;
             filaExistente = i + 2;
             break;
@@ -3403,84 +3883,872 @@ function crearProductoTarifaSheet(ss, payload) {
     }
 
     if (yaExisteEnTarifas) {
-      // Si ya existía y se envía un precio válido desde Administrador, actualizar tarifa
       if (tienePrecioValido) {
         sheetTarifas.getRange(filaExistente, 5).setValue(Number(precio));
         sheetTarifas.getRange(filaExistente, 6).setValue('Activo');
+        if (payload.observaciones) {
+          sheetTarifas.getRange(filaExistente, 7).setValue(observaciones);
+        }
         return {
           success: true,
-          mensaje: 'Tarifa actualizada a $' + precio + ' para ' + producto + ' en ' + proveedor,
+          mensaje: 'Tarifa actualizada a $' + precio + ' para ' + producto + ' en ' + proveedor + ' (Vigente desde ' + vigenteDesde + ')',
           producto: producto,
           proveedor: proveedor,
           punto: punto,
           precio: Number(precio),
+          vigenteDesde: vigenteDesde,
           actualizado: true
         };
       }
       return {
         success: true,
-        mensaje: 'El producto ' + producto + ' ya se encuentra configurado para ' + proveedor,
+        mensaje: 'El producto ' + producto + ' ya se encuentra configurado para ' + proveedor + ' (Vigente desde ' + vigenteDesde + ')',
         producto: producto,
         proveedor: proveedor,
         punto: punto,
+        vigenteDesde: vigenteDesde,
         yaExiste: true
       };
     }
 
-    // 2. Si no existe, insertar nueva fila en Tarifas
+    // 2. Si no existe para esta vigencia, insertar nueva fila de 8 columnas sin dañar la tarifa histórica anterior
     if (sheetTarifas.getLastRow() >= sheetTarifas.getMaxRows()) {
       sheetTarifas.insertRowsAfter(sheetTarifas.getMaxRows(), 50);
     }
 
     var nextRowTarifas = sheetTarifas.getLastRow() + 1;
-    sheetTarifas.getRange(nextRowTarifas, 1, 1, 6).setValues([[
-      ruta,
-      proveedor,
-      punto,
-      producto,
-      tienePrecioValido ? Number(precio) : '',
-      estado
-    ]]);
+    var rowWidth = Math.max(8, vigColIdx + 1);
+    var nuevaFila = [];
+    for (var cInit = 0; cInit < rowWidth; cInit++) nuevaFila.push('');
+    nuevaFila[0] = ruta;
+    nuevaFila[1] = sanitizarParaHoja(proveedor);
+    nuevaFila[2] = sanitizarParaHoja(punto);
+    nuevaFila[3] = producto;
+    nuevaFila[4] = tienePrecioValido ? Number(precio) : '';
+    nuevaFila[5] = estado;
+    nuevaFila[6] = observaciones;
+    nuevaFila[vigColIdx] = vigenteDesde;
+
+    sheetTarifas.getRange(nextRowTarifas, vigColIdx + 1).setNumberFormat('@');
+    sheetTarifas.getRange(nextRowTarifas, 1, 1, rowWidth).setValues([nuevaFila]);
 
     // 3. Revisar si existe en pestaña Productos; si no, agregarlo
-    var sheetProductos = ss.getSheetByName("Productos");
-    var agregadoAProductos = false;
-    if (sheetProductos) {
-      var lastRowProd = sheetProductos.getLastRow();
-      var prodExisteEnMaestro = false;
-      if (lastRowProd > 1) {
-        var prodData = sheetProductos.getRange(2, 1, lastRowProd - 1, 1).getValues();
-        var pNorm = normalizarTexto(producto);
-        for (var p = 0; p < prodData.length; p++) {
-          if (normalizarTexto(prodData[p][0]) === pNorm) {
-            prodExisteEnMaestro = true;
-            break;
-          }
-        }
-      }
-      if (!prodExisteEnMaestro) {
-        if (sheetProductos.getLastRow() >= sheetProductos.getMaxRows()) {
-          sheetProductos.insertRowsAfter(sheetProductos.getMaxRows(), 20);
-        }
-        var nextRowProd = sheetProductos.getLastRow() + 1;
-        sheetProductos.getRange(nextRowProd, 1, 1, 2).setValues([[producto, 'Activo']]);
-        agregadoAProductos = true;
-      }
-    }
+    var prodsAgregados = asegurarProductosEnMaestro_(ss, [producto]);
+    var agregadoAProductos = prodsAgregados.length > 0;
 
     return {
       success: true,
-      mensaje: 'Producto ' + producto + ' asociado exitosamente a ' + proveedor,
+      mensaje: 'Producto ' + producto + ' asociado exitosamente a ' + proveedor + ' (Vigente desde ' + vigenteDesde + ')',
       producto: producto,
       proveedor: proveedor,
       punto: punto,
       precio: tienePrecioValido ? Number(precio) : null,
+      vigenteDesde: vigenteDesde,
       agregadoAProductos: agregadoAProductos
     };
   } catch (err) {
     Logger.log("Error en crearProductoTarifaSheet: " + err.toString());
     return { success: false, error: err.toString() };
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) {
+      try { lock.releaseLock(); } catch (eRel) {}
+    }
+  }
+}
+
+// ==============================================================================
+// LISTA OFICIAL DE PRECIOS VIGENCIA 23/11/2026 (86 FILAS VERIFICADAS)
+// Fuente: LISTA_DE_PRECIOS.xlsx — Carga 100% idempotente con Vigente_Desde = '2026-11-23'
+// ==============================================================================
+var LISTA_PRECIOS_NOV23_2026 = [
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "El Rebajón", punto: "", producto: "SEBO EN RAMA", precio: 900, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "El Rebajón", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "El Rebajón", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana Santa Elena", punto: "Sevillana Santa Elena", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana", punto: "Cavasa", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana República de Israel", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Sevillana", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Sevillana", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Sevillana", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana Santa Elena", punto: "Sevillana Santa Elena", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana", punto: "Cavasa", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana", punto: "", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana República de Israel", punto: "", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Sevillana", punto: "", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Sevillana", punto: "", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Sevillana", punto: "", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana Santa Elena", punto: "Sevillana Santa Elena", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana", punto: "Cavasa", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana", punto: "", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana República de Israel", punto: "", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Sevillana", punto: "", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Sevillana", punto: "", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Sevillana", punto: "", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana Santa Elena", punto: "Sevillana Santa Elena", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana", punto: "Cavasa", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana República de Israel", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Sevillana", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Sevillana", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Sevillana", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana Santa Elena", punto: "Sevillana Santa Elena", producto: "PIELES", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana", punto: "Cavasa", producto: "PIELES", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana", punto: "", producto: "PIELES", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Sevillana República de Israel", punto: "", producto: "PIELES", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Sevillana", punto: "", producto: "PIELES", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Sevillana", punto: "", producto: "PIELES", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Sevillana", punto: "", producto: "PIELES", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Bodega Santa Elena", punto: "Santa Elena", producto: "MANTECA", precio: 3200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Alejandro Garay", punto: "Santa Elena", producto: "MANTECA", precio: 3200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Sevillana Santa Elena", punto: "Sevillana Santa Elena", producto: "MANTECA", precio: 3200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Santa Elena", punto: "", producto: "MANTECA", precio: 3200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Caribe", punto: "Cavasa", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 3: Puerto Tejada / Villarica / Jamundí / Pance", proveedor: "Caribe", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Caribe", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Caribe", punto: "Cavasa", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 3: Puerto Tejada / Villarica / Jamundí / Pance", proveedor: "Caribe", punto: "", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Caribe", punto: "", producto: "SEBO EN RAMA", precio: 1200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Caribe", punto: "Cavasa", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 3: Puerto Tejada / Villarica / Jamundí / Pance", proveedor: "Caribe", punto: "", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Caribe", punto: "", producto: "GORDANA", precio: 1500, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Caribe", punto: "Cavasa", producto: "PIEL POLLO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 3: Puerto Tejada / Villarica / Jamundí / Pance", proveedor: "Caribe", punto: "", producto: "PIEL POLLO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Caribe", punto: "", producto: "PIEL POLLO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Caribe", punto: "Cavasa", producto: "HUESO DE POLLO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 3: Puerto Tejada / Villarica / Jamundí / Pance", proveedor: "Caribe", punto: "", producto: "HUESO DE POLLO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Caribe", punto: "", producto: "HUESO DE POLLO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Caribe", punto: "Cavasa", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 3: Puerto Tejada / Villarica / Jamundí / Pance", proveedor: "Caribe", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Caribe", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Caribe", punto: "Cavasa", producto: "HUESO DE CERDO", precio: 150, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 3: Puerto Tejada / Villarica / Jamundí / Pance", proveedor: "Caribe", punto: "", producto: "HUESO DE CERDO", precio: 150, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Caribe", punto: "", producto: "HUESO DE CERDO", precio: 150, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Carnes Maiale", punto: "", producto: "HUESO BLANCO", precio: 100, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Carnes Maiale", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Carnes Maiale", punto: "", producto: "SEBO EN RAMA", precio: 900, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Los Lagos", punto: "Cavasa", producto: "SEBO EN RAMA", precio: 1100, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Super Carnes Los Andes", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Orlando Martinez", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Super Carnes Los Andes", punto: "", producto: "SEBO EN RAMA", precio: 1000, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Orlando Martinez", punto: "", producto: "SEBO EN RAMA", precio: 1000, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Super Carnes Los Andes", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Orlando Martinez", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "Barbara Gomez", punto: "Cavasa", producto: "SEBO EN RAMA", precio: 1100, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 1: Santa Elena / Cavasa", proveedor: "La Reserva", punto: "Cavasa", producto: "SEBO EN RAMA", precio: 1100, vigenteDesde: "2026-11-23" },
+  { ruta: "Planta San Joaquin", proveedor: "Barbara Gomez", punto: "", producto: "SEBO EN RAMA", precio: 1100, vigenteDesde: "2026-11-23" },
+  { ruta: "Planta San Joaquin", proveedor: "Miguel Angel Otero", punto: "", producto: "HUESO BLANCO", precio: 300, vigenteDesde: "2026-11-23" },
+  { ruta: "Planta San Joaquin", proveedor: "Miguel Angel Otero", punto: "", producto: "SEBO EN RAMA", precio: 1300, vigenteDesde: "2026-11-23" },
+  { ruta: "Planta San Joaquin", proveedor: "Miguel Angel Otero", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Distribuidora de Carnes Millan", punto: "", producto: "HUESO DE CERDO", precio: 150, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Frigorivalle", punto: "", producto: "HUESO BLANCO", precio: 250, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Frigorivalle", punto: "", producto: "SEBO EN RAMA", precio: 1250, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Mercaunion", punto: "", producto: "HUESO BLANCO", precio: 200, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Mercaunion", punto: "", producto: "SEBO EN RAMA", precio: 900, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "Mercaunion", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Jhonatan Martinez", punto: "", producto: "SEBO EN RAMA", precio: 1000, vigenteDesde: "2026-11-23" }
+];
+
+// ==============================================================================
+// GESTOR RÁPIDO DE TARIFAS ADMIN: CONSULTA HTTP (action=getTarifas)
+// ==============================================================================
+function obtenerTarifasHttp_(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var hoy = obtenerFechaHoyIsoColombia_();
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    if (!sheetTarifas || sheetTarifas.getLastRow() <= 1) {
+      return ContentService.createTextOutput(JSON.stringify({
+        result: 'success',
+        hoy: hoy,
+        total: 0,
+        tarifas: [],
+        nov23YaCargada: false,
+        nov23Count: 0,
+        nov23Total: LISTA_PRECIOS_NOV23_2026.length
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var lastRow = sheetTarifas.getLastRow();
+    var lastCol = sheetTarifas.getLastColumn();
+    var headers = sheetTarifas.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colIdx = { ruta: 0, prov: 1, punto: 2, prod: 3, precio: 4, estado: 5, obs: 6, vigenteDesde: (lastCol >= 8 ? 7 : -1) };
+    for (var c = 0; c < headers.length; c++) {
+      var h = normalizarTexto(headers[c]);
+      if (h.indexOf('ruta') !== -1) colIdx.ruta = c;
+      else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+      else if (h.indexOf('estado') !== -1) colIdx.estado = c;
+      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+      else if (h.indexOf('observ') !== -1) colIdx.obs = c;
+      else if (h.indexOf('vigente') !== -1 || h.indexOf('vigencia') !== -1) colIdx.vigenteDesde = c;
+    }
+
+    var raw = sheetTarifas.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    var tarifas = [];
+    var clavesEnHoja = {};
+
+    for (var i = 0; i < raw.length; i++) {
+      var rRuta = String(raw[i][colIdx.ruta] || '').trim();
+      var rProv = String(raw[i][colIdx.prov] || '').trim();
+      var rPunto = String(raw[i][colIdx.punto] || '').trim();
+      var rProd = String(raw[i][colIdx.prod] || '').trim().toUpperCase();
+      if (!rProv && !rProd) continue;
+
+      var rPrecio = parsePrecioMoneda(raw[i][colIdx.precio]);
+      var rEstado = String(raw[i][colIdx.estado] || 'Activo').trim();
+      var rObs = (colIdx.obs !== -1 && colIdx.obs < raw[i].length) ? String(raw[i][colIdx.obs] || '').trim() : '';
+      var rawVig = (colIdx.vigenteDesde !== -1 && colIdx.vigenteDesde < raw[i].length) ? raw[i][colIdx.vigenteDesde] : '';
+      var rVig = normalizarFechaIso_(rawVig, '2026-01-01');
+
+      tarifas.push({
+        fila: i + 2,
+        ruta: rRuta,
+        proveedor: rProv,
+        proveedorHomologado: homologarProveedor(rProv),
+        punto: rPunto,
+        producto: rProd,
+        precio: rPrecio !== null ? rPrecio : 0,
+        estado: rEstado,
+        observaciones: rObs,
+        vigenteDesde: rVig
+      });
+
+      var kNov = normalizarTexto(rRuta) + '|' + normalizarTexto(rProv) + '|' + normalizarTexto(rPunto) + '|' + normalizarTexto(rProd) + '|' + rVig;
+      clavesEnHoja[kNov] = true;
+    }
+
+    var nov23Count = 0;
+    for (var n = 0; n < LISTA_PRECIOS_NOV23_2026.length; n++) {
+      var item = LISTA_PRECIOS_NOV23_2026[n];
+      var kSpec = normalizarTexto(item.ruta) + '|' + normalizarTexto(item.proveedor) + '|' + normalizarTexto(item.punto) + '|' + normalizarTexto(item.producto) + '|' + item.vigenteDesde;
+      if (clavesEnHoja[kSpec]) {
+        nov23Count++;
+      }
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      result: 'success',
+      hoy: hoy,
+      total: tarifas.length,
+      tarifas: tarifas,
+      nov23YaCargada: (nov23Count >= LISTA_PRECIOS_NOV23_2026.length),
+      nov23Count: nov23Count,
+      nov23Total: LISTA_PRECIOS_NOV23_2026.length
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log("Error en obtenerTarifasHttp_: " + err.toString());
+    return ContentService.createTextOutput(JSON.stringify({
+      result: 'error',
+      error: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==============================================================================
+// RE-LIQUIDACIÓN QUIRÚRGICA POR RANGO DE FECHAS EN RECOLECCIONES (v2.0.0)
+// ==============================================================================
+function reliquidarRecoleccionesPorRango_(ss, opts) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetRec = ss.getSheetByName("Recolecciones");
+  if (!sheetRec || sheetRec.getLastRow() <= 1) {
+    return { filasActualizadas: 0, valorAnteriorCOP: 0, valorNuevoCOP: 0, backupSheetName: '' };
+  }
+
+  var normProvTarget = normalizarTexto(opts.proveedor || '');
+  var puntoScopeRaw = String(opts.puntoScope || 'TODAS').trim();
+  var aplicarFiltroPunto = (
+    puntoScopeRaw !== '' &&
+    puntoScopeRaw.toUpperCase() !== 'TODAS' &&
+    puntoScopeRaw.toLowerCase() !== '(general)' &&
+    puntoScopeRaw.toLowerCase() !== 'general'
+  );
+  var puntoScopeNorm = aplicarFiltroPunto ? normalizarTexto(puntoScopeRaw) : '';
+  var desdeIso = normalizarFechaIso_(opts.fechaDesde, '');
+  var hastaIso = normalizarFechaIso_(opts.fechaHasta, '');
+  var cambiosValidos = Array.isArray(opts.cambios) ? opts.cambios : [];
+
+  if (!normProvTarget || !desdeIso || !hastaIso || desdeIso > hastaIso || cambiosValidos.length === 0) {
+    return { filasActualizadas: 0, valorAnteriorCOP: 0, valorNuevoCOP: 0, backupSheetName: '' };
+  }
+
+  var lastRow = sheetRec.getLastRow();
+  var lastCol = sheetRec.getLastColumn();
+  var headers = sheetRec.getRange(1, 1, 1, lastCol).getValues()[0];
+  var colIdx = { id: 0, fecha: 1, prov: 4, punto: 5, prod: 6, kg: 7, precio: 10, valor: 11 };
+  for (var c = 0; c < Math.min(headers.length, 12); c++) {
+    var h = normalizarTexto(headers[c]);
+    if (h.indexOf('id') !== -1 && c === 0) colIdx.id = c;
+    else if (h.indexOf('fecha') !== -1) colIdx.fecha = c;
+    else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+    else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+    else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+    else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+    else if ((h.indexOf('kg') !== -1 || h.indexOf('kilo') !== -1) && h.indexOf('precio') === -1 && h.indexOf('tarifa') === -1) colIdx.kg = c;
+    else if ((h.indexOf('valor') !== -1 || h.indexOf('total') !== -1) && h.indexOf('factura') === -1) colIdx.valor = c;
+  }
+
+  var numColsToRead = Math.max(colIdx.valor + 1, 12);
+  var rawValues = sheetRec.getRange(2, 1, lastRow - 1, numColsToRead).getValues();
+  var filasReales = 0;
+  for (var rScan = rawValues.length - 1; rScan >= 0; rScan--) {
+    var hasId = String(rawValues[rScan][0] || '').trim() !== '';
+    var hasFecha = String(rawValues[rScan][1] || '').trim() !== '';
+    var hasProd = String(rawValues[rScan][colIdx.prod] || '').trim() !== '';
+    if (hasId || hasFecha || hasProd) {
+      filasReales = rScan + 1;
+      break;
+    }
+  }
+  var values = filasReales > 0 ? rawValues.slice(0, filasReales) : [];
+  if (values.length === 0) {
+    return { filasActualizadas: 0, valorAnteriorCOP: 0, valorNuevoCOP: 0, backupSheetName: '' };
+  }
+
+  var precioValorMatrix = [];
+  var filasActualizadas = 0;
+  var valorAnteriorCOP = 0;
+  var valorNuevoCOP = 0;
+
+  for (var i = 0; i < values.length; i++) {
+    var rawPrecio = values[i][colIdx.precio];
+    var rawValor = values[i][colIdx.valor];
+    var rowIdStr = String(values[i][colIdx.id] || '').trim();
+    var rowProdRaw = String(values[i][colIdx.prod] || '').trim();
+    var rowKg = parseKilosNumero(values[i][colIdx.kg]);
+
+    if (rowKg <= 0 || !rowProdRaw || rowProdRaw.toLowerCase().indexOf('visita fallida') !== -1 || rowIdStr.indexOf('NOV-') === 0) {
+      precioValorMatrix.push([rawPrecio, rawValor]);
+      continue;
+    }
+
+    var rowFechaIso = normalizarFechaIso_(values[i][colIdx.fecha], '');
+    if (!rowFechaIso || rowFechaIso < desdeIso || rowFechaIso > hastaIso) {
+      precioValorMatrix.push([rawPrecio, rawValor]);
+      continue;
+    }
+
+    var rowProvNorm = normalizarTexto(values[i][colIdx.prov]);
+    if (rowProvNorm !== normProvTarget) {
+      precioValorMatrix.push([rawPrecio, rawValor]);
+      continue;
+    }
+
+    if (aplicarFiltroPunto) {
+      var rowPuntoNorm = normalizarTexto(values[i][colIdx.punto]);
+      var puntoOk = (rowPuntoNorm !== '' && (rowPuntoNorm === puntoScopeNorm || rowPuntoNorm.indexOf(puntoScopeNorm) !== -1 || puntoScopeNorm.indexOf(rowPuntoNorm) !== -1));
+      if (!puntoOk) {
+        precioValorMatrix.push([rawPrecio, rawValor]);
+        continue;
+      }
+    }
+
+    var matchedPrecio = null;
+    for (var cb = 0; cb < cambiosValidos.length; cb++) {
+      if (productosCoinciden(rowProdRaw, cambiosValidos[cb].producto)) {
+        matchedPrecio = cambiosValidos[cb].precio;
+        break;
+      }
+    }
+
+    if (matchedPrecio !== null && matchedPrecio > 0) {
+      var prevValNum = parsePrecioMoneda(rawValor) || 0;
+      var nuevoValor = Math.round(matchedPrecio * rowKg * 100) / 100;
+      precioValorMatrix.push([matchedPrecio, nuevoValor]);
+      filasActualizadas++;
+      valorAnteriorCOP += prevValNum;
+      valorNuevoCOP += nuevoValor;
+    } else {
+      precioValorMatrix.push([rawPrecio, rawValor]);
+    }
+  }
+
+  var backupSheetName = '';
+  if (filasActualizadas > 0) {
+    var hoyCompact = obtenerFechaHoyIsoColombia_().replace(/-/g, '');
+    backupSheetName = crearRespaldoSiNoExiste_(ss, sheetRec, 'Recolecciones_Backup_PreReliq_' + hoyCompact);
+
+    if (colIdx.valor === colIdx.precio + 1) {
+      sheetRec.getRange(2, colIdx.precio + 1, precioValorMatrix.length, 2).setValues(precioValorMatrix);
+    } else {
+      var colPrecioArr = [];
+      var colValorArr = [];
+      for (var pIdx = 0; pIdx < precioValorMatrix.length; pIdx++) {
+        colPrecioArr.push([precioValorMatrix[pIdx][0]]);
+        colValorArr.push([precioValorMatrix[pIdx][1]]);
+      }
+      sheetRec.getRange(2, colIdx.precio + 1, colPrecioArr.length, 1).setValues(colPrecioArr);
+      sheetRec.getRange(2, colIdx.valor + 1, colValorArr.length, 1).setValues(colValorArr);
+    }
+  }
+
+  return {
+    filasActualizadas: filasActualizadas,
+    valorAnteriorCOP: Math.round(valorAnteriorCOP),
+    valorNuevoCOP: Math.round(valorNuevoCOP),
+    backupSheetName: backupSheetName
+  };
+}
+
+// ==============================================================================
+// GESTOR RÁPIDO DE TARIFAS ADMIN: ACTUALIZACIÓN MASIVA POR PROVEEDOR (v2.0.0)
+// ==============================================================================
+function actualizarTarifasMasivoSheet_(ss, rawPayload) {
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
+  try {
+    lock.waitLock(25000);
+    lockAcquired = true;
+  } catch (eLock) {
+    return ContentService.createTextOutput(JSON.stringify({
+      result: 'error',
+      error: 'El servidor está procesando otra operación contable. Intente nuevamente en unos segundos.'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    if (!sheetTarifas) throw new Error("No existe la pestaña Tarifas.");
+
+    var data = null;
+    if (typeof rawPayload === 'string') {
+      try { data = JSON.parse(rawPayload); } catch (e) { data = null; }
+    } else {
+      data = rawPayload;
+    }
+    if (!data || typeof data !== 'object') throw new Error("Payload inválido.");
+
+    var proveedor = String(data.proveedor || '').trim();
+    if (!proveedor) throw new Error("El campo proveedor es obligatorio.");
+
+    var cambiosRaw = data.cambios;
+    if (typeof cambiosRaw === 'string') {
+      try { cambiosRaw = JSON.parse(cambiosRaw); } catch (eC) { cambiosRaw = []; }
+    }
+    if (!Array.isArray(cambiosRaw) || cambiosRaw.length === 0) {
+      throw new Error("Debe suministrar al menos un cambio de precio en cambios[].");
+    }
+
+    var cambios = [];
+    var productosLista = [];
+    for (var ci = 0; ci < cambiosRaw.length; ci++) {
+      var ch = cambiosRaw[ci];
+      if (!ch) continue;
+      var prodU = String(ch.producto || '').trim().toUpperCase();
+      var precN = parsePrecioMoneda(ch.precio);
+      if (!prodU || precN === null || precN <= 0) continue;
+      cambios.push({
+        producto: prodU,
+        precio: precN,
+        estado: String(ch.estado || 'Activo').trim() || 'Activo',
+        observaciones: ch.observaciones ? String(ch.observaciones).trim() : ''
+      });
+      productosLista.push(prodU);
+    }
+    if (cambios.length === 0) {
+      throw new Error("No hay cambios válidos (producto no vacío y precio > 0).");
+    }
+
+    var hoyIso = obtenerFechaHoyIsoColombia_();
+    var hoyCompact = hoyIso.replace(/-/g, '');
+    var vigenteDesde = normalizarFechaIso_(data.vigenteDesde, hoyIso);
+    var puntoScopeRaw = 'TODAS';
+    if (data.puntoScope !== undefined && data.puntoScope !== null && String(data.puntoScope).trim() !== '') {
+      puntoScopeRaw = String(data.puntoScope).trim();
+    } else if (String(data.alcancePunto || '').trim().toUpperCase() === 'UNA' && data.punto !== undefined && data.punto !== null && String(data.punto).trim() !== '') {
+      puntoScopeRaw = String(data.punto).trim();
+    } else if (data.punto !== undefined && data.punto !== null && String(data.punto).trim() !== '') {
+      puntoScopeRaw = String(data.punto).trim();
+    }
+    var fechaDesdeParam = data.fechaDesde || data.rangoDesde || '';
+    var fechaHastaParam = data.fechaHasta || data.rangoHasta || '';
+    var modoAplicacion = String(data.modoAplicacion || 'solo_futuras').trim().toLowerCase();
+    var obsDefault = String(data.observaciones || ('Actualización rápida Admin (Vigencia ' + vigenteDesde + ')')).trim();
+
+    // 1. Respaldo automático de Tarifas antes de mutar
+    var backupTarifas = crearRespaldoSiNoExiste_(ss, sheetTarifas, 'Tarifas_Backup_' + hoyCompact);
+
+    // 2. Garantizar Columna H Vigente_Desde sin alterar A..G
+    var vigColIdx = garantizarColumnaVigenciaTarifas_(sheetTarifas);
+
+    // 3. Leer estructura y filas actuales de Tarifas
+    var lastRow = sheetTarifas.getLastRow();
+    var lastCol = Math.max(8, sheetTarifas.getLastColumn(), vigColIdx + 1);
+    var headers = sheetTarifas.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colIdx = { ruta: 0, prov: 1, punto: 2, prod: 3, precio: 4, estado: 5, obs: 6, vigenteDesde: vigColIdx };
+    for (var c = 0; c < headers.length; c++) {
+      var h = normalizarTexto(headers[c]);
+      if (h.indexOf('ruta') !== -1) colIdx.ruta = c;
+      else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+      else if (h.indexOf('estado') !== -1) colIdx.estado = c;
+      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+      else if (h.indexOf('observ') !== -1) colIdx.obs = c;
+      else if (h.indexOf('vigente') !== -1 || h.indexOf('vigencia') !== -1) colIdx.vigenteDesde = c;
+    }
+
+    var rawData = (lastRow > 1) ? sheetTarifas.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
+    var normProvTarget = normalizarTexto(proveedor);
+
+    // Indexar filas existentes y recolectar rutas/puntos del proveedor
+    var indexConRuta = {};     // ruta|prov|punto|prod|vig -> row1
+    var indexSinRuta = {};     // prov|punto|prod|vig -> [row1, ...]
+    var destinosMap = {};      // rutaNorm|puntoNorm -> { ruta, proveedor, punto }
+    var primeraRutaProv = '';
+    var provNombreHoja = proveedor;
+
+    for (var i = 0; i < rawData.length; i++) {
+      var rRuta = String(rawData[i][colIdx.ruta] || '').trim();
+      var rProv = String(rawData[i][colIdx.prov] || '').trim();
+      var rPunto = String(rawData[i][colIdx.punto] || '').trim();
+      var rProd = String(rawData[i][colIdx.prod] || '').trim();
+      var rVig = normalizarFechaIso_(rawData[i][colIdx.vigenteDesde], '2026-01-01');
+
+      var kConR = normalizarTexto(rRuta) + '|' + normalizarTexto(rProv) + '|' + normalizarTexto(rPunto) + '|' + normalizarTexto(rProd) + '|' + rVig;
+      var kSinR = normalizarTexto(rProv) + '|' + normalizarTexto(rPunto) + '|' + normalizarTexto(rProd) + '|' + rVig;
+      indexConRuta[kConR] = i + 2;
+      if (!indexSinRuta[kSinR]) indexSinRuta[kSinR] = [];
+      indexSinRuta[kSinR].push(i + 2);
+
+      if (normalizarTexto(rProv) === normProvTarget) {
+        if (!primeraRutaProv && rRuta) primeraRutaProv = rRuta;
+        if (rProv) provNombreHoja = rProv;
+        var kDest = normalizarTexto(rRuta) + '|' + normalizarTexto(rPunto);
+        if (!destinosMap[kDest]) {
+          destinosMap[kDest] = { ruta: rRuta || 'Ruta General', proveedor: rProv, punto: rPunto };
+        }
+      }
+    }
+
+    // 4. Resolver destinos según puntoScope
+    var destinos = [];
+    var esTodas = (puntoScopeRaw.toUpperCase() === 'TODAS');
+    var esGeneral = (puntoScopeRaw === '' || puntoScopeRaw.toLowerCase() === '(general)' || puntoScopeRaw.toLowerCase() === 'general');
+
+    if (esTodas) {
+      for (var dk in destinosMap) {
+        destinos.push(destinosMap[dk]);
+      }
+      if (destinos.length === 0) {
+        destinos.push({ ruta: String(data.ruta || 'Ruta General').trim(), proveedor: provNombreHoja, punto: '' });
+      }
+    } else if (esGeneral) {
+      for (var dkG in destinosMap) {
+        if (normalizarTexto(destinosMap[dkG].punto) === '') {
+          destinos.push(destinosMap[dkG]);
+        }
+      }
+      if (destinos.length === 0) {
+        destinos.push({ ruta: primeraRutaProv || String(data.ruta || 'Ruta General').trim(), proveedor: provNombreHoja, punto: '' });
+      }
+    } else {
+      var targetPuntoNorm = normalizarTexto(puntoScopeRaw);
+      for (var dkP in destinosMap) {
+        if (normalizarTexto(destinosMap[dkP].punto) === targetPuntoNorm) {
+          destinos.push(destinosMap[dkP]);
+        }
+      }
+      if (destinos.length === 0) {
+        destinos.push({ ruta: primeraRutaProv || String(data.ruta || 'Ruta General').trim(), proveedor: provNombreHoja, punto: puntoScopeRaw });
+      }
+    }
+
+    // 5. Aplicar cada (destino, cambio) preservando vigencias anteriores
+    var actualizadas = 0;
+    var insertadas = 0;
+    var filasNuevas = [];
+
+    for (var d = 0; d < destinos.length; d++) {
+      var dest = destinos[d];
+      for (var j = 0; j < cambios.length; j++) {
+        var cam = cambios[j];
+        var obsFinal = sanitizarParaHoja(cam.observaciones || obsDefault);
+        var keyExacta = normalizarTexto(dest.ruta) + '|' + normalizarTexto(dest.proveedor) + '|' + normalizarTexto(dest.punto) + '|' + normalizarTexto(cam.producto) + '|' + vigenteDesde;
+        var keySinR = normalizarTexto(dest.proveedor) + '|' + normalizarTexto(dest.punto) + '|' + normalizarTexto(cam.producto) + '|' + vigenteDesde;
+
+        var filaMatch = indexConRuta[keyExacta] || -1;
+        if (filaMatch === -1 && indexSinRuta[keySinR] && indexSinRuta[keySinR].length === 1) {
+          filaMatch = indexSinRuta[keySinR][0];
+        }
+
+        if (filaMatch > 0) {
+          sheetTarifas.getRange(filaMatch, colIdx.precio + 1).setValue(cam.precio);
+          sheetTarifas.getRange(filaMatch, colIdx.estado + 1).setValue(cam.estado);
+          if (colIdx.obs !== -1) {
+            sheetTarifas.getRange(filaMatch, colIdx.obs + 1).setValue(obsFinal);
+          }
+          actualizadas++;
+        } else {
+          var nuevaFila = [];
+          for (var cInit = 0; cInit < lastCol; cInit++) nuevaFila.push('');
+          nuevaFila[colIdx.ruta] = sanitizarParaHoja(dest.ruta);
+          nuevaFila[colIdx.prov] = sanitizarParaHoja(dest.proveedor);
+          nuevaFila[colIdx.punto] = sanitizarParaHoja(dest.punto);
+          nuevaFila[colIdx.prod] = sanitizarParaHoja(cam.producto);
+          nuevaFila[colIdx.precio] = cam.precio;
+          nuevaFila[colIdx.estado] = cam.estado;
+          if (colIdx.obs !== -1) nuevaFila[colIdx.obs] = obsFinal;
+          nuevaFila[colIdx.vigenteDesde] = vigenteDesde;
+
+          filasNuevas.push(nuevaFila);
+          insertadas++;
+          indexConRuta[keyExacta] = -2; // Prevenir duplicado en mismo lote
+        }
+      }
+    }
+
+    if (filasNuevas.length > 0) {
+      var curLastRow = sheetTarifas.getLastRow();
+      var maxFilas = sheetTarifas.getMaxRows();
+      var reqEndRow = curLastRow + filasNuevas.length;
+      if (reqEndRow > maxFilas) {
+        sheetTarifas.insertRowsAfter(maxFilas, Math.max(reqEndRow - maxFilas, 100));
+      }
+      sheetTarifas.getRange(curLastRow + 1, colIdx.vigenteDesde + 1, filasNuevas.length, 1).setNumberFormat('@');
+      sheetTarifas.getRange(curLastRow + 1, 1, filasNuevas.length, lastCol).setValues(filasNuevas);
+    }
+
+    // 6. Asegurar que los productos modificados existan en maestro Productos
+    var productosAgregados = asegurarProductosEnMaestro_(ss, productosLista);
+
+    // 7. Modo de aplicación contable en Recolecciones
+    var resLiqPendientes = null;
+    var resReliqRango = null;
+    if (modoAplicacion === 'pendientes') {
+      resLiqPendientes = ejecutarLiquidacionPreciosVacios_(ss);
+    } else if (modoAplicacion === 'rango' && fechaDesdeParam && fechaHastaParam) {
+      resReliqRango = reliquidarRecoleccionesPorRango_(ss, {
+        proveedor: provNombreHoja,
+        puntoScope: puntoScopeRaw,
+        cambios: cambios,
+        fechaDesde: fechaDesdeParam,
+        fechaHasta: fechaHastaParam
+      });
+    }
+
+    var totalReliq = 0;
+    if (resReliqRango && resReliqRango.filasActualizadas) {
+      totalReliq += resReliqRango.filasActualizadas;
+    }
+    if (resLiqPendientes && resLiqPendientes.totalLiquidadas) {
+      totalReliq += resLiqPendientes.totalLiquidadas;
+    }
+    var backupRec = (resReliqRango && resReliqRango.backupSheetName) || (resLiqPendientes && resLiqPendientes.backupSheetName) || '';
+    var msgFinal = 'Tarifas actualizadas para ' + provNombreHoja + ' (Vigencia ' + vigenteDesde + '): ' + insertadas + ' nuevas, ' + actualizadas + ' actualizadas.';
+
+    return ContentService.createTextOutput(JSON.stringify({
+      result: 'success',
+      mensaje: msgFinal,
+      message: msgFinal,
+      proveedor: provNombreHoja,
+      puntoScope: puntoScopeRaw,
+      vigenteDesde: vigenteDesde,
+      destinosAplicados: destinos.length,
+      insertadas: insertadas,
+      actualizadas: actualizadas,
+      tarifasInsertadas: insertadas,
+      tarifasActualizadas: actualizadas,
+      reliquidadas: totalReliq,
+      productosAgregados: productosAgregados,
+      backupTarifas: backupTarifas,
+      backupSheetName: backupTarifas,
+      backupRecolecciones: backupRec,
+      liquidacionPendientes: resLiqPendientes,
+      reliquidacionRango: resReliqRango
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log("Error en actualizarTarifasMasivoSheet_: " + err.toString());
+    return ContentService.createTextOutput(JSON.stringify({
+      result: 'error',
+      error: err.message || err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    if (lockAcquired) {
+      try { lock.releaseLock(); } catch (eRel) {}
+    }
+  }
+}
+
+// ==============================================================================
+// CARGA IDEMPOTENTE LISTA DE PRECIOS 23/NOV/2026 (86 FILAS + PRODUCTOS)
+// ==============================================================================
+function ejecutarAplicarListaPreciosNov23_(ss) {
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
+  try {
+    lock.waitLock(25000);
+    lockAcquired = true;
+  } catch (eLock) {
+    throw new Error('El servidor está procesando otra operación. Intente nuevamente en unos segundos.');
+  }
+
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetTarifas = ss.getSheetByName("Tarifas");
+    if (!sheetTarifas) throw new Error("No existe la pestaña Tarifas.");
+
+    var hoyCompact = obtenerFechaHoyIsoColombia_().replace(/-/g, '');
+    var backupSheetName = crearRespaldoSiNoExiste_(ss, sheetTarifas, 'Tarifas_Backup_PreNov23_' + hoyCompact);
+
+    // Garantizar Columna H Vigente_Desde (dejando '2026-01-01' en todas las filas existentes)
+    var vigColIdx = garantizarColumnaVigenciaTarifas_(sheetTarifas);
+
+    var lastRow = sheetTarifas.getLastRow();
+    var lastCol = Math.max(8, sheetTarifas.getLastColumn(), vigColIdx + 1);
+    var headers = sheetTarifas.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colIdx = { ruta: 0, prov: 1, punto: 2, prod: 3, precio: 4, estado: 5, obs: 6, vigenteDesde: vigColIdx };
+    for (var c = 0; c < headers.length; c++) {
+      var h = normalizarTexto(headers[c]);
+      if (h.indexOf('ruta') !== -1) colIdx.ruta = c;
+      else if (h.indexOf('proveedor') !== -1) colIdx.prov = c;
+      else if (h.indexOf('punto') !== -1 || h.indexOf('sucursal') !== -1) colIdx.punto = c;
+      else if (h.indexOf('producto') !== -1 || h.indexOf('materia') !== -1) colIdx.prod = c;
+      else if (h.indexOf('estado') !== -1) colIdx.estado = c;
+      else if (h.indexOf('precio') !== -1 || h.indexOf('tarifa') !== -1) colIdx.precio = c;
+      else if (h.indexOf('observ') !== -1) colIdx.obs = c;
+      else if (h.indexOf('vigente') !== -1 || h.indexOf('vigencia') !== -1) colIdx.vigenteDesde = c;
+    }
+
+    var existentesMap = {};
+    var rawData = (lastRow > 1) ? sheetTarifas.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
+    for (var i = 0; i < rawData.length; i++) {
+      var rRuta = String(rawData[i][colIdx.ruta] || '').trim();
+      var rProv = String(rawData[i][colIdx.prov] || '').trim();
+      var rPunto = String(rawData[i][colIdx.punto] || '').trim();
+      var rProd = String(rawData[i][colIdx.prod] || '').trim();
+      var rVig = normalizarFechaIso_(rawData[i][colIdx.vigenteDesde], '2026-01-01');
+      var k = normalizarTexto(rRuta) + '|' + normalizarTexto(rProv) + '|' + normalizarTexto(rPunto) + '|' + normalizarTexto(rProd) + '|' + rVig;
+      existentesMap[k] = {
+        row1: i + 2,
+        precio: parsePrecioMoneda(rawData[i][colIdx.precio]),
+        estado: String(rawData[i][colIdx.estado] || '').trim(),
+        obs: (colIdx.obs !== -1 && colIdx.obs < rawData[i].length) ? String(rawData[i][colIdx.obs] || '').trim() : ''
+      };
+    }
+
+    var obsOficial = 'Actualización LISTA_DE_PRECIOS.xlsx (Vigencia 23/11/2026)';
+    var insertadas = 0;
+    var actualizadas = 0;
+    var sinCambios = 0;
+    var filasNuevas = [];
+    var productosLista = [];
+
+    for (var n = 0; n < LISTA_PRECIOS_NOV23_2026.length; n++) {
+      var item = LISTA_PRECIOS_NOV23_2026[n];
+      var vig = item.vigenteDesde || '2026-11-23';
+      productosLista.push(item.producto);
+
+      var kSpec = normalizarTexto(item.ruta) + '|' + normalizarTexto(item.proveedor) + '|' + normalizarTexto(item.punto) + '|' + normalizarTexto(item.producto) + '|' + vig;
+      var match = existentesMap[kSpec];
+
+      if (match) {
+        if (match.precio !== item.precio || match.estado.toLowerCase() !== 'activo' || match.obs !== obsOficial) {
+          sheetTarifas.getRange(match.row1, colIdx.precio + 1).setValue(item.precio);
+          sheetTarifas.getRange(match.row1, colIdx.estado + 1).setValue('Activo');
+          if (colIdx.obs !== -1) {
+            sheetTarifas.getRange(match.row1, colIdx.obs + 1).setValue(obsOficial);
+          }
+          actualizadas++;
+        } else {
+          sinCambios++;
+        }
+      } else {
+        var nuevaFila = [];
+        for (var cInit = 0; cInit < lastCol; cInit++) nuevaFila.push('');
+        nuevaFila[colIdx.ruta] = sanitizarParaHoja(item.ruta);
+        nuevaFila[colIdx.prov] = sanitizarParaHoja(item.proveedor);
+        nuevaFila[colIdx.punto] = sanitizarParaHoja(item.punto);
+        nuevaFila[colIdx.prod] = sanitizarParaHoja(item.producto);
+        nuevaFila[colIdx.precio] = item.precio;
+        nuevaFila[colIdx.estado] = 'Activo';
+        if (colIdx.obs !== -1) nuevaFila[colIdx.obs] = obsOficial;
+        nuevaFila[colIdx.vigenteDesde] = vig;
+
+        filasNuevas.push(nuevaFila);
+        insertadas++;
+        existentesMap[kSpec] = { row1: -1, precio: item.precio, estado: 'Activo', obs: obsOficial };
+      }
+    }
+
+    if (filasNuevas.length > 0) {
+      var curLastRow = sheetTarifas.getLastRow();
+      var maxFilas = sheetTarifas.getMaxRows();
+      var reqEndRow = curLastRow + filasNuevas.length;
+      if (reqEndRow > maxFilas) {
+        sheetTarifas.insertRowsAfter(maxFilas, Math.max(reqEndRow - maxFilas, 100));
+      }
+      sheetTarifas.getRange(curLastRow + 1, colIdx.vigenteDesde + 1, filasNuevas.length, 1).setNumberFormat('@');
+      sheetTarifas.getRange(curLastRow + 1, 1, filasNuevas.length, lastCol).setValues(filasNuevas);
+    }
+
+    // Asegurar productos nuevos (ej. HUESO DE POLLO) en pestaña Productos como Activo
+    var productosAgregados = asegurarProductosEnMaestro_(ss, productosLista);
+
+    var msgNov23 = 'Lista de precios 23/11/2026 procesada (86 filas): ' + insertadas + ' insertadas, ' + actualizadas + ' actualizadas, ' + sinCambios + ' sin cambios.';
+    return {
+      result: 'success',
+      vigencia: '2026-11-23',
+      totalLista: LISTA_PRECIOS_NOV23_2026.length,
+      insertadas: insertadas,
+      actualizadas: actualizadas,
+      sinCambios: sinCambios,
+      productosAgregados: productosAgregados,
+      backupSheetName: backupSheetName,
+      mensaje: msgNov23,
+      message: msgNov23
+    };
+  } finally {
+    if (lockAcquired) {
+      try { lock.releaseLock(); } catch (eRel) {}
+    }
+  }
+}
+
+function aplicarListaPreciosNov23Sheet_(ss) {
+  try {
+    var res = ejecutarAplicarListaPreciosNov23_(ss);
+    return ContentService.createTextOutput(JSON.stringify(res))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log("Error en aplicarListaPreciosNov23Sheet_: " + err.toString());
+    return ContentService.createTextOutput(JSON.stringify({
+      result: 'error',
+      error: err.message || err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function menuAplicarListaPreciosNov23() {
+  var ui = SpreadsheetApp.getUi();
+  var resp = ui.alert(
+    '📅 Cargar Lista de Precios 23/Nov/2026 (Idempotente)',
+    '¿Deseas cargar las 86 tarifas oficiales de LISTA_DE_PRECIOS.xlsx con vigencia desde 2026-11-23?\n\n' +
+    '🛡️ Seguridad:\n' +
+    '• Se creará un respaldo automático de la pestaña Tarifas.\n' +
+    '• Se agregará la columna Vigente_Desde en Columna H (sin tocar A..G).\n' +
+    '• Todas las tarifas actuales quedarán protegidas con vigencia 2026-01-01.\n' +
+    '• Los nuevos precios SOLO aplicarán a recolecciones desde el 23/11/2026.\n' +
+    '• Es 100% idempotente: puedes ejecutarlo varias veces sin crear duplicados.',
+    ui.ButtonSet.YES_NO
+  );
+  if (resp !== ui.Button.YES) return;
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss.toast('Cargando lista de precios 23/11/2026 y creando respaldo...', '📅 ProteinAgro', 10);
+    var res = ejecutarAplicarListaPreciosNov23_(ss);
+    var msg = '✅ Proceso completado con éxito:\n\n' +
+      '• Total lista oficial: ' + res.totalLista + ' tarifas\n' +
+      '• Nuevas filas insertadas: ' + res.insertadas + '\n' +
+      '• Filas actualizadas: ' + res.actualizadas + '\n' +
+      '• Filas ya existentes sin cambios: ' + res.sinCambios + '\n' +
+      '• Productos nuevos agregados a maestro: ' + (res.productosAgregados.length > 0 ? res.productosAgregados.join(', ') : 'Ninguno') + '\n' +
+      (res.backupSheetName ? ('• Pestaña de respaldo: ' + res.backupSheetName) : '');
+    ui.alert('📅 Lista de Precios 23/Nov/2026', msg, ui.ButtonSet.OK);
+  } catch (e) {
+    ui.alert('❌ Error al cargar lista de precios', e.toString(), ui.ButtonSet.OK);
   }
 }

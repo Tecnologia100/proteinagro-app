@@ -692,7 +692,11 @@ const logout = () => {
     CURRENT_LOGGED_DRIVER = null;
     try {
         sessionStorage.removeItem('proteinagro_current_driver');
+        sessionStorage.removeItem('proteinagro_role');
     } catch(e) {}
+
+    const modalTarifas = document.getElementById('modal-gestion-tarifas');
+    if (modalTarifas) modalTarifas.style.display = 'none';
 
     loginOverlay.style.display = 'flex';
     driverView.style.display = 'none';
@@ -2360,6 +2364,108 @@ function getProveedoresOficialesSheets() {
     return Array.from(mapa.values()).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 }
 
+// ==============================================================================
+// UTILIDADES DE TARIFAS: MONEDA COLOMBIANA, CSV CON COMILLAS Y VIGENCIA ISO (v1.9.10)
+// ==============================================================================
+let TARIFAS_CARIBE_GVIZ_LIST = [];
+
+function parsePrecioMonedaCliente(val) {
+    if (val === null || val === undefined || val === '') return null;
+    if (typeof val === 'number') {
+        return (isFinite(val) && val > 0) ? val : null;
+    }
+    let s = String(val).trim();
+    if (!s || /pendiente/i.test(s)) return null;
+    s = s.replace(/\$/g, '').replace(/cop/gi, '').replace(/\s+/g, '');
+    if (!s || !/^[0-9.,+-]+$/.test(s)) return null;
+
+    if (s.includes(',') && s.includes('.')) {
+        if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+            s = s.replace(/\./g, '').replace(',', '.'); // Latino: 1.250,50 -> 1250.50
+        } else {
+            s = s.replace(/,/g, ''); // Anglo: 1,250.50 -> 1250.50
+        }
+    } else if (s.includes('.')) {
+        const partsDot = s.split('.');
+        if (partsDot.length === 2 && partsDot[1].length === 3 && parseInt(partsDot[0], 10) > 0) {
+            s = partsDot[0] + partsDot[1]; // Miles Colombia: 1.300 -> 1300
+        } else if (partsDot.length > 2) {
+            s = partsDot.join(''); // Múltiples puntos: 1.200.000 -> 1200000
+        }
+    } else if (s.includes(',')) {
+        const partsComma = s.split(',');
+        if (partsComma.length === 2 && partsComma[1].length === 3 && parseInt(partsComma[0], 10) > 0) {
+            s = partsComma[0] + partsComma[1]; // Miles con coma: 1,300 -> 1300
+        } else if (partsComma.length > 2) {
+            s = partsComma.join(''); // 1,200,000 -> 1200000
+        } else {
+            s = partsComma[0] + '.' + partsComma[1]; // Decimal con coma: 1250,50 -> 1250.5
+        }
+    }
+
+    const num = parseFloat(s);
+    return (!isNaN(num) && isFinite(num) && num > 0) ? num : null;
+}
+
+function parseCSVRowTarifas(row) {
+    const result = [];
+    if (typeof row !== 'string') return result;
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < row.length; i++) {
+        const ch = row[i];
+        if (ch === '"') {
+            if (inQuotes && row[i + 1] === '"') {
+                current += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (ch === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += ch;
+        }
+    }
+    result.push(current.trim());
+    return result;
+}
+
+function obtenerFechaHoyIsoLocal() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function normalizarFechaVigenciaCliente(val) {
+    if (val === null || val === undefined) return '2026-01-01';
+    if (val instanceof Date && !isNaN(val.getTime())) {
+        const y = val.getFullYear();
+        const m = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+    const raw = String(val).trim();
+    if (!raw) return '2026-01-01';
+
+    const isoMatch = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (isoMatch) {
+        return `${isoMatch[1]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[3].padStart(2, '0')}`;
+    }
+
+    const latMatch = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
+    if (latMatch) {
+        let y = latMatch[3];
+        if (y.length === 2) y = '20' + y;
+        return `${y}-${latMatch[2].padStart(2, '0')}-${latMatch[1].padStart(2, '0')}`;
+    }
+
+    return '2026-01-01';
+}
+
 async function sincronizarCatalogosDesdeGviz() {
     try {
         const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
@@ -2373,7 +2479,7 @@ async function sincronizarCatalogosDesdeGviz() {
                 const lines = csvProd.split(/\r?\n/).filter(l => l.trim().length > 0);
                 const gvizProductos = [];
                 for (let i = 1; i < lines.length; i++) {
-                    const row = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+                    const row = parseCSVRowTarifas(lines[i]);
                     const pName = row[0];
                     const pEstado = (row[1] || 'Activo').toLowerCase();
                     if (pName && pEstado !== 'inactivo') {
@@ -2392,7 +2498,7 @@ async function sincronizarCatalogosDesdeGviz() {
         // 2. Sincronizar Puntos_Rutas directamente vía Gviz CSV (&headers=1 para no perder la fila 1 de Ruta 1)
         await refrescarPuntosRutasDesdeSheets();
 
-        // 3. Sincronizar catálogo maestro desacoplado desde Tarifas vía Gviz CSV
+        // 3. Sincronizar catálogo maestro desacoplado desde Tarifas vía Gviz CSV (con vigencia y moneda CO)
         try {
             const tarifUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Tarifas&headers=1&t=${Date.now()}`;
             const resTarif = await fetch(tarifUrl);
@@ -2400,14 +2506,38 @@ async function sincronizarCatalogosDesdeGviz() {
                 const csvTarif = await resTarif.text();
                 const linesT = csvTarif.split(/\r?\n/).filter(l => l.trim().length > 0);
                 const provsTarif = [];
+                const hoyIso = obtenerFechaHoyIsoLocal();
+                const caribeGvizRows = [];
+
+                // Detección flexible de columnas en encabezados (fallback exacto a índices estándar 0..7)
+                let idxProv = 1, idxPunto = 2, idxProd = 3, idxPrecio = 4, idxEstado = 5, idxVigente = 7;
+                if (linesT.length > 0) {
+                    const hdrs = parseCSVRowTarifas(linesT[0]).map(h =>
+                        String(h || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    );
+                    hdrs.forEach((h, idx) => {
+                        if (h.includes('proveedor')) idxProv = idx;
+                        else if (h.includes('punto') || h.includes('sucursal')) idxPunto = idx;
+                        else if (h.includes('producto') || h.includes('materia')) idxProd = idx;
+                        else if (h.includes('precio') || h.includes('tarifa')) idxPrecio = idx;
+                        else if (h.includes('estado')) idxEstado = idx;
+                        else if (h.includes('vigente')) idxVigente = idx;
+                    });
+                }
+
                 for (let i = 1; i < linesT.length; i++) {
-                    const cols = linesT[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
-                    const tProv = cols[1];
-                    const tPunto = cols[2];
-                    const tProd = (cols[3] || '').trim().toUpperCase();
-                    const tEstado = (cols[5] || 'Activo').toLowerCase();
-                    if (tProv) provsTarif.push(tProv);
-                    if (tProv && tProd && tEstado !== 'inactivo') {
+                    const cols = parseCSVRowTarifas(linesT[i]);
+                    const tProv = cols[idxProv] || '';
+                    const tPunto = cols[idxPunto] || '';
+                    const tProd = (cols[idxProd] || '').trim().toUpperCase();
+                    const tEstado = (cols[idxEstado] || 'Activo').trim().toLowerCase();
+                    const vigenteDesde = normalizarFechaVigenciaCliente(cols[idxVigente]);
+                    const precioNum = parsePrecioMonedaCliente(cols[idxPrecio]);
+
+                    if (tProv && tEstado !== 'inactivo') provsTarif.push(tProv);
+
+                    // Solo inyectar al catálogo operativo tarifas activas y ya vigentes hoy (vigenteDesde <= hoyIso)
+                    if (tProv && tProd && tEstado !== 'inactivo' && vigenteDesde <= hoyIso) {
                         const kProv = normalizarClaveTarifa(tProv);
                         const kPunto = normalizarClaveTarifa(tPunto);
                         if (kProv) {
@@ -2420,18 +2550,28 @@ async function sincronizarCatalogosDesdeGviz() {
                             if (!MAPA_PROVEEDOR_PRODUCTOS[keyP].includes(tProd)) MAPA_PROVEEDOR_PRODUCTOS[keyP].push(tProd);
                         }
                     }
-                    if (typeof esProveedorCaribe === 'function' && (esProveedorCaribe(cols[1] || '') || esProveedorCaribe(cols[2] || ''))) {
-                        const prodClean = (cols[3] || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-                        const precioNum = parseFloat(String(cols[4] || '').replace(/[^0-9.-]/g, ''));
-                        if (prodClean && !isNaN(precioNum) && precioNum > 0 && typeof TARIFAS_REFERENCIA_CARIBE === 'object') {
-                            TARIFAS_REFERENCIA_CARIBE[prodClean] = precioNum;
+
+                    // Guardar tarifas activas de Caribe con su vigencia y punto (sin mezclar Cavasa ni futuras)
+                    if (tEstado !== 'inactivo' && typeof esProveedorCaribe === 'function' && (esProveedorCaribe(tProv) || esProveedorCaribe(tPunto))) {
+                        const prodClean = tProd.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        if (prodClean && precioNum !== null && precioNum > 0) {
+                            caribeGvizRows.push({
+                                puntoNorm: normalizarClaveTarifa(tPunto),
+                                prodClean: prodClean,
+                                precio: precioNum,
+                                vigenteDesde: vigenteDesde
+                            });
                         }
                     }
                 }
+                TARIFAS_CARIBE_GVIZ_LIST = caribeGvizRows;
                 try {
                     localStorage.setItem('proteinagro_proveedor_productos', JSON.stringify(MAPA_PROVEEDOR_PRODUCTOS));
                 } catch(e) {}
                 actualizarCatalogoProductosSegunSeleccion();
+                if (typeof evaluarDiscrepanciaFacturaCaribe === 'function') {
+                    evaluarDiscrepanciaFacturaCaribe();
+                }
                 if (provsTarif.length > 0) {
                     actualizarCatalogoMaestroProveedores(provsTarif);
                     console.log("✅ Catálogo maestro enriquecido desde Tarifas (Gviz):", provsTarif.length);
@@ -2708,7 +2848,7 @@ function renderAddedProducts() {
 // ==============================================================================
 let capturedFacturaPhoto = null;
 
-// Tarifas oficiales de referencia para Caribe (usadas para alerta en vivo de discrepancia)
+// Tarifas oficiales de referencia para Caribe vigentes hasta el 2026-11-22 (alerta en vivo de discrepancia)
 const TARIFAS_REFERENCIA_CARIBE = {
     'DESPERDICIO': 100,
     'HUESO BLANCO': 350,
@@ -2717,6 +2857,7 @@ const TARIFAS_REFERENCIA_CARIBE = {
     'SEBO EN RAMA': 1300,
     'SEBO': 1200,
     'PIEL POLLO': 300,
+    'HUESO DE POLLO': 100,
     'PIELES': 100,
     'HUESO PROMOCION': 1200,
     'PULMON DE CERDO': 100,
@@ -2724,24 +2865,111 @@ const TARIFAS_REFERENCIA_CARIBE = {
     'PATAS': 350
 };
 
+// Tarifas oficiales LISTA_DE_PRECIOS.xlsx con vigencia automática a partir del 2026-11-23
+const FECHA_VIGENCIA_CARIBE_NOV23 = '2026-11-23';
+const TARIFAS_REFERENCIA_CARIBE_NOV23 = {
+    'DESPERDICIO': 50,
+    'HUESO BLANCO': 200,
+    'HUESO DE CERDO': 150,
+    'GORDANA': 1500,
+    'SEBO EN RAMA': 1200,
+    'PIEL POLLO': 50,
+    'HUESO DE POLLO': 50
+};
+
+function getTarifasReferenciaCaribeActivas(fechaIso, puntoStr) {
+    const targetFecha = fechaIso ? normalizarFechaVigenciaCliente(fechaIso) : obtenerFechaHoyIsoLocal();
+    const targetPuntoNorm = normalizarClaveTarifa(puntoStr || '');
+    const esPuntoCavasa = targetPuntoNorm.includes('cavasa');
+
+    const tarifas = {};
+    const vigenciaPorProd = {};
+
+    // 1. Base previa al 23-Nov-2026
+    Object.keys(TARIFAS_REFERENCIA_CARIBE).forEach(k => {
+        tarifas[k] = TARIFAS_REFERENCIA_CARIBE[k];
+        vigenciaPorProd[k] = '2026-01-01';
+    });
+
+    // 2. Vigencia automática LISTA_DE_PRECIOS.xlsx desde el 2026-11-23 (para Supermercados Caribe)
+    if (targetFecha >= FECHA_VIGENCIA_CARIBE_NOV23) {
+        Object.keys(TARIFAS_REFERENCIA_CARIBE_NOV23).forEach(k => {
+            tarifas[k] = TARIFAS_REFERENCIA_CARIBE_NOV23[k];
+            vigenciaPorProd[k] = FECHA_VIGENCIA_CARIBE_NOV23;
+        });
+    }
+
+    // 3. Overrides dinámicos desde GViz filtrados por vigenteDesde <= targetFecha y respetando separación por punto (Cavasa vs demás sedes)
+    if (Array.isArray(TARIFAS_CARIBE_GVIZ_LIST) && TARIFAS_CARIBE_GVIZ_LIST.length > 0) {
+        const bestGeneral = {}; // prodClean -> { precio, vigenteDesde }
+        const bestPunto = {};   // prodClean -> { precio, vigenteDesde }
+
+        TARIFAS_CARIBE_GVIZ_LIST.forEach(item => {
+            if (!item || !item.prodClean || !item.precio || item.precio <= 0) return;
+            const vig = item.vigenteDesde || '2026-01-01';
+            if (vig > targetFecha) return;
+
+            const pNorm = item.puntoNorm || '';
+            const rowEsCavasa = pNorm.includes('cavasa');
+            const rowEsGeneral = !pNorm || pNorm.includes('todas') || pNorm.includes('general');
+
+            // Separación estricta: Cavasa nunca contamina Supermercados Caribe y viceversa
+            if (!esPuntoCavasa && rowEsCavasa) return;
+
+            if (targetPuntoNorm && pNorm && (pNorm === targetPuntoNorm || pNorm.includes(targetPuntoNorm) || targetPuntoNorm.includes(pNorm))) {
+                const prev = bestPunto[item.prodClean];
+                if (!prev || vig >= prev.vigenteDesde) {
+                    bestPunto[item.prodClean] = { precio: item.precio, vigenteDesde: vig };
+                }
+            } else if (rowEsGeneral || (!esPuntoCavasa && !rowEsCavasa)) {
+                const prev = bestGeneral[item.prodClean];
+                if (!prev || vig >= prev.vigenteDesde) {
+                    bestGeneral[item.prodClean] = { precio: item.precio, vigenteDesde: vig };
+                }
+            }
+        });
+
+        // Aplicar generales solo si su vigencia es igual o más reciente que el fallback activo
+        Object.keys(bestGeneral).forEach(prod => {
+            const g = bestGeneral[prod];
+            if (!vigenciaPorProd[prod] || g.vigenteDesde >= vigenciaPorProd[prod]) {
+                tarifas[prod] = g.precio;
+                vigenciaPorProd[prod] = g.vigenteDesde;
+            }
+        });
+
+        // Tarifa específica del punto (ej. Cavasa) prevalece si su vigencia es igual o más reciente que el fallback activo
+        Object.keys(bestPunto).forEach(prod => {
+            const p = bestPunto[prod];
+            if (!vigenciaPorProd[prod] || p.vigenteDesde >= vigenciaPorProd[prod]) {
+                tarifas[prod] = p.precio;
+                vigenciaPorProd[prod] = p.vigenteDesde;
+            }
+        });
+    }
+
+    return tarifas;
+}
+
 function esProveedorCaribe(proveedor) {
     const norm = s => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
     const p = norm(proveedor);
     return p === 'caribe' || p.includes('caribe');
 }
 
-function calcularValorEstimadoCaribe(productosList) {
+function calcularValorEstimadoCaribe(productosList, fechaIsoOpt, puntoOpt) {
     if (!Array.isArray(productosList) || productosList.length === 0) return 0;
+    const puntoStr = puntoOpt !== undefined
+        ? puntoOpt
+        : (typeof obtenerPuntoSeleccionado === 'function' ? obtenerPuntoSeleccionado() : '');
+    const fechaIso = fechaIsoOpt || obtenerFechaHoyIsoLocal();
+    const tarifasActivas = getTarifasReferenciaCaribeActivas(fechaIso, puntoStr);
+
     let total = 0;
     productosList.forEach(item => {
         const prodClean = String(item.producto || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const kilos = Number(item.kilos) || 0;
-        let tarifa = TARIFAS_REFERENCIA_CARIBE[prodClean] || 0;
-        if (!tarifa) {
-            for (const k in TARIFAS_REFERENCIA_CARIBE) {
-                if (prodClean === k) { tarifa = TARIFAS_REFERENCIA_CARIBE[k]; break; }
-            }
-        }
+        const tarifa = tarifasActivas[prodClean] || 0;
         if (tarifa > 0 && kilos > 0) {
             total += Math.round(kilos * tarifa);
         }
@@ -2817,6 +3045,7 @@ function actualizarVisibilidadFacturaCaribe() {
 }
 
 document.getElementById('factura-valor')?.addEventListener('input', evaluarDiscrepanciaFacturaCaribe);
+document.getElementById('sucursal')?.addEventListener('change', evaluarDiscrepanciaFacturaCaribe);
 document.getElementById('btn-capturar-factura')?.addEventListener('click', () => {
     document.getElementById('factura-foto-input')?.click();
 });
@@ -2963,6 +3192,7 @@ window.eliminarProductoRegistrado = function(index) {
 const canvas = document.getElementById('signature-pad');
 const ctx = canvas.getContext('2d');
 let isDrawing = false;
+let hasSignatureDrawn = false;
 
 // Ajustar tamaño del canvas
 function resizeCanvas() {
@@ -2995,6 +3225,7 @@ const startDrawing = (e) => {
 const draw = (e) => {
     e.preventDefault();
     if (!isDrawing) return;
+    hasSignatureDrawn = true;
     const pos = getPos(e);
     ctx.lineTo(pos.x, pos.y);
     ctx.strokeStyle = '#000';
@@ -3019,6 +3250,7 @@ canvas.addEventListener('touchend', stopDrawing);
 
 document.getElementById('btn-clear-signature').addEventListener('click', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hasSignatureDrawn = false;
 });
 
 
@@ -3489,6 +3721,7 @@ async function ejecutarGuardadoRecoleccion(dataParams, nombreEntregado) {
         actualizarInterfazUnidadProducto(null);
         document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('active'));
         if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        hasSignatureDrawn = false;
         
         resetearDropdownSucursal("Primero seleccione un proveedor");
         limpiarCamposFacturaCaribe();
@@ -5409,6 +5642,12 @@ function mostrarComprobanteDigital(data) {
 document.getElementById('btn-close-receipt')?.addEventListener('click', () => {
     const modal = document.getElementById('receipt-modal');
     if (modal) modal.style.display = 'none';
+    if (typeof pendingAppReloadAfterSave !== 'undefined' && pendingAppReloadAfterSave) {
+        if (typeof tieneCapturaActivaSinGuardar !== 'function' || !tieneCapturaActivaSinGuardar()) {
+            pendingAppReloadAfterSave = false;
+            window.location.href = window.location.origin + window.location.pathname + '?v=1.9.10&t=' + Date.now();
+        }
+    }
 });
 
 document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
@@ -5482,7 +5721,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.5&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.10&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -6260,16 +6499,29 @@ function initAdminEditModal() {
                 }
             } catch(e) {}
 
-            // 4. Sincronizar actualización con Google Sheets en segundo plano (Doble envío POST + GET)
+            // 4. Sincronizar actualización con Google Sheets (POST prioritario con fallback condicional a GET)
             if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== '') {
                 const payloadParam = encodeURIComponent(JSON.stringify({ ...updatedData, id: localId || docId, action: 'updateRecoleccion' }));
-                fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
-                    method: 'POST',
-                    
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `action=updateRecoleccion&payload=${payloadParam}`
-                }).catch(err => console.warn("Sync Sheets edit POST err:", err));
-                fetch(GOOGLE_SHEETS_WEBHOOK_URL + '?action=updateRecoleccion&payload=' + payloadParam, { method: 'GET' }).catch(err => console.warn("Sync Sheets edit err:", err));
+                let postOk = false;
+                try {
+                    const resPost = await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `action=updateRecoleccion&payload=${payloadParam}`
+                    });
+                    if (resPost && resPost.ok) {
+                        postOk = true;
+                    }
+                } catch (errPost) {
+                    console.warn("Sync Sheets edit POST falló, usando fallback GET:", errPost);
+                }
+                if (!postOk) {
+                    try {
+                        await fetch(GOOGLE_SHEETS_WEBHOOK_URL + '?action=updateRecoleccion&payload=' + payloadParam, { method: 'GET' });
+                    } catch (errGet) {
+                        console.warn("Sync Sheets edit GET fallback err:", errGet);
+                    }
+                }
             }
 
             // 5. Re-renderizar tabla de Administrador
@@ -6782,6 +7034,56 @@ function initNovedadesModal() {
     });
 }
 
+// ==============================================================================
+// PROTECCIÓN CONTRA RECARGA PWA DURANTE CAPTURA ACTIVA DEL CONDUCTOR (v1.9.10)
+// ==============================================================================
+let pendingAppReloadAfterSave = false;
+
+function tieneCapturaActivaSinGuardar() {
+    try {
+        const drvView = document.getElementById('driver-view');
+        if (!drvView || drvView.style.display === 'none' || window.getComputedStyle(drvView).display === 'none') {
+            return false;
+        }
+        if (typeof collectedProducts !== 'undefined' && Array.isArray(collectedProducts) && collectedProducts.length > 0) {
+            return true;
+        }
+        if ((typeof capturedSoportePhoto !== 'undefined' && Boolean(capturedSoportePhoto)) ||
+            (typeof capturedEvidenciaPhoto !== 'undefined' && Boolean(capturedEvidenciaPhoto))) {
+            return true;
+        }
+        if (typeof capturedFacturaPhoto !== 'undefined' && Boolean(capturedFacturaPhoto)) {
+            return true;
+        }
+        if ((typeof isDrawing !== 'undefined' && isDrawing) || (typeof hasSignatureDrawn !== 'undefined' && hasSignatureDrawn)) {
+            return true;
+        }
+        const kInput = document.getElementById('kilos');
+        if (kInput && String(kInput.value || '').trim() !== '') {
+            return true;
+        }
+        const modalVB = document.getElementById('modal-visto-bueno');
+        if (modalVB && modalVB.style.display !== 'none' && modalVB.style.display !== '') {
+            return true;
+        }
+    } catch (e) {}
+    return false;
+}
+
+function solicitarRecargaSeguraApp(motivo) {
+    if (tieneCapturaActivaSinGuardar()) {
+        pendingAppReloadAfterSave = true;
+        console.log(`🛡️ Recarga diferida (${motivo}): captura en curso sin guardar.`);
+        if (typeof mostrarToastAutoSync === 'function') {
+            mostrarToastAutoSync('Actualización lista: se aplicará al terminar esta recolección');
+        }
+        return false;
+    }
+    console.log(`🔄 Aplicando actualización v1.9.10 (${motivo})...`);
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.10&t=' + Date.now();
+    return true;
+}
+
 // Inicializar selectores dinámicos y catálogos al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Inicializar inmediatamente con catálogo base pre-cargado (0ms de latencia, 100% offline-ready)
@@ -6810,6 +7112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initRutasYProveedores();
     initAdminSupportModal();
     initAdminEditModal();
+    initAdminGestionTarifasModal();
     initNovedadesModal();
     inicializarSelectorAtados();
     inicializarModuloEvidenciaPesaje();
@@ -6826,12 +7129,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {}
 
-    // 4. Registrar Service Worker v1.9.7 para PWA instalable con actualización automática inmediata
+    // 4. Registrar Service Worker v1.9.10 para PWA instalable con actualización segura (protege capturas activas)
     if ('serviceWorker' in navigator) {
+        let refreshing = false;
+
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.9.7')
+            navigator.serviceWorker.register('/sw.js?v=1.9.10')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.9.7 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.9.10 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -6839,8 +7144,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (installingWorker) {
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('🔄 Nueva versión v1.9.5 disponible, recargando...');
-                                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.5&t=' + Date.now();
+                                    if (!refreshing && solicitarRecargaSeguraApp('nueva versión instalada')) {
+                                        refreshing = true;
+                                    }
                                 }
                             };
                         }
@@ -6864,21 +7170,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!refreshing) {
+            if (!refreshing && solicitarRecargaSeguraApp('controllerchange')) {
                 refreshing = true;
-                console.log('🔄 Nuevo Service Worker detectado, recargando con bypass de caché...');
-                window.location.href = window.location.origin + window.location.pathname + '?v=1.9.5&t=' + Date.now();
             }
         });
 
         navigator.serviceWorker.addEventListener('message', (event) => {
             if (event.data && event.data.action === 'RELOAD_PAGE') {
-                if (!refreshing) {
+                if (!refreshing && solicitarRecargaSeguraApp('RELOAD_PAGE')) {
                     refreshing = true;
-                    console.log('🔄 Mensaje de recarga recibido del Service Worker...');
-                    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.5&t=' + Date.now();
                 }
             }
         });
@@ -7904,3 +8205,1091 @@ async function verificarVisorSoporteURL() {
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(verificarVisorSoporteURL, 800);
 });
+
+// ==============================================================================
+// GESTOR RÁPIDO DE TARIFAS Y VIGENCIAS (EXCLUSIVO ADMINISTRADOR - v1.9.10)
+// REGLA DE ORO: JAMÁS ACCESIBLE NI VISIBLE PARA CONDUCTORES
+// ==============================================================================
+const tarifasModalState = {
+    rows: [],
+    readOnlyMode: false,
+    sourceLabel: '',
+    nov23YaCargada: false,
+    nov23Count: 0,
+    nov23Total: 86,
+    allProviders: [],
+    selectedProveedor: '',
+    puntoScope: 'TODAS',
+    selectedPunto: '',
+    filtroVista: 'todos',
+    editedPrices: {},
+    addedProducts: {},
+    provSearch: '',
+    isLoading: false
+};
+
+function formatearCOPTarifa(val) {
+    const n = Number(val);
+    if (!isFinite(n) || n <= 0) return '—';
+    return '$' + n.toLocaleString('es-CO');
+}
+
+function formatearFechaCortaDDMM(isoDate) {
+    const iso = normalizarFechaVigenciaCliente(isoDate);
+    const parts = iso.split('-');
+    if (parts.length !== 3) return iso;
+    return `${parts[2]}/${parts[1]}`;
+}
+
+function formatearFechaLegibleCO(isoDate) {
+    const iso = normalizarFechaVigenciaCliente(isoDate);
+    const parts = iso.split('-');
+    if (parts.length !== 3) return iso;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function setTarifasModalStatus(tipo, htmlMsg) {
+    const el = document.getElementById('tarifas-modal-status');
+    if (!el) return;
+    el.className = `tarifas-status-banner ${tipo || 'info'}`;
+    el.innerHTML = htmlMsg;
+}
+
+function actualizarEstadoBotonesModalTarifas() {
+    const btnGuardar = document.getElementById('btn-guardar-tarifas-masivo');
+    const btnNov23 = document.getElementById('btn-tarifas-cargar-nov23');
+    const cambiosCount = obtenerCambiosPendientesTarifas().length;
+
+    if (btnGuardar) {
+        const textSpan = btnGuardar.querySelector('.btn-text-content');
+        if (textSpan) {
+            textSpan.textContent = cambiosCount > 0
+                ? `💾 Guardar y Aplicar Precios (${cambiosCount} ${cambiosCount === 1 ? 'cambio' : 'cambios'})`
+                : '💾 Guardar y Aplicar Precios';
+        }
+        btnGuardar.disabled = Boolean(tarifasModalState.readOnlyMode || tarifasModalState.isLoading);
+        btnGuardar.title = tarifasModalState.readOnlyMode
+            ? 'Despliegue la nueva versión de Code.gs en Google Apps Script para habilitar guardado'
+            : 'Guardar los precios modificados y aplicar en Google Sheets';
+    }
+    if (btnNov23) {
+        btnNov23.disabled = Boolean(tarifasModalState.readOnlyMode || tarifasModalState.isLoading);
+        if (!tarifasModalState.isLoading) {
+            if (tarifasModalState.nov23YaCargada) {
+                btnNov23.textContent = `✅ Lista 23-Nov Cargada (${tarifasModalState.nov23Count}/${tarifasModalState.nov23Total})`;
+            } else if (tarifasModalState.nov23Count > 0) {
+                btnNov23.textContent = `📅 Completar Lista 23-Nov (${tarifasModalState.nov23Count}/${tarifasModalState.nov23Total})`;
+            } else {
+                btnNov23.textContent = '📅 Cargar Lista 23-Nov-2026';
+            }
+        }
+        btnNov23.title = tarifasModalState.readOnlyMode
+            ? 'Despliegue la nueva versión de Code.gs en Google Apps Script para habilitar esta carga'
+            : (tarifasModalState.nov23YaCargada
+                ? 'Las 86 tarifas oficiales del 23/11/2026 ya están programadas (acción idempotente)'
+                : 'Programar las 86 tarifas oficiales de LISTA_DE_PRECIOS.xlsx vigentes desde el 23/11/2026');
+    }
+}
+
+function obtenerCatalogoMaestroProductosTarifas() {
+    const setProds = new Set();
+    const base = Array.isArray(DEFAULT_PRODUCTOS) ? DEFAULT_PRODUCTOS : [];
+    const oficiales = Array.isArray(productosOficialesSheets) ? productosOficialesSheets : [];
+    [...base, ...oficiales].forEach(p => {
+        const clean = String(p || '').trim().toUpperCase();
+        if (clean) setProds.add(clean);
+    });
+    return Array.from(setProds).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+}
+
+function poblarSelectAgregarProductoTarifas() {
+    const sel = document.getElementById('tarifas-add-prod-select');
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">Seleccione materia prima...</option>';
+    obtenerCatalogoMaestroProductosTarifas().forEach(prod => {
+        const opt = document.createElement('option');
+        opt.value = prod;
+        opt.textContent = `${getEmojiForProduct(prod)} ${prod}`;
+        sel.appendChild(opt);
+    });
+    if (prev) sel.value = prev;
+}
+
+function obtenerCambiosPendientesTarifas() {
+    const cambios = [];
+    const seen = new Set();
+
+    Object.keys(tarifasModalState.editedPrices).forEach(prod => {
+        const raw = tarifasModalState.editedPrices[prod];
+        const num = parsePrecioMonedaCliente(raw);
+        if (num !== null && num > 0) {
+            seen.add(prod);
+            cambios.push({
+                producto: prod,
+                precio: num,
+                esNuevo: Boolean(tarifasModalState.addedProducts[prod])
+            });
+        }
+    });
+
+    Object.keys(tarifasModalState.addedProducts).forEach(prod => {
+        if (seen.has(prod)) return;
+        const num = parsePrecioMonedaCliente(tarifasModalState.addedProducts[prod]);
+        if (num !== null && num > 0) {
+            cambios.push({
+                producto: prod,
+                precio: num,
+                esNuevo: true
+            });
+        }
+    });
+
+    cambios.sort((a, b) => a.producto.localeCompare(b.producto, 'es', { sensitivity: 'base' }));
+    return cambios;
+}
+
+async function enviarMutacionTarifasConFallback(actionName, payloadObj) {
+    if (!GOOGLE_SHEETS_WEBHOOK_URL || !GOOGLE_SHEETS_WEBHOOK_URL.trim()) {
+        throw new Error('No está configurada la URL del Webhook de Google Sheets.');
+    }
+
+    const bodyJson = JSON.stringify({ ...payloadObj, action: actionName });
+    let lastError = null;
+
+    // 1. Intento prioritario por POST (Content-Type text/plain evita preflight CORS en Apps Script)
+    try {
+        const resPost = await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: bodyJson
+        });
+        if (!resPost.ok) {
+            throw new Error(`HTTP ${resPost.status}`);
+        }
+        const dataPost = await resPost.json();
+        return dataPost;
+    } catch (postErr) {
+        lastError = postErr;
+        console.warn(`[Tarifas] POST ${actionName} falló, intentando fallback GET:`, postErr);
+    }
+
+    // 2. Fallback condicional por GET únicamente si POST falló
+    const urlGet = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=${encodeURIComponent(actionName)}&payload=${encodeURIComponent(bodyJson)}&t=${Date.now()}`;
+    const resGet = await fetch(urlGet, { method: 'GET' });
+    if (!resGet.ok) {
+        throw new Error(`Error POST (${lastError?.message || 'red'}) y GET (HTTP ${resGet.status})`);
+    }
+    return await resGet.json();
+}
+
+function normalizarFilaTarifaDesdeObjeto(item, idxFallback) {
+    if (!item || typeof item !== 'object') return null;
+    const provRaw = item.proveedor || item.prov || item.Proveedor || '';
+    const puntoRaw = item.punto || item.sucursal || item.Punto || item.Sucursal || '';
+    const prodRaw = item.producto || item.materiaPrima || item.materia || item.prod || item.Producto || '';
+    const rutaRaw = item.ruta || item.Ruta || '';
+    const estadoRaw = item.estado || item.Estado || 'Activo';
+    const vigRaw = item.vigenteDesde || item.vigente_desde || item.Vigente_Desde || item.fechaVigencia || item.vigencia || '';
+    const precioRaw = item.precio !== undefined ? item.precio : (item.Precio !== undefined ? item.Precio : item.tarifa);
+
+    const prov = homologarNombreProveedor(provRaw);
+    const prod = String(prodRaw || '').trim().toUpperCase();
+    if (!prov && !prod) return null;
+
+    const precioNum = parsePrecioMonedaCliente(precioRaw);
+    const estadoClean = String(estadoRaw || 'Activo').trim();
+    const estadoLower = estadoClean.toLowerCase();
+
+    return {
+        rowIndex: item.rowIndex || item.fila || (idxFallback + 2),
+        ruta: String(rutaRaw || '').trim(),
+        proveedor: prov,
+        punto: puntoRaw ? homologarNombrePunto(puntoRaw) : '',
+        producto: prod,
+        precio: precioNum,
+        estado: estadoLower === 'inactivo' ? 'Inactivo' : (precioNum === null ? 'Pendiente Precio' : estadoClean || 'Activo'),
+        vigenteDesde: normalizarFechaVigenciaCliente(vigRaw)
+    };
+}
+
+async function cargarTarifasDesdeBackend(silencioso) {
+    if (!esUsuarioAdmin()) return;
+
+    tarifasModalState.isLoading = true;
+    actualizarEstadoBotonesModalTarifas();
+
+    const tbody = document.getElementById('tarifas-edit-table-body');
+    if (tbody && !silencioso) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:22px; color:#64748b;">⏳ Consultando tarifas vigentes y programadas en Google Sheets...</td></tr>';
+    }
+
+    const hoyIso = obtenerFechaHoyIsoLocal();
+    const spreadsheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
+    let rowsCargadas = null;
+    let modoSoloLectura = false;
+    let mensajeFallback = '';
+
+    // 1. Consulta primaria al Webhook Apps Script (action=getTarifas)
+    if (GOOGLE_SHEETS_WEBHOOK_URL && GOOGLE_SHEETS_WEBHOOK_URL.trim() !== '') {
+        try {
+            const url = `${GOOGLE_SHEETS_WEBHOOK_URL}?action=getTarifas&t=${Date.now()}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            if (data && (data.result === 'error' || data.success === false)) {
+                throw new Error(data.error || 'Error reportado por Apps Script en getTarifas');
+            }
+
+            const lista = Array.isArray(data?.tarifas)
+                ? data.tarifas
+                : (Array.isArray(data?.rows)
+                    ? data.rows
+                    : (data?.action === 'getTarifas' && Array.isArray(data?.data) ? data.data : null));
+
+            if (lista !== null) {
+                rowsCargadas = lista
+                    .map((it, i) => normalizarFilaTarifaDesdeObjeto(it, i))
+                    .filter(Boolean);
+                modoSoloLectura = false;
+                tarifasModalState.nov23YaCargada = Boolean(data?.nov23YaCargada);
+                tarifasModalState.nov23Count = Number(data?.nov23Count || 0);
+                tarifasModalState.nov23Total = Number(data?.nov23Total || 86);
+            } else {
+                mensajeFallback = 'El Webhook de Google Apps Script aún no tiene desplegado el endpoint getTarifas.';
+            }
+        } catch (errApi) {
+            console.warn('[Tarifas] Endpoint getTarifas no disponible, usando fallback GViz CSV:', errApi);
+            mensajeFallback = `No se pudo leer vía Apps Script (${errApi.message}).`;
+        }
+    }
+
+    // 2. Fallback a lectura GViz CSV en modo solo lectura si Apps Script aún no tiene getTarifas
+    if (rowsCargadas === null) {
+        modoSoloLectura = true;
+        try {
+            const gvizUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Tarifas&headers=1&t=${Date.now()}`;
+            const resCsv = await fetch(gvizUrl);
+            if (!resCsv.ok) throw new Error(`HTTP ${resCsv.status}`);
+            const csvText = await resCsv.text();
+            const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
+
+            let idxRuta = 0, idxProv = 1, idxPunto = 2, idxProd = 3, idxPrecio = 4, idxEstado = 5, idxVigente = 7;
+            if (lines.length > 0) {
+                const hdrs = parseCSVRowTarifas(lines[0]).map(h =>
+                    String(h || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                );
+                hdrs.forEach((h, idx) => {
+                    if (h.includes('ruta')) idxRuta = idx;
+                    else if (h.includes('proveedor')) idxProv = idx;
+                    else if (h.includes('punto') || h.includes('sucursal')) idxPunto = idx;
+                    else if (h.includes('producto') || h.includes('materia')) idxProd = idx;
+                    else if (h.includes('precio') || h.includes('tarifa')) idxPrecio = idx;
+                    else if (h.includes('estado')) idxEstado = idx;
+                    else if (h.includes('vigente')) idxVigente = idx;
+                });
+            }
+
+            rowsCargadas = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = parseCSVRowTarifas(lines[i]);
+                const obj = normalizarFilaTarifaDesdeObjeto({
+                    rowIndex: i + 1,
+                    ruta: cols[idxRuta] || '',
+                    proveedor: cols[idxProv] || '',
+                    punto: cols[idxPunto] || '',
+                    producto: cols[idxProd] || '',
+                    precio: cols[idxPrecio] || '',
+                    estado: cols[idxEstado] || 'Activo',
+                    vigenteDesde: cols[idxVigente] || ''
+                }, i - 1);
+                if (obj) rowsCargadas.push(obj);
+            }
+        } catch (errCsv) {
+            tarifasModalState.isLoading = false;
+            tarifasModalState.readOnlyMode = true;
+            setTarifasModalStatus(
+                'error',
+                `❌ <strong>Error cargando tarifas:</strong> ${escapeHtml(errCsv.message)}. Verifique conexión a internet e intente nuevamente con <em>🔄 Recargar</em>.`
+            );
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#b91c1c;">⚠️ No se pudieron cargar las tarifas de Google Sheets.</td></tr>';
+            }
+            actualizarEstadoBotonesModalTarifas();
+            return;
+        }
+    }
+
+    tarifasModalState.rows = rowsCargadas;
+    tarifasModalState.readOnlyMode = modoSoloLectura;
+    tarifasModalState.sourceLabel = modoSoloLectura ? 'GViz CSV (Solo Lectura)' : 'Google Apps Script (En Vivo)';
+    tarifasModalState.isLoading = false;
+
+    const activasCount = rowsCargadas.filter(r => r.estado.toLowerCase() !== 'inactivo').length;
+    const futurasCount = rowsCargadas.filter(r => r.estado.toLowerCase() !== 'inactivo' && r.vigenteDesde > hoyIso).length;
+
+    if (modoSoloLectura) {
+        setTarifasModalStatus(
+            'warn',
+            `⚠️ <strong>Modo Solo Lectura (GViz CSV):</strong> ${escapeHtml(mensajeFallback || 'El endpoint getTarifas aún no responde.')} ` +
+            `Debe desplegar la nueva versión de <strong>Code.gs</strong> en Google Apps Script para guardar o programar precios. ` +
+            `<br><small>Fecha hoy: <strong>${formatearFechaLegibleCO(hoyIso)}</strong> • Filas leídas: ${activasCount} (${futurasCount} programadas a futuro).</small>`
+        );
+    } else {
+        setTarifasModalStatus(
+            'success',
+            `✅ <strong>Conectado a Google Sheets en Vivo</strong> • Hoy: <strong>${formatearFechaLegibleCO(hoyIso)}</strong> • ` +
+            `Tarifas activas: <strong>${activasCount}</strong>${futurasCount > 0 ? ` • Programadas a futuro: <strong>${futurasCount}</strong>` : ''}. ` +
+            `<br><small>🛡️ Respaldo automático garantizado en Google Sheets antes de aplicar cualquier cambio.</small>`
+        );
+    }
+
+    poblarSelectoresModalTarifas();
+    renderTarifasModalTable();
+    actualizarEstadoBotonesModalTarifas();
+}
+
+function poblarSelectoresModalTarifas() {
+    const mapaProv = new Map();
+
+    // 1. Proveedores presentes en la hoja Tarifas
+    tarifasModalState.rows.forEach(r => {
+        if (!r || r.estado.toLowerCase() === 'inactivo' || !r.proveedor) return;
+        const k = normalizarClaveTarifa(r.proveedor);
+        if (k && !mapaProv.has(k)) mapaProv.set(k, r.proveedor);
+    });
+
+    // 2. Proveedores oficiales de Puntos_Rutas (por si se desea configurar tarifas nuevas)
+    if (typeof getProveedoresOficialesSheets === 'function') {
+        getProveedoresOficialesSheets().forEach(p => {
+            const k = normalizarClaveTarifa(p);
+            if (k && !mapaProv.has(k)) mapaProv.set(k, p);
+        });
+    }
+
+    tarifasModalState.allProviders = Array.from(mapaProv.values())
+        .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+    filtrarYPoblarSelectProveedoresTarifas();
+}
+
+function filtrarYPoblarSelectProveedoresTarifas() {
+    const provSelect = document.getElementById('tarifas-prov-select');
+    if (!provSelect) return;
+
+    const queryNorm = normalizarClaveTarifa(tarifasModalState.provSearch || '');
+    const filtrados = queryNorm
+        ? tarifasModalState.allProviders.filter(p => normalizarClaveTarifa(p).includes(queryNorm))
+        : tarifasModalState.allProviders;
+
+    const prevSelected = tarifasModalState.selectedProveedor;
+    provSelect.innerHTML = '';
+
+    if (filtrados.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Sin coincidencias...';
+        provSelect.appendChild(opt);
+        tarifasModalState.selectedProveedor = '';
+        poblarSelectPuntosProveedorTarifas();
+        return;
+    }
+
+    filtrados.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        provSelect.appendChild(opt);
+    });
+
+    if (prevSelected && filtrados.includes(prevSelected)) {
+        provSelect.value = prevSelected;
+    } else {
+        provSelect.value = filtrados[0];
+        tarifasModalState.selectedProveedor = filtrados[0];
+    }
+
+    poblarSelectPuntosProveedorTarifas();
+}
+
+function poblarSelectPuntosProveedorTarifas() {
+    const puntoSelect = document.getElementById('tarifas-punto-select');
+    if (!puntoSelect) return;
+
+    const kProv = normalizarClaveTarifa(tarifasModalState.selectedProveedor || '');
+    const mapaPuntos = new Map();
+
+    // Puntos desde Tarifas
+    tarifasModalState.rows.forEach(r => {
+        if (!r || r.estado.toLowerCase() === 'inactivo') return;
+        if (normalizarClaveTarifa(r.proveedor) !== kProv) return;
+        const pTxt = String(r.punto || '').trim();
+        const kP = normalizarClaveTarifa(pTxt);
+        if (!kP || kP.includes('todas') || kP === 'general') return;
+        if (!mapaPuntos.has(kP)) mapaPuntos.set(kP, pTxt);
+    });
+
+    // Puntos desde Puntos_Rutas
+    if (Array.isArray(MATRIZ_PUNTOS_RUTAS)) {
+        MATRIZ_PUNTOS_RUTAS.forEach(it => {
+            if (!it || it.estado === 'Inactivo') return;
+            if (normalizarClaveTarifa(it.proveedor) !== kProv) return;
+            const pTxt = homologarNombrePunto(it.punto || '');
+            const kP = normalizarClaveTarifa(pTxt);
+            if (!kP || kP.includes('todas') || kP === 'general') return;
+            if (!mapaPuntos.has(kP)) mapaPuntos.set(kP, pTxt);
+        });
+    }
+
+    const listaPuntos = Array.from(mapaPuntos.values())
+        .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+    puntoSelect.innerHTML = '';
+    if (tarifasModalState.puntoScope === 'TODAS') {
+        const optAll = document.createElement('option');
+        optAll.value = '';
+        optAll.textContent = listaPuntos.length > 0
+            ? `Todas las sedes (${listaPuntos.length} sedes registradas)`
+            : 'Todas las sedes del proveedor';
+        puntoSelect.appendChild(optAll);
+        puntoSelect.disabled = true;
+        tarifasModalState.selectedPunto = '';
+        return;
+    }
+
+    puntoSelect.disabled = false;
+    if (listaPuntos.length === 0) {
+        const optEmpty = document.createElement('option');
+        optEmpty.value = tarifasModalState.selectedProveedor || 'General';
+        optEmpty.textContent = tarifasModalState.selectedProveedor || 'Sede Principal';
+        puntoSelect.appendChild(optEmpty);
+        tarifasModalState.selectedPunto = optEmpty.value;
+        return;
+    }
+
+    listaPuntos.forEach(pt => {
+        const opt = document.createElement('option');
+        opt.value = pt;
+        opt.textContent = pt;
+        puntoSelect.appendChild(opt);
+    });
+
+    if (tarifasModalState.selectedPunto && listaPuntos.includes(tarifasModalState.selectedPunto)) {
+        puntoSelect.value = tarifasModalState.selectedPunto;
+    } else {
+        puntoSelect.value = listaPuntos[0];
+        tarifasModalState.selectedPunto = listaPuntos[0];
+    }
+}
+
+function renderTarifasModalTable() {
+    const tbody = document.getElementById('tarifas-edit-table-body');
+    const resumenEl = document.getElementById('tarifas-resumen-conteo');
+    if (!tbody) return;
+
+    const provActual = tarifasModalState.selectedProveedor;
+    if (!provActual) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:#64748b;">Seleccione un proveedor para consultar y editar sus tarifas.</td></tr>';
+        if (resumenEl) resumenEl.textContent = 'Sin proveedor seleccionado.';
+        actualizarEstadoBotonesModalTarifas();
+        return;
+    }
+
+    const hoyIso = obtenerFechaHoyIsoLocal();
+    const kProv = normalizarClaveTarifa(provActual);
+    const scope = tarifasModalState.puntoScope;
+    const kPuntoSel = normalizarClaveTarifa(tarifasModalState.selectedPunto || '');
+
+    // Filtrar filas activas del proveedor seleccionado
+    const provRows = tarifasModalState.rows.filter(r => {
+        if (!r || r.estado.toLowerCase() === 'inactivo') return false;
+        if (normalizarClaveTarifa(r.proveedor) !== kProv) return false;
+        if (scope === 'UNA' && kPuntoSel) {
+            const kRowP = normalizarClaveTarifa(r.punto || '');
+            const esGeneral = !kRowP || kRowP.includes('todas') || kRowP === 'general';
+            return kRowP === kPuntoSel || kRowP.includes(kPuntoSel) || kPuntoSel.includes(kRowP) || esGeneral;
+        }
+        return true;
+    });
+
+    // Agrupar por Materia Prima
+    const prodMap = new Map();
+    provRows.forEach(r => {
+        const prod = String(r.producto || '').trim().toUpperCase();
+        if (!prod) return;
+        if (!prodMap.has(prod)) prodMap.set(prod, []);
+        prodMap.get(prod).push(r);
+    });
+
+    // Incluir productos agregados manualmente en la sesión actual
+    Object.keys(tarifasModalState.addedProducts).forEach(prod => {
+        if (!prodMap.has(prod)) prodMap.set(prod, []);
+    });
+
+    const items = [];
+    prodMap.forEach((rowsList, prod) => {
+        // Si estamos en alcance UNA sede, priorizar filas exactas de esa sede sobre las generales
+        let workingRows = rowsList;
+        if (scope === 'UNA' && kPuntoSel) {
+            const exactas = rowsList.filter(r => {
+                const kRowP = normalizarClaveTarifa(r.punto || '');
+                return kRowP && !kRowP.includes('todas') && kRowP !== 'general' &&
+                    (kRowP === kPuntoSel || kRowP.includes(kPuntoSel) || kPuntoSel.includes(kRowP));
+            });
+            if (exactas.length > 0) workingRows = exactas;
+        }
+
+        // 1. Calcular Vigente Hoy (mayor vigenteDesde <= hoyIso por sede)
+        const vigentesPorSede = new Map();
+        workingRows.forEach(r => {
+            if (r.vigenteDesde <= hoyIso && r.precio !== null && r.precio > 0) {
+                const kSede = normalizarClaveTarifa(r.punto || '') || '_general';
+                const prev = vigentesPorSede.get(kSede);
+                if (!prev || r.vigenteDesde >= prev.vigenteDesde) {
+                    vigentesPorSede.set(kSede, r);
+                }
+            }
+        });
+
+        const preciosVigentesUnicos = Array.from(new Set(Array.from(vigentesPorSede.values()).map(r => r.precio)))
+            .sort((a, b) => a - b);
+        const precioVigente = preciosVigentesUnicos.length > 0 ? preciosVigentesUnicos[0] : null;
+        const variaPorSede = preciosVigentesUnicos.length > 1;
+        const maxPrecioVigente = preciosVigentesUnicos.length > 1 ? preciosVigentesUnicos[preciosVigentesUnicos.length - 1] : precioVigente;
+
+        // 2. Calcular Programadas a Futuro (vigenteDesde > hoyIso)
+        const futMap = new Map(); // fecha -> Set(precios)
+        workingRows.forEach(r => {
+            if (r.vigenteDesde > hoyIso && r.precio !== null && r.precio > 0) {
+                if (!futMap.has(r.vigenteDesde)) futMap.set(r.vigenteDesde, new Set());
+                futMap.get(r.vigenteDesde).add(r.precio);
+            }
+        });
+        const programadas = Array.from(futMap.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([fecha, preciosSet]) => ({
+                fecha,
+                precios: Array.from(preciosSet).sort((a, b) => a - b)
+            }));
+
+        const esNuevo = Boolean(tarifasModalState.addedProducts[prod]) && rowsList.length === 0;
+        const rawEdit = tarifasModalState.editedPrices[prod] !== undefined
+            ? tarifasModalState.editedPrices[prod]
+            : (tarifasModalState.addedProducts[prod] !== undefined ? tarifasModalState.addedProducts[prod] : '');
+        const editNum = parsePrecioMonedaCliente(rawEdit);
+        const estaModificado = (editNum !== null && editNum > 0) || esNuevo;
+
+        items.push({
+            producto: prod,
+            precioVigente,
+            maxPrecioVigente,
+            variaPorSede,
+            programadas,
+            esNuevo,
+            rawEdit,
+            estaModificado
+        });
+    });
+
+    items.sort((a, b) => a.producto.localeCompare(b.producto, 'es', { sensitivity: 'base' }));
+
+    // Aplicar filtro rápido de vista
+    const filtro = tarifasModalState.filtroVista || 'todos';
+    const visibles = items.filter(it => {
+        if (filtro === 'pendientes') return it.precioVigente === null && !it.esNuevo;
+        if (filtro === 'programados') return it.programadas.length > 0;
+        return true;
+    });
+
+    if (resumenEl) {
+        resumenEl.textContent = `Mostrando ${visibles.length} de ${items.length} materias primas de ${provActual}.`;
+    }
+
+    if (visibles.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#64748b;">No hay materias primas para este filtro en <strong>${escapeHtml(provActual)}</strong>. Use <em>➕ Agregar producto al proveedor</em> abajo para añadir una.</td></tr>`;
+        actualizarEstadoBotonesModalTarifas();
+        return;
+    }
+
+    tbody.innerHTML = visibles.map(it => {
+        // Columna 2: Vigente Hoy
+        let vigenteHtml = '<span class="tarifa-badge-pendiente">Sin precio</span>';
+        if (it.precioVigente !== null) {
+            if (it.variaPorSede) {
+                vigenteHtml = `<strong>${formatearCOPTarifa(it.precioVigente)} – ${formatearCOPTarifa(it.maxPrecioVigente)}</strong><br><small style="color:#64748b; font-size:0.7rem;">varía por sede</small>`;
+            } else {
+                vigenteHtml = `<strong style="color:#0f172a;">${formatearCOPTarifa(it.precioVigente)}</strong>`;
+            }
+        }
+
+        // Columna 3: Programada
+        let progHtml = '<span style="color:#94a3b8;">—</span>';
+        if (it.programadas.length > 0) {
+            progHtml = it.programadas.map(pr => {
+                const precioLabel = pr.precios.length > 1
+                    ? `${formatearCOPTarifa(pr.precios[0])}–${formatearCOPTarifa(pr.precios[pr.precios.length - 1])}`
+                    : formatearCOPTarifa(pr.precios[0]);
+                return `<span class="tarifa-badge-programada" style="margin:1px 2px 1px 0;">📅 ${formatearFechaCortaDDMM(pr.fecha)}: ${precioLabel}</span>`;
+            }).join(' ');
+        }
+
+        // Columna 5: Estado
+        let estadoHtml = '';
+        if (it.esNuevo) {
+            estadoHtml = `<span class="tarifa-badge-programada">➕ Nuevo</span> <button type="button" class="btn-quitar-tarifa-nueva" data-prod="${escapeHtml(it.producto)}" title="Quitar de la lista" style="background:none; border:none; color:#dc2626; font-weight:700; cursor:pointer; font-size:0.85rem; padding:0 4px;">✕</button>`;
+        } else if (it.estaModificado) {
+            estadoHtml = '<span class="tarifa-badge-programada">✏️ Modificado</span>';
+        } else if (it.precioVigente === null && it.programadas.length > 0) {
+            estadoHtml = '<span class="tarifa-badge-programada">📅 Programada</span>';
+        } else if (it.precioVigente === null) {
+            estadoHtml = '<span class="tarifa-badge-pendiente">⚠️ Pendiente</span>';
+        } else if (it.programadas.length > 0) {
+            estadoHtml = '<span class="tarifa-badge-vigente">✅ Vigente</span>';
+        } else {
+            estadoHtml = '<span class="tarifa-badge-vigente">✅ Vigente</span>';
+        }
+
+        const placeholderTxt = it.precioVigente !== null ? `Actual: ${it.precioVigente}` : 'Ingresar $';
+        const valAttr = (it.rawEdit !== '' && it.rawEdit !== null && it.rawEdit !== undefined) ? String(it.rawEdit) : '';
+
+        return `
+            <tr class="${it.estaModificado ? 'tarifa-row-modified' : ''}" data-tarifa-prod="${escapeHtml(it.producto)}">
+                <td style="font-weight: 700;">${getEmojiForProduct(it.producto)} ${escapeHtml(it.producto)}</td>
+                <td>${vigenteHtml}</td>
+                <td>${progHtml}</td>
+                <td>
+                    <input type="number" class="tarifa-price-input" data-prod="${escapeHtml(it.producto)}" min="0" step="1" inputmode="numeric" placeholder="${escapeHtml(placeholderTxt)}" value="${escapeHtml(valAttr)}">
+                </td>
+                <td>${estadoHtml}</td>
+            </tr>
+        `;
+    }).join('');
+
+    // Listeners reactivos sobre inputs de precio y botones de quitar nuevos
+    tbody.querySelectorAll('.tarifa-price-input').forEach(inp => {
+        inp.addEventListener('input', () => {
+            const prod = inp.getAttribute('data-prod');
+            if (!prod) return;
+            const rawVal = inp.value.trim();
+            if (rawVal === '') {
+                delete tarifasModalState.editedPrices[prod];
+                if (tarifasModalState.addedProducts[prod] !== undefined) {
+                    tarifasModalState.addedProducts[prod] = '';
+                }
+            } else {
+                tarifasModalState.editedPrices[prod] = rawVal;
+                if (tarifasModalState.addedProducts[prod] !== undefined) {
+                    tarifasModalState.addedProducts[prod] = rawVal;
+                }
+            }
+            const tr = inp.closest('tr');
+            const numVal = parsePrecioMonedaCliente(rawVal);
+            const modified = (numVal !== null && numVal > 0) || Boolean(tarifasModalState.addedProducts[prod]);
+            if (tr) tr.classList.toggle('tarifa-row-modified', modified);
+            actualizarEstadoBotonesModalTarifas();
+        });
+    });
+
+    tbody.querySelectorAll('.btn-quitar-tarifa-nueva').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const prod = btn.getAttribute('data-prod');
+            if (!prod) return;
+            delete tarifasModalState.addedProducts[prod];
+            delete tarifasModalState.editedPrices[prod];
+            renderTarifasModalTable();
+        });
+    });
+
+    actualizarEstadoBotonesModalTarifas();
+}
+
+async function guardarTarifasMasivoAdmin() {
+    if (!esUsuarioAdmin()) return;
+    if (tarifasModalState.readOnlyMode) {
+        alert('⚠️ El modal está en Modo Solo Lectura porque Google Apps Script aún no tiene desplegada la nueva versión de Code.gs.\n\nDespliegue Code.gs en Apps Script y luego pulse "🔄 Recargar".');
+        return;
+    }
+
+    const proveedor = tarifasModalState.selectedProveedor;
+    if (!proveedor) {
+        alert('⚠️ Seleccione primero un proveedor.');
+        return;
+    }
+
+    const cambios = obtenerCambiosPendientesTarifas();
+    if (cambios.length === 0) {
+        alert('ℹ️ No hay precios nuevos o modificados para guardar.\n\nEscriba al menos un valor en la columna "Nuevo Precio ($ COP)" o añada una materia prima.');
+        return;
+    }
+
+    const vigenteDesde = (document.getElementById('tarifas-vigente-desde')?.value || '').trim();
+    if (!vigenteDesde) {
+        alert('⚠️ Seleccione la fecha "Vigente Desde".');
+        return;
+    }
+
+    const modoAplicacion = document.querySelector('input[name="tarifas-modo-aplicacion"]:checked')?.value || 'futuras';
+    const rangoDesde = (document.getElementById('tarifas-rango-desde')?.value || '').trim();
+    const rangoHasta = (document.getElementById('tarifas-rango-hasta')?.value || '').trim();
+
+    if (modoAplicacion === 'rango') {
+        if (!rangoDesde || !rangoHasta) {
+            alert('⚠️ Debe indicar las fechas "Desde" y "Hasta" para re-liquidar por rango.');
+            return;
+        }
+        if (rangoDesde > rangoHasta) {
+            alert('⚠️ La fecha "Desde" no puede ser mayor que la fecha "Hasta".');
+            return;
+        }
+    }
+
+    const puntoScope = tarifasModalState.puntoScope;
+    const puntoDestino = puntoScope === 'UNA' ? (tarifasModalState.selectedPunto || '') : 'TODAS';
+    const alcanceTexto = puntoScope === 'UNA' ? `Solo sede: ${puntoDestino}` : 'Todas las sedes del proveedor';
+
+    const modoTexto = modoAplicacion === 'futuras'
+        ? 'Solo desde fecha de vigencia (protege el histórico)'
+        : (modoAplicacion === 'pendientes'
+            ? 'Vigencia + liquidar recolecciones con precio vacío pendiente'
+            : `Vigencia + re-liquidar rango ${formatearFechaLegibleCO(rangoDesde)} a ${formatearFechaLegibleCO(rangoHasta)}`);
+
+    const resumenLista = cambios
+        .slice(0, 12)
+        .map(c => `  • ${c.producto}: ${formatearCOPTarifa(c.precio)}${c.esNuevo ? ' (Nuevo)' : ''}`)
+        .join('\n') + (cambios.length > 12 ? `\n  ... y ${cambios.length - 12} más` : '');
+
+    const confirmar = confirm(
+        `🏷️ CONFIRMAR ACTUALIZACIÓN DE TARIFAS EN GOOGLE SHEETS\n\n` +
+        `• Proveedor: ${proveedor}\n` +
+        `• Alcance sedes: ${alcanceTexto}\n` +
+        `• Vigente Desde: ${formatearFechaLegibleCO(vigenteDesde)} (${vigenteDesde})\n` +
+        `• Modo aplicación: ${modoTexto}\n` +
+        `• Materias primas a guardar (${cambios.length}):\n${resumenLista}\n\n` +
+        `🛡️ Se creará respaldo automático en Google Sheets antes de aplicar los cambios. ¿Desea continuar?`
+    );
+    if (!confirmar) return;
+
+    const btnGuardar = document.getElementById('btn-guardar-tarifas-masivo');
+    const spinner = btnGuardar?.querySelector('.spinner');
+    if (spinner) spinner.style.display = 'inline-block';
+    tarifasModalState.isLoading = true;
+    actualizarEstadoBotonesModalTarifas();
+
+    try {
+        const kProv = normalizarClaveTarifa(proveedor);
+        const kPuntoSel = puntoScope === 'UNA' ? normalizarClaveTarifa(puntoDestino) : '';
+        const rutaSugerida = (Array.isArray(MATRIZ_PUNTOS_RUTAS)
+            ? ((kPuntoSel && MATRIZ_PUNTOS_RUTAS.find(it => it && normalizarClaveTarifa(it.proveedor) === kProv && normalizarClaveTarifa(it.punto) === kPuntoSel)?.ruta) ||
+                MATRIZ_PUNTOS_RUTAS.find(it => it && normalizarClaveTarifa(it.proveedor) === kProv)?.ruta || '')
+            : '') || (tarifasModalState.rows.find(r => normalizarClaveTarifa(r.proveedor) === kProv)?.ruta || 'Ruta General');
+
+        const payload = {
+            proveedor: proveedor,
+            puntoScope: puntoDestino,
+            punto: puntoDestino,
+            alcancePunto: puntoScope,
+            ruta: rutaSugerida,
+            vigenteDesde: vigenteDesde,
+            modoAplicacion: modoAplicacion,
+            fechaDesde: modoAplicacion === 'rango' ? rangoDesde : '',
+            fechaHasta: modoAplicacion === 'rango' ? rangoHasta : '',
+            cambios: cambios.map(c => ({ producto: c.producto, precio: c.precio })),
+            usuario: 'Administrador'
+        };
+
+        const data = await enviarMutacionTarifasConFallback('actualizarTarifasMasivo', payload);
+        if (!data || data.result === 'error' || data.success === false) {
+            throw new Error(data?.error || data?.mensaje || data?.message || 'Respuesta de error desde Google Apps Script');
+        }
+
+        const insertadasCount = Number(data.tarifasInsertadas ?? data.insertadas ?? 0);
+        const actualizadasCount = Number(data.tarifasActualizadas ?? data.actualizadas ?? 0);
+        const filasAfectadas = (insertadasCount + actualizadasCount) || Number(data.filasActualizadas || data.totalActualizadas || data.filasProgramadas || cambios.length);
+        const reliquidadas = Number(
+            data.reliquidadas ??
+            data.reliquidacionRango?.filasActualizadas ??
+            data.liquidacionPendientes?.totalLiquidadas ??
+            data.totalLiquidadas ??
+            data.filasRecoleccionesActualizadas ??
+            0
+        );
+        const backupName = data.backupTarifas || data.backupSheetName || data.respaldo || '';
+        const backupRec = data.backupRecolecciones || data.reliquidacionRango?.backupSheetName || data.liquidacionPendientes?.backupSheetName || '';
+        const msgBackend = data.mensaje || data.message || '';
+
+        tarifasModalState.editedPrices = {};
+        tarifasModalState.addedProducts = {};
+
+        alert(
+            `✅ Tarifas guardadas y aplicadas exitosamente en Google Sheets:\n\n` +
+            `• Proveedor: ${proveedor} (${alcanceTexto})\n` +
+            `• Vigente Desde: ${formatearFechaLegibleCO(vigenteDesde)}\n` +
+            `• Filas de tarifa aplicadas: ${filasAfectadas} (${insertadasCount} nuevas, ${actualizadasCount} actualizadas)` +
+            (reliquidadas > 0 ? `\n• Recolecciones liquidadas/re-liquidadas: ${reliquidadas}` : '') +
+            (backupName ? `\n• Respaldo Tarifas: ${backupName}` : '') +
+            (backupRec ? `\n• Respaldo Recolecciones: ${backupRec}` : '') +
+            (msgBackend ? `\n\nℹ️ ${msgBackend}` : '')
+        );
+
+        await cargarTarifasDesdeBackend(true);
+        sincronizarCatalogosDesdeGviz();
+    } catch (err) {
+        console.error('[Tarifas] Error guardando tarifas masivo:', err);
+        alert(`⚠️ No se pudieron guardar las tarifas en Google Sheets:\n${err.message}`);
+    } finally {
+        if (spinner) spinner.style.display = 'none';
+        tarifasModalState.isLoading = false;
+        actualizarEstadoBotonesModalTarifas();
+    }
+}
+
+async function aplicarListaPreciosNov23Admin() {
+    if (!esUsuarioAdmin()) return;
+    if (tarifasModalState.readOnlyMode) {
+        alert('⚠️ El modal está en Modo Solo Lectura porque Google Apps Script aún no tiene desplegada la nueva versión de Code.gs.\n\nDespliegue Code.gs en Apps Script y luego pulse "🔄 Recargar".');
+        return;
+    }
+
+    const confirmar = confirm(
+        `📅 CARGAR LISTA OFICIAL DE PRECIOS 23-NOV-2026\n\n` +
+        `Se programarán en la hoja Tarifas las 86 tarifas oficiales de LISTA_DE_PRECIOS.xlsx (13 grupos de proveedores) con vigencia desde 23/11/2026:\n` +
+        `  • El Rebajón, Sevillana (todas las sedes + Cavasa + Santa Elena)\n` +
+        `  • Santa Elena (Manteca $3.200; Aceite intacto $3.600)\n` +
+        `  • Caribe (Cavasa + Rutas 3 y 4, incl. Hueso de Pollo $50)\n` +
+        `  • Carnes Maiale, Los Lagos, Orlando Martínez / Los Andes\n` +
+        `  • Bárbara Gómez / La Reserva, Miguel Ángel Otero, Carnes Millán\n` +
+        `  • Frigorivalle, Mercaunion y Jhonatan Martínez\n\n` +
+        `🛡️ Seguridad contable:\n` +
+        `• Se creará una pestaña de respaldo automática antes de modificar.\n` +
+        `• Las tarifas anteriores siguen vigentes hasta el 22/11/2026 (no altera histórico).\n` +
+        `• Operación 100% idempotente (no crea duplicados si ya se cargó).\n\n` +
+        `¿Desea ejecutar la programación de la Lista 23-Nov-2026 ahora?`
+    );
+    if (!confirmar) return;
+
+    const btnNov23 = document.getElementById('btn-tarifas-cargar-nov23');
+    if (btnNov23) btnNov23.textContent = '⏳ Programando Lista 23-Nov...';
+    tarifasModalState.isLoading = true;
+    actualizarEstadoBotonesModalTarifas();
+
+    try {
+        const data = await enviarMutacionTarifasConFallback('aplicarListaPreciosNov23', {
+            vigenteDesde: '2026-11-23',
+            usuario: 'Administrador'
+        });
+
+        if (!data || data.result === 'error' || data.success === false) {
+            throw new Error(data?.error || data?.mensaje || data?.message || 'Error ejecutando aplicarListaPreciosNov23');
+        }
+
+        const insertadas = Number(data.insertadas || 0);
+        const actualizadas = Number(data.actualizadas || 0);
+        const sinCambios = Number(data.sinCambios ?? data.omitidas ?? data.yaExistentes ?? 0);
+        const programadas = insertadas + actualizadas || Number(data.filasProgramadas || data.totalProgramadas || 0);
+        const backupName = data.backupSheetName || data.respaldo || 'Creado automáticamente';
+        const msgBackend = data.mensaje || data.message || '';
+
+        alert(
+            `✅ Lista de Precios 23-Nov-2026 procesada con éxito:\n\n` +
+            `• Nuevas/actualizadas (vigencia 23/11/2026): ${programadas} (${insertadas} insertadas, ${actualizadas} actualizadas)` +
+            (sinCambios > 0 ? `\n• Filas ya existentes conservadas sin cambios: ${sinCambios}` : '') +
+            `\n• Respaldo creado: ${backupName}` +
+            (msgBackend ? `\n\nℹ️ ${msgBackend}` : '')
+        );
+
+        await cargarTarifasDesdeBackend(true);
+        sincronizarCatalogosDesdeGviz();
+    } catch (err) {
+        console.error('[Tarifas] Error en aplicarListaPreciosNov23:', err);
+        alert(`⚠️ No se pudo programar la Lista 23-Nov-2026:\n${err.message}`);
+    } finally {
+        tarifasModalState.isLoading = false;
+        actualizarEstadoBotonesModalTarifas();
+    }
+}
+
+function abrirModalGestionTarifas() {
+    if (!esUsuarioAdmin()) {
+        console.warn('🔒 Acceso denegado a Gestión de Tarifas: exclusivo para Administrador.');
+        return;
+    }
+
+    const modal = document.getElementById('modal-gestion-tarifas');
+    if (!modal) return;
+
+    const hoyIso = obtenerFechaHoyIsoLocal();
+    const vigInput = document.getElementById('tarifas-vigente-desde');
+    if (vigInput) vigInput.value = hoyIso;
+
+    const rDesde = document.getElementById('tarifas-rango-desde');
+    const rHasta = document.getElementById('tarifas-rango-hasta');
+    if (rDesde && !rDesde.value) rDesde.value = hoyIso;
+    if (rHasta && !rHasta.value) rHasta.value = hoyIso;
+
+    const radioFuturas = document.querySelector('input[name="tarifas-modo-aplicacion"][value="futuras"]');
+    if (radioFuturas) radioFuturas.checked = true;
+    const rangoBox = document.getElementById('tarifas-rango-fechas-box');
+    if (rangoBox) rangoBox.style.display = 'none';
+
+    const radioTodas = document.querySelector('input[name="tarifas-punto-scope"][value="TODAS"]');
+    if (radioTodas) radioTodas.checked = true;
+
+    const searchInput = document.getElementById('tarifas-prov-search');
+    if (searchInput) searchInput.value = '';
+
+    tarifasModalState.puntoScope = 'TODAS';
+    tarifasModalState.selectedPunto = '';
+    tarifasModalState.filtroVista = 'todos';
+    tarifasModalState.provSearch = '';
+    tarifasModalState.editedPrices = {};
+    tarifasModalState.addedProducts = {};
+
+    document.querySelectorAll('#tarifas-vista-filtro-group .btn-tarifa-pill').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-tarifa-filter') === 'todos');
+    });
+
+    poblarSelectAgregarProductoTarifas();
+    modal.style.display = 'flex';
+    cargarTarifasDesdeBackend(false);
+}
+
+function cerrarModalGestionTarifas() {
+    const modal = document.getElementById('modal-gestion-tarifas');
+    if (modal) modal.style.display = 'none';
+}
+
+function initAdminGestionTarifasModal() {
+    const btnAbrir = document.getElementById('btn-admin-gestion-tarifas');
+    const modal = document.getElementById('modal-gestion-tarifas');
+    if (!btnAbrir || !modal) return;
+
+    btnAbrir.addEventListener('click', abrirModalGestionTarifas);
+    document.getElementById('btn-cerrar-modal-tarifas')?.addEventListener('click', cerrarModalGestionTarifas);
+    document.getElementById('btn-cancelar-modal-tarifas')?.addEventListener('click', cerrarModalGestionTarifas);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) cerrarModalGestionTarifas();
+    });
+
+    document.getElementById('btn-tarifas-recargar')?.addEventListener('click', () => {
+        if (!esUsuarioAdmin()) return;
+        tarifasModalState.editedPrices = {};
+        tarifasModalState.addedProducts = {};
+        cargarTarifasDesdeBackend(false);
+    });
+
+    document.getElementById('btn-tarifas-cargar-nov23')?.addEventListener('click', aplicarListaPreciosNov23Admin);
+    document.getElementById('btn-guardar-tarifas-masivo')?.addEventListener('click', guardarTarifasMasivoAdmin);
+
+    // Buscador rápido de proveedor
+    document.getElementById('tarifas-prov-search')?.addEventListener('input', (e) => {
+        tarifasModalState.provSearch = e.target.value || '';
+        filtrarYPoblarSelectProveedoresTarifas();
+        renderTarifasModalTable();
+    });
+
+    // Cambio de proveedor
+    document.getElementById('tarifas-prov-select')?.addEventListener('change', (e) => {
+        tarifasModalState.selectedProveedor = e.target.value || '';
+        tarifasModalState.editedPrices = {};
+        tarifasModalState.addedProducts = {};
+        tarifasModalState.puntoScope = 'TODAS';
+        tarifasModalState.selectedPunto = '';
+        const radioTodas = document.querySelector('input[name="tarifas-punto-scope"][value="TODAS"]');
+        if (radioTodas) radioTodas.checked = true;
+        poblarSelectPuntosProveedorTarifas();
+        renderTarifasModalTable();
+    });
+
+    // Alcance de sedes (Todas vs Una)
+    document.querySelectorAll('input[name="tarifas-punto-scope"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            tarifasModalState.puntoScope = radio.value === 'UNA' ? 'UNA' : 'TODAS';
+            tarifasModalState.editedPrices = {};
+            tarifasModalState.addedProducts = {};
+            poblarSelectPuntosProveedorTarifas();
+            renderTarifasModalTable();
+        });
+    });
+
+    // Cambio de sede específica
+    document.getElementById('tarifas-punto-select')?.addEventListener('change', (e) => {
+        tarifasModalState.selectedPunto = e.target.value || '';
+        tarifasModalState.editedPrices = {};
+        tarifasModalState.addedProducts = {};
+        renderTarifasModalTable();
+    });
+
+    // Atajos de fecha de vigencia
+    document.getElementById('btn-tarifas-fecha-nov23')?.addEventListener('click', () => {
+        const vigInput = document.getElementById('tarifas-vigente-desde');
+        if (vigInput) vigInput.value = '2026-11-23';
+    });
+    document.getElementById('btn-tarifas-fecha-hoy')?.addEventListener('click', () => {
+        const vigInput = document.getElementById('tarifas-vigente-desde');
+        if (vigInput) vigInput.value = obtenerFechaHoyIsoLocal();
+    });
+
+    // Filtro rápido de vista (Todos / Solo Pendiente Precio / Programados a Futuro)
+    document.querySelectorAll('#tarifas-vista-filtro-group .btn-tarifa-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const filter = btn.getAttribute('data-tarifa-filter') || 'todos';
+            tarifasModalState.filtroVista = filter;
+            document.querySelectorAll('#tarifas-vista-filtro-group .btn-tarifa-pill').forEach(b => {
+                b.classList.toggle('active', b === btn);
+            });
+            renderTarifasModalTable();
+        });
+    });
+
+    // Botón rápido: + Agregar producto al proveedor
+    document.getElementById('btn-tarifas-add-prod')?.addEventListener('click', () => {
+        if (!esUsuarioAdmin()) return;
+        const prodSel = document.getElementById('tarifas-add-prod-select');
+        const precioInp = document.getElementById('tarifas-add-prod-precio');
+        const prod = String(prodSel?.value || '').trim().toUpperCase();
+        const precioNum = parsePrecioMonedaCliente(precioInp?.value);
+
+        if (!tarifasModalState.selectedProveedor) {
+            alert('⚠️ Seleccione primero un proveedor.');
+            return;
+        }
+        if (!prod) {
+            alert('⚠️ Seleccione una materia prima de la lista.');
+            if (prodSel) prodSel.focus();
+            return;
+        }
+        if (precioNum === null || precioNum <= 0) {
+            alert('⚠️ Ingrese un precio válido en pesos COP mayor a 0.');
+            if (precioInp) precioInp.focus();
+            return;
+        }
+
+        tarifasModalState.addedProducts[prod] = String(precioNum);
+        tarifasModalState.editedPrices[prod] = String(precioNum);
+
+        // Asegurar que la fila agregada sea visible si el usuario tenía otro filtro activo
+        if (tarifasModalState.filtroVista !== 'todos') {
+            tarifasModalState.filtroVista = 'todos';
+            document.querySelectorAll('#tarifas-vista-filtro-group .btn-tarifa-pill').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-tarifa-filter') === 'todos');
+            });
+        }
+
+        if (prodSel) prodSel.value = '';
+        if (precioInp) precioInp.value = '';
+        renderTarifasModalTable();
+
+        const targetRow = document.querySelector(`#tarifas-edit-table-body tr[data-tarifa-prod="${CSS.escape ? CSS.escape(prod) : prod}"]`);
+        if (targetRow) targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    // Selector de alcance de aplicación (mostrar/ocultar rango de fechas)
+    document.querySelectorAll('input[name="tarifas-modo-aplicacion"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const box = document.getElementById('tarifas-rango-fechas-box');
+            if (box) box.style.display = radio.value === 'rango' ? 'block' : 'none';
+        });
+    });
+}

@@ -1556,5 +1556,542 @@ label {
     color: #ffffff;
 }
 
+/* ==============================================================================
+   MODAL GESTOR RÁPIDO DE TARIFAS Y VIGENCIAS (EXCLUSIVO ADMIN - v1.9.10)
+   ============================================================================== */
+#modal-gestion-tarifas .tarifas-modal-card {
+    max-width: 780px;
+    width: 95%;
+    max-height: 92vh;
+    overflow-y: auto;
+    text-align: left;
+    padding: 20px 22px;
+}
+
+.tarifas-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    border-bottom: 2px solid #ede9fe;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.tarifas-modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 240px;
+}
+
+.tarifas-modal-icon {
+    font-size: 1.65rem;
+    background: #f5f3ff;
+    border: 1px solid #ddd6fe;
+    padding: 6px 9px;
+    border-radius: 10px;
+    line-height: 1;
+}
+
+.tarifas-modal-title {
+    margin: 0;
+    font-size: 1.12rem;
+    font-weight: 800;
+    color: #4c1d95;
+}
+
+.tarifas-modal-subtitle {
+    margin: 2px 0 0 0;
+    font-size: 0.77rem;
+    color: #64748b;
+}
+
+.tarifas-modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-tarifa-header-action {
+    background: #f8fafc;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    padding: 6px 11px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-tarifa-header-action:hover {
+    background: #e2e8f0;
+}
+
+.btn-tarifa-header-nov23 {
+    background: #f5f3ff;
+    color: #6d28d9;
+    border: 1px solid #c4b5fd;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-tarifa-header-nov23:hover {
+    background: #ede9fe;
+    border-color: #8b5cf6;
+}
+
+.btn-tarifa-header-nov23:disabled,
+.btn-tarifa-header-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-tarifa-close {
+    background: none;
+    border: none;
+    font-size: 1.8rem;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.btn-tarifa-close:hover {
+    color: #334155;
+}
+
+.tarifas-status-banner {
+    padding: 10px 13px;
+    border-radius: 9px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    margin-bottom: 14px;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #1e40af;
+}
+
+.tarifas-status-banner.success {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #065f46;
+}
+
+.tarifas-status-banner.warn {
+    background: #fffbeb;
+    border-color: #fcd34d;
+    color: #92400e;
+}
+
+.tarifas-status-banner.error {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #991b1b;
+}
+
+.tarifas-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.tarifas-control-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tarifas-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #1e293b;
+    display: block;
+    margin: 0;
+}
+
+.tarifas-label-xs {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #475569;
+    display: block;
+    margin-bottom: 3px;
+}
+
+.tarifas-input-sm {
+    padding: 7px 10px !important;
+    font-size: 0.86rem !important;
+    min-height: 36px;
+}
+
+.tarifas-scope-radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tarifas-radio-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.77rem;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    margin: 0;
+}
+
+.tarifas-radio-chip input[type="radio"] {
+    accent-color: #6d28d9;
+}
+
+.tarifas-date-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.tarifas-date-row input[type="date"] {
+    flex: 1;
+    min-width: 120px;
+}
+
+.btn-tarifa-date-quick {
+    background: #ede9fe;
+    color: #5b21b6;
+    border: 1px solid #c4b5fd;
+    border-radius: 7px;
+    padding: 6px 9px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-tarifa-date-quick.secondary {
+    background: #ffffff;
+    color: #475569;
+    border-color: #cbd5e1;
+}
+
+.btn-tarifa-date-quick:hover {
+    filter: brightness(0.96);
+}
+
+.tarifas-filter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.btn-tarifa-pill {
+    background: #ffffff;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 16px;
+    padding: 5px 11px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-tarifa-pill.active {
+    background: #6d28d9;
+    color: #ffffff;
+    border-color: #6d28d9;
+}
+
+.tarifas-field-hint {
+    font-size: 0.72rem;
+    color: #64748b;
+    line-height: 1.3;
+}
+
+.tarifas-table-wrap {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    max-height: 290px;
+    overflow: auto;
+    margin-bottom: 12px;
+    background: #ffffff;
+}
+
+.tarifas-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+}
+
+.tarifas-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #f1f5f9;
+    color: #334155;
+    font-weight: 700;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 9px 10px;
+    border-bottom: 1px solid #cbd5e1;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.tarifas-table tbody td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+    color: #1e293b;
+}
+
+.tarifas-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.tarifas-table tbody tr.tarifa-row-modified {
+    background: #f5f3ff !important;
+    box-shadow: inset 3px 0 0 #7c3aed;
+}
+
+.tarifa-price-input {
+    width: 128px;
+    max-width: 100%;
+    padding: 6px 9px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 7px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #0f172a;
+    background: #ffffff;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tarifa-price-input:focus {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.16);
+}
+
+.tarifa-row-modified .tarifa-price-input {
+    border-color: #7c3aed;
+    background: #ffffff;
+    color: #4c1d95;
+}
+
+.tarifa-badge-vigente,
+.tarifa-badge-programada,
+.tarifa-badge-pendiente {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.tarifa-badge-vigente {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.tarifa-badge-programada {
+    background: #ede9fe;
+    color: #5b21b6;
+    border: 1px solid #ddd6fe;
+}
+
+.tarifa-badge-pendiente {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.tarifas-add-bar {
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.tarifas-add-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.tarifas-add-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.tarifas-add-controls select {
+    flex: 2;
+    min-width: 180px;
+}
+
+.tarifas-add-controls input {
+    flex: 1;
+    min-width: 120px;
+}
+
+.tarifas-btn-add {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.84rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.tarifas-btn-add:hover {
+    background: #dbeafe;
+}
+
+.tarifas-apply-section {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 11px 13px;
+    margin-bottom: 14px;
+}
+
+.tarifas-apply-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.tarifas-apply-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: #1e293b;
+    cursor: pointer;
+    margin: 0;
+}
+
+.tarifas-apply-option input[type="radio"] {
+    margin-top: 3px;
+    accent-color: #6d28d9;
+}
+
+.tarifas-apply-option small {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.tarifas-rango-box {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.tarifas-rango-inputs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.tarifas-rango-warning {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+.tarifas-modal-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 6px;
+}
+
+.tarifas-btn-cancel {
+    flex: 1;
+    max-width: 170px;
+    padding: 11px;
+    font-weight: 600;
+}
+
+.tarifas-btn-save {
+    flex: 2;
+    padding: 11px 16px;
+    background: #6d28d9;
+    border-color: #6d28d9;
+    font-weight: 700;
+    font-size: 0.92rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.tarifas-btn-save:hover:not(:disabled) {
+    background: #5b21b6;
+    border-color: #5b21b6;
+}
+
+.tarifas-btn-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+    #modal-gestion-tarifas .tarifas-modal-card {
+        padding: 14px;
+        width: 97%;
+    }
+    .tarifas-controls-grid {
+        grid-template-columns: 1fr;
+    }
+    .tarifas-rango-inputs {
+        grid-template-columns: 1fr;
+    }
+    .tarifas-modal-footer {
+        flex-direction: column-reverse;
+    }
+    .tarifas-btn-cancel,
+    .tarifas-btn-save {
+        max-width: 100%;
+        width: 100%;
+    }
+    .tarifa-price-input {
+        width: 104px;
+    }
+}
+
+
 
 

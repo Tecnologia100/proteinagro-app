@@ -28,7 +28,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.9.6">
+    <link rel="stylesheet" href="styles.css?v=1.9.10">
 
     <!-- Firebase (Carga no bloqueante con defer para acelerar FCP) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
@@ -40,7 +40,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     
     <!-- App Script -->
-    <script src="app.js?v=1.9.6" defer></script>
+    <script src="app.js?v=1.9.10" defer></script>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -49,7 +49,7 @@
             <div class="logo-icon" style="font-size: 3rem; text-align: center; margin-bottom: 10px;">🌿</div>
             <h2 style="text-align: center; margin-bottom: 5px; color: var(--primary);">ProteinAgro</h2>
             <p style="text-align: center; color: var(--text-muted); margin-bottom: 22px;">
-                Acceso al Sistema <button type="button" onclick="forzarActualizacionApp()" class="btn-update-badge" style="margin-left: 6px;" title="Tocar o hacer clic para forzar actualización inmediata">🔄 v1.9.9</button>
+                Acceso al Sistema <button type="button" onclick="forzarActualizacionApp()" class="btn-update-badge" style="margin-left: 6px;" title="Tocar o hacer clic para forzar actualización inmediata">🔄 v1.9.10</button>
             </p>
             
             <!-- Modo Conductor (Predeterminado) -->
@@ -133,10 +133,10 @@
             <div class="logo-container">
                 <div class="logo-icon">👑</div>
                 <h1>Panel Administrativo</h1>
-                <span class="version-tag">v1.9.9</span>
+                <span class="version-tag">v1.9.10</span>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" class="btn-text btn-update-badge" title="Forzar actualización de la app" onclick="forzarActualizacionApp()">🔄 v1.9.9</button>
+                <button type="button" class="btn-text btn-update-badge" title="Forzar actualización de la app" onclick="forzarActualizacionApp()">🔄 v1.9.10</button>
                 <button id="btn-logout-admin" class="btn-secondary" style="padding: 8px 16px;">Salir</button>
             </div>
         </header>
@@ -248,6 +248,9 @@
                         <button type="button" id="btn-admin-liquidar-sheets" onclick="liquidarPreciosVaciosSheetsAdmin()" class="btn-secondary" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; cursor: pointer;" title="Asignar precio y valor automáticamente a celdas vacías en Google Sheets según la hoja Tarifas">
                             💰 Liquidar Precios Vacíos
                         </button>
+                        <button type="button" id="btn-admin-gestion-tarifas" class="btn-secondary" style="background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; cursor: pointer;" title="Consultar, modificar o programar precios por fecha de vigencia en Google Sheets">
+                            🏷️ Cambiar Precios
+                        </button>
                         <a href="https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing" target="_blank" class="btn-sheets">
                             📊 Abrir Google Sheets
                         </a>
@@ -283,6 +286,171 @@
                 </div>
             </div>
         </main>
+
+        <!-- Modal Gestor Rápido de Tarifas y Vigencias (Exclusivo Administrador - v1.9.10) -->
+        <div id="modal-gestion-tarifas" class="voucher-modal-overlay" style="display: none;">
+            <div class="voucher-card tarifas-modal-card">
+                <!-- Cabecera -->
+                <div class="tarifas-modal-header">
+                    <div class="tarifas-modal-title-wrap">
+                        <span class="tarifas-modal-icon">🏷️</span>
+                        <div>
+                            <h3 class="tarifas-modal-title">Gestor Rápido de Tarifas y Vigencias</h3>
+                            <p class="tarifas-modal-subtitle">Consulte, modifique o programe tarifas por fecha de vigencia en Google Sheets</p>
+                        </div>
+                    </div>
+                    <div class="tarifas-modal-header-actions">
+                        <button type="button" id="btn-tarifas-recargar" class="btn-tarifa-header-action" title="Recargar tarifas en vivo desde Google Sheets">
+                            🔄 Recargar
+                        </button>
+                        <button type="button" id="btn-tarifas-cargar-nov23" class="btn-tarifa-header-nov23" title="Programar lista oficial de precios vigente desde el 23 de Noviembre de 2026">
+                            📅 Cargar Lista 23-Nov-2026
+                        </button>
+                        <button type="button" id="btn-cerrar-modal-tarifas" class="btn-tarifa-close" aria-label="Cerrar">&times;</button>
+                    </div>
+                </div>
+
+                <!-- Banner de estado / respaldo automático / fecha actual -->
+                <div id="tarifas-modal-status" class="tarifas-status-banner info">
+                    🛡️ <strong>Protección Contable Activa:</strong> Todo cambio crea respaldo automático previo en Google Sheets. Cargando tarifas...
+                </div>
+
+                <!-- Controles de Selección -->
+                <div class="tarifas-controls-grid">
+                    <!-- Selector de Proveedor con buscador rápido -->
+                    <div class="tarifas-control-box">
+                        <label for="tarifas-prov-select" class="tarifas-label">🏬 Proveedor / Razón Social</label>
+                        <input type="text" id="tarifas-prov-search" class="premium-input tarifas-input-sm" placeholder="🔍 Filtrar proveedor..." autocomplete="off">
+                        <select id="tarifas-prov-select" class="premium-input tarifas-input-sm">
+                            <option value="">Cargando proveedores...</option>
+                        </select>
+                    </div>
+
+                    <!-- Alcance de Sedes -->
+                    <div class="tarifas-control-box" id="tarifas-punto-scope-group">
+                        <label class="tarifas-label">📍 Alcance de Sedes</label>
+                        <div class="tarifas-scope-radios">
+                            <label class="tarifas-radio-chip">
+                                <input type="radio" name="tarifas-punto-scope" value="TODAS" checked>
+                                <span>Todas las sedes del proveedor</span>
+                            </label>
+                            <label class="tarifas-radio-chip">
+                                <input type="radio" name="tarifas-punto-scope" value="UNA">
+                                <span>Solo una sede específica</span>
+                            </label>
+                        </div>
+                        <select id="tarifas-punto-select" class="premium-input tarifas-input-sm" disabled>
+                            <option value="">Todas las sedes</option>
+                        </select>
+                    </div>
+
+                    <!-- Fecha de Vigencia -->
+                    <div class="tarifas-control-box">
+                        <label for="tarifas-vigente-desde" class="tarifas-label">📅 Vigente Desde</label>
+                        <div class="tarifas-date-row">
+                            <input type="date" id="tarifas-vigente-desde" class="premium-input tarifas-input-sm">
+                            <button type="button" id="btn-tarifas-fecha-nov23" class="btn-tarifa-date-quick" title="Establecer fecha de vigencia 23 de Noviembre de 2026">
+                                23 Nov 2026
+                            </button>
+                            <button type="button" id="btn-tarifas-fecha-hoy" class="btn-tarifa-date-quick secondary" title="Establecer fecha de hoy">
+                                Hoy
+                            </button>
+                        </div>
+                        <small class="tarifas-field-hint">Si elige una fecha futura, los precios actuales siguen aplicando hasta ese día.</small>
+                    </div>
+
+                    <!-- Filtro Rápido de Vista -->
+                    <div class="tarifas-control-box">
+                        <label class="tarifas-label">🔎 Filtro Rápido de Vista</label>
+                        <div class="tarifas-filter-pills" id="tarifas-vista-filtro-group">
+                            <button type="button" class="btn-tarifa-pill active" data-tarifa-filter="todos">Todos</button>
+                            <button type="button" class="btn-tarifa-pill" data-tarifa-filter="pendientes">Solo Pendiente Precio</button>
+                            <button type="button" class="btn-tarifa-pill" data-tarifa-filter="programados">Programados a Futuro</button>
+                        </div>
+                        <small id="tarifas-resumen-conteo" class="tarifas-field-hint">Mostrando materias primas configuradas.</small>
+                    </div>
+                </div>
+
+                <!-- Tabla Editable de Tarifas -->
+                <div class="tarifas-table-wrap">
+                    <table class="tarifas-table">
+                        <thead>
+                            <tr>
+                                <th>Materia Prima</th>
+                                <th>Vigente Hoy</th>
+                                <th>Programada</th>
+                                <th>Nuevo Precio ($ COP)</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tarifas-edit-table-body">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 20px; color: #64748b;">⏳ Cargando tarifas...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Fila Rápida: + Agregar producto al proveedor -->
+                <div class="tarifas-add-bar">
+                    <span class="tarifas-add-title">➕ Agregar producto al proveedor:</span>
+                    <div class="tarifas-add-controls">
+                        <select id="tarifas-add-prod-select" class="premium-input tarifas-input-sm">
+                            <option value="">Seleccione materia prima...</option>
+                        </select>
+                        <input type="number" id="tarifas-add-prod-precio" class="premium-input tarifas-input-sm" placeholder="Precio $ COP" min="0" step="1" inputmode="numeric">
+                        <button type="button" id="btn-tarifas-add-prod" class="btn-secondary tarifas-btn-add">➕ Añadir</button>
+                    </div>
+                </div>
+
+                <!-- Selector de Alcance de Aplicación -->
+                <div class="tarifas-apply-section">
+                    <label class="tarifas-label" style="margin-bottom: 8px;">⚙️ Alcance de Aplicación en Recolecciones</label>
+                    <div class="tarifas-apply-modes">
+                        <label class="tarifas-apply-option">
+                            <input type="radio" name="tarifas-modo-aplicacion" value="futuras" checked>
+                            <span>🟢 <strong>Aplicar solo desde la fecha de vigencia</strong> <small>(protege el histórico)</small></span>
+                        </label>
+                        <label class="tarifas-apply-option">
+                            <input type="radio" name="tarifas-modo-aplicacion" value="pendientes">
+                            <span>🟡 <strong>Además liquidar recolecciones con precio vacío pendiente</strong></span>
+                        </label>
+                        <label class="tarifas-apply-option">
+                            <input type="radio" name="tarifas-modo-aplicacion" value="rango">
+                            <span>🟠 <strong>Re-liquidar también recolecciones entre fechas</strong></span>
+                        </label>
+                    </div>
+
+                    <!-- Rango de Fechas Condicional -->
+                    <div id="tarifas-rango-fechas-box" class="tarifas-rango-box" style="display: none;">
+                        <div class="tarifas-rango-inputs">
+                            <div>
+                                <label for="tarifas-rango-desde" class="tarifas-label-xs">Desde fecha</label>
+                                <input type="date" id="tarifas-rango-desde" class="premium-input tarifas-input-sm">
+                            </div>
+                            <div>
+                                <label for="tarifas-rango-hasta" class="tarifas-label-xs">Hasta fecha</label>
+                                <input type="date" id="tarifas-rango-hasta" class="premium-input tarifas-input-sm">
+                            </div>
+                        </div>
+                        <div class="tarifas-rango-warning">
+                            ⚠️ <strong>Advertencia de Re-liquidación:</strong> Se recalcularán Precio y Valor en las recolecciones del proveedor dentro del rango indicado. Google Sheets creará automáticamente una pestaña de respaldo antes de modificar cualquier fila histórica.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones Finales -->
+                <div class="tarifas-modal-footer">
+                    <button type="button" id="btn-cancelar-modal-tarifas" class="btn-secondary tarifas-btn-cancel">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btn-guardar-tarifas-masivo" class="btn-primary tarifas-btn-save">
+                        <span class="spinner" style="display: none; width: 16px; height: 16px; border: 2px solid #ffffff; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+                        <span class="btn-text-content">💾 Guardar y Aplicar Precios</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- App de Conductor (Se muestra al hacer login como conductor) -->
@@ -295,10 +463,10 @@
                     <h1 style="font-size: 1.25rem; line-height: 1.1; margin: 0;">ProteinAgro</h1>
                     <span id="driver-header-badge" class="driver-header-badge" style="display: none;">👤 <span id="driver-header-name">Conductor</span></span>
                 </div>
-                <span class="version-tag">v1.9.9</span>
+                <span class="version-tag">v1.9.10</span>
             </div>
             <div class="app-header-right">
-                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.9.9</button>
+                <button type="button" id="btn-force-update-header" class="btn-text btn-update-badge" title="Tocar para forzar actualización" onclick="forzarActualizacionApp()">🔄 v1.9.10</button>
                 <button id="btn-pwa-install-header" class="btn-text" style="display: none; color: #10b981; font-weight: 600; font-size: 0.85rem; align-items: center; gap: 4px;">📲 Instalar</button>
                 <div class="status-indicator offline" id="network-status">
                     <span class="dot"></span>
@@ -575,7 +743,7 @@
 
                 <!-- Footer de Versión & Ayuda de Caché -->
                 <div style="text-align: center; margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">ProteinAgro Digital v1.9.9 • Soporte Oficial Admin & Trazabilidad Diaria</p>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">ProteinAgro Digital v1.9.10 • Soporte Oficial Admin & Trazabilidad Diaria</p>
                     <button type="button" onclick="forzarActualizacionApp()" style="background: none; border: 1px dashed #cbd5e1; color: #64748b; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">
                         🔄 ¿No ves los cambios? Toca aquí para actualizar
                     </button>

@@ -1,7 +1,7 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.9.9`  
-> **Última Actualización:** 12 de Noviembre 2026  
+> **Versión Actual:** `v=1.9.10`  
+> **Última Actualización:** 18 de Noviembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
 
@@ -1134,3 +1134,10 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - Archivo estructurado Alejandro_Garay_Octubre_2026.xlsx con los 35 registros de Hueso y Sebo para conciliación directa.
   - Conciliación contra las 4.410 filas reales: 20 días coinciden al 100% exacto; se identificaron ausencias en Sheets (01/10 y 16/10), un desfase de fecha (20/10 registrado el 19/10), y variaciones menores en pesaje (15/10, 22/10 y 23/10).
 
+---
+
+### 45. Motor de Tarifas Programadas (`Vigente_Desde`), Lista 23-Nov-2026 y Gestor Rápido en Admin (v1.9.10)
+- **Vigencia Temporal en `Tarifas` (`Code.gs`):** Columna `Vigente_Desde` agregada al final en Columna H (sin alterar A..G ni renombrar `Estado`), asignando `2026-01-01` a las tarifas actuales. Todo el motor de precios (`cargarCatalogoTarifas`, `buscarPrecioEnCatalogoTarifas`, `guardarRecoleccionSheet`, `ejecutarLiquidacionPreciosVacios_`, `aplicarNovedadesConciliacionSheet`) selecciona la vigencia más reciente `<= fechaRecoleccion` en zona horaria Colombia (`GMT-5`).
+- **Integración Exacta de `LISTA_DE_PRECIOS.xlsx` (Vigencia 23/11/2026):** 86 filas verificadas en `LISTA_PRECIOS_NOV23_2026` cubriendo los 13 grupos de proveedores del Excel (manteniendo `Santa Elena | ACEITE` en $3.600, incluyendo todas las Sevillanas y todos los Caribe con Cavasa/Santa Elena, aplicando "Hueso" solo a `HUESO BLANCO`, y dejando intactos `Orlando Giraldo` y `Supertienda Cañaveral - Frigorivalle`). Carga 100% idempotente vía `action=aplicarListaPreciosNov23` o menú Sheets `📊 Conciliador > 📅 Cargar Lista de Precios 23/Nov/2026 (Idempotente)` con respaldo previo `Tarifas_Backup_PreNov23_YYYYMMDD`.
+- **Gestor Rápido de Tarifas en Panel Admin (`index.html`, `styles.css`, `app.js`):** Botón `🏷️ Cambiar Precios` y modal `#modal-gestion-tarifas` aislados dentro de `#admin-view` (cero exposición a conductores), con soporte multi-producto, alcance `TODAS` las sedes o sede específica, fecha `Vigente_Desde`, modos `futuras`/`pendientes`/`rango` con respaldos automáticos, y fallback seguro a Solo Lectura GViz CSV mientras `Code.gs` no esté desplegado.
+- **Correcciones Preventivas:** Definición de `homologarPunto` en `Code.gs`, protección de metadatos y precio histórico con `LockService` en `actualizarRecoleccionSheet`, corrección de `parsePrecioMonedaCliente` (`"$1.300" -> 1300`) y cambio automático el `2026-11-23` en `TARIFAS_REFERENCIA_CARIBE`, protección `tieneCapturaActivaSinGuardar()` contra recarga forzada del Service Worker, y caché PWA actualizada a `proteinagro-v1.9.10`.

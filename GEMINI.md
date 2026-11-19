@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** 12 de Noviembre 2026 (Versión 1.9.9)  
+> **Última Actualización:** 18 de Noviembre 2026 (Versión 1.9.10)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -809,6 +809,26 @@ i.fecha), consolidándose directamente en la fila de ese día.
 - **Generación y Auditoría Día por Día para Alejandro Garay:**
   - Archivo estructurado [`Alejandro_Garay_Octubre_2026.xlsx`](./Alejandro_Garay_Octubre_2026.xlsx) con los 35 registros de Hueso y Sebo para conciliación directa.
   - Conciliación contra las 4.410 filas reales: 20 días coinciden al 100% exacto; se identificaron ausencias en Sheets (01/10 y 16/10), un desfase de fecha (20/10 registrado el 19/10), y variaciones menores en pesaje (15/10, 22/10 y 23/10).
+
+### 45. Motor de Tarifas Programadas (`Vigente_Desde`), Lista 23-Nov-2026 y Gestor Rápido en Admin (`v1.9.10`)
+- **Estructura Retrocompatible en `Tarifas` (`Code.gs`):**
+  - Se conservan intactas las columnas `A..G` (`Ruta`, `Proveedor`, `Punto_Sucursal`, `Producto`, `Precio_Kg`, `Estado`, `Observaciones`) sin renombrar `Estado` a `Estado_Tarifa`.
+  - Se agrega `Vigente_Desde` exclusivamente al final en **Columna H** (`garantizarColumnaVigenciaTarifas_`), asignando `2026-01-01` por defecto a todas las tarifas existentes para proteger al 100% liquidaciones históricas.
+- **Resolución Temporal de Precios (`GMT-5`):**
+  - `cargarCatalogoTarifas`, `buscarPrecioEnCatalogoTarifas`, `obtenerPrecioTarifa`, `guardarRecoleccionSheet`, `ejecutarLiquidacionPreciosVacios_` y `aplicarNovedadesConciliacionSheet` evalúan la fecha real del servicio (`vigenteDesde <= fechaRecoleccion`), eligiendo la vigencia más reciente en cada nivel de coincidencia.
+  - Recolecciones offline atrasadas (ej. `22/11/2026` sincronizada el `25/11/2026`) y liquidaciones de filas vacías de meses anteriores liquidan con la tarifa histórica correspondiente a su fecha.
+- **Integración Exacta de `LISTA_DE_PRECIOS.xlsx` (Vigencia `2026-11-23`):**
+  - Constante `LISTA_PRECIOS_NOV23_2026` con **86 filas verificadas** para los 13 grupos de proveedores del Excel, aplicando las reglas confirmadas: `Santa Elena | ACEITE` se mantiene en `\$3.600`; `Sevillana` y `Caribe` cubren todas sus sedes incluyendo Cavasa y Santa Elena; `"Hueso"` aplica solo a `HUESO BLANCO` (excepto `HUESO DE CERDO` explícito en `Caribe` y `Distribuidora de Carnes Millan`); excluidos `Orlando Giraldo` y `Supertienda Cañaveral - Frigorivalle`.
+  - Carga 100% idempotente vía `action=aplicarListaPreciosNov23` o menú Sheets `📊 Conciliador > 📅 Cargar Lista de Precios 23/Nov/2026 (Idempotente)`, con respaldo automático previo (`Tarifas_Backup_PreNov23_YYYYMMDD`) y alta automática de `HUESO DE POLLO` en `Productos`.
+- **Gestor Rápido de Tarifas en Panel Admin (`index.html`, `styles.css`, `app.js`):**
+  - Botón `🏷️ Cambiar Precios` y modal `#modal-gestion-tarifas` **estrictamente aislados dentro de `#admin-view`** y validados con `esUsuarioAdmin()` (cero exposición de precios a conductores; `logout()` limpia `proteinagro_role`).
+  - Soporta edición multi-producto por proveedor, alcance `TODAS` las sedes o una sede específica (`puntoScope`), programación de fecha `Vigente_Desde`, modos `futuras` / `pendientes` / `rango` (con respaldos automáticos `Tarifas_Backup_YYYYMMDD` y `Recolecciones_Backup_PreReliq_YYYYMMDD`), carga 1-clic de la lista 23/11/2026 y fallback seguro a Solo Lectura GViz CSV si `Code.gs` aún no se ha actualizado en Apps Script.
+- **Correcciones Preventivas y Estabilidad:**
+  - Definida `homologarPunto` en `Code.gs` alineada con `CANONICOS_PUNTOS` de `app.js`.
+  - Blindado `actualizarRecoleccionSheet` con `LockService`, preservación de metadatos (`GPS`, factura Caribe `O:Q`, soporte `R:T`) y precios históricos (`_preciosPreservados`) en ediciones del mismo proveedor; `guardarEdicionAdmin` en `app.js` usa `POST` secuencial con fallback condicional a `GET`.
+  - Corregido `parsePrecioMonedaCliente` (`"$1.300" -> 1300`) y `TARIFAS_REFERENCIA_CARIBE` con cambio automático el `2026-11-23` y separación de `Cavasa`.
+  - Protegido `RELOAD_PAGE` / `controllerchange` (`tieneCapturaActivaSinGuardar()`) para no recargar el celular si el conductor tiene productos, fotos o firma sin guardar.
+  - Verificado con suite E2E automatizada (`24/24 PASS`) y bumping de caché PWA a `proteinagro-v1.9.10`.
 
 ---
 
