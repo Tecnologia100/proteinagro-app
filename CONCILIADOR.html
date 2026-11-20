@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Materias y Proveedores - v1.9.12</title>
+    <title>Dashboard de Materias y Proveedores - v1.9.13</title>
     <!-- Librerías para exportación avanzada con estilos (ExcelJS y FileSaver) -->
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
@@ -465,7 +465,7 @@
         <div style="display: flex; align-items: center; gap: 12px;">
             <span style="font-size: 1.25em;">⚖️</span>
             <span style="color: #38bdf8; font-weight: 800; letter-spacing: 0.5px; font-size: 1.05em;">CONCILIADOR UNIVERSAL PROTEINAGRO</span>
-            <span style="background: #10b981; color: #ffffff; padding: 3px 12px; border-radius: 999px; font-weight: 800; font-size: 0.9em; box-shadow: 0 1px 4px rgba(16,185,129,0.4); border: 1px solid rgba(255,255,255,0.3);">VERSIÓN 1.9.12</span>
+            <span style="background: #10b981; color: #ffffff; padding: 3px 12px; border-radius: 999px; font-weight: 800; font-size: 0.9em; box-shadow: 0 1px 4px rgba(16,185,129,0.4); border: 1px solid rgba(255,255,255,0.3);">VERSIÓN 1.9.13</span>
         </div>
         <div style="font-size: 0.88em; color: #94a3b8; display: flex; align-items: center; gap: 14px;">
             <span>🛡️ Modo Anti-Filtros (Bypass SQL)</span>
@@ -479,7 +479,7 @@
         <div class="header-top">
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                 <h1>Resumen de Materias y Proveedores</h1>
-                <span id="badgeVersionPill" style="font-size: 0.78em; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 4px 12px; border-radius: 999px; font-weight: 700; box-shadow: 0 2px 6px rgba(16,185,129,0.35); border: 1px solid rgba(255,255,255,0.2); letter-spacing: 0.3px;">v1.9.12 · Modo Anti-Filtros</span>
+                <span id="badgeVersionPill" style="font-size: 0.78em; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 4px 12px; border-radius: 999px; font-weight: 700; box-shadow: 0 2px 6px rgba(16,185,129,0.35); border: 1px solid rgba(255,255,255,0.2); letter-spacing: 0.3px;">v1.9.13 · Modo Anti-Filtros</span>
             </div>
             <a href="https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit" target="_blank" class="btn-sheet-link" title="Abrir la base de datos en Google Sheets">
                 📊 Abrir Hoja en Sheets ↗
@@ -592,7 +592,7 @@
             <footer style="text-align: center; padding: 20px 10px; color: #64748b; font-size: 0.85em; font-weight: 500; border-top: 1px solid #e2e8f0; margin-top: 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>🌿 ProteinAgro &copy; 2026 · Sistema Matriz de Conciliación y Auditoría Universal</div>
                 <div style="display: inline-flex; align-items: center; gap: 8px;">
-                    <span style="background: #e2e8f0; color: #334155; padding: 3px 9px; border-radius: 6px; font-weight: 700; font-size: 0.9em;">Versión 1.9.12</span>
+                    <span style="background: #e2e8f0; color: #334155; padding: 3px 9px; border-radius: 6px; font-weight: 700; font-size: 0.9em;">Versión 1.9.13</span>
                     <span style="color: #10b981; font-weight: 700;">● Modo Anti-Filtros Activo</span>
                 </div>
             </footer>
@@ -602,7 +602,7 @@
     <div class="modal-overlay" id="modalConciliacion">
         <div class="modal-card">
             <div class="modal-header">
-                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; padding:4px 12px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700; box-shadow:0 2px 6px rgba(16,185,129,0.35);">v1.9.12 · Modo Anti-Filtros</span></h2>
+                <h2>⚡ Auditoría y Conciliación Universal de Proveedores <span style="font-size:0.62em; background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; padding:4px 12px; border-radius:999px; vertical-align:middle; margin-left:8px; font-weight:700; box-shadow:0 2px 6px rgba(16,185,129,0.35);">v1.9.13 · Modo Anti-Filtros</span></h2>
                 <button class="modal-close-btn" onclick="cerrarModalConciliacion()" title="Cerrar ventana">✕</button>
             </div>
             <div class="modal-body">
@@ -1684,12 +1684,12 @@
             isLoading = false;
             if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Actualizar'; }
             const now = new Date();
-            updateStatus(`✅ Conexión establecida con Sheets (${origen} · v1.9.12): ${now.toLocaleTimeString('es-CO')} | ${rawData.length.toLocaleString('es-CO')} registros`, 'success');
+            updateStatus(`✅ Conexión establecida con Sheets (${origen} · v1.9.13): ${now.toLocaleTimeString('es-CO')} | ${rawData.length.toLocaleString('es-CO')} registros`, 'success');
         }
 
         async function fetchDataDirecto(btn) {
             if (cargaDatosCompletada && rawData && rawData.length > 500) return;
-            updateStatus('🌐 Conectando directamente con Google Sheets (Modo Anti-Filtros v1.9.12)...', 'normal');
+            updateStatus('🌐 Conectando directamente con Google Sheets (Modo Anti-Filtros v1.9.13)...', 'normal');
 
             const sheetId = '1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU';
             const exportTsvUrl = 'https:' + '/' + '/docs.google.com/spreadsheets/d/' + sheetId + '/export?format=tsv&sheet=Recolecciones&_t=' + Date.now();
@@ -1848,7 +1848,7 @@
                 btn.innerHTML = '⏳ Cargando...';
             }
             
-            updateStatus('Conectando directamente con Google Sheets (v1.9.12 · Modo Anti-Filtros)...', 'normal');
+            updateStatus('Conectando directamente con Google Sheets (v1.9.13 · Modo Anti-Filtros)...', 'normal');
 
             // 0. Sincronizar en paralelo el catálogo maestro desde Puntos_Rutas y pestaña Productos
             cargarCatalogoMaestroPuntosRutas();
@@ -5309,6 +5309,7 @@
                 obs: datos.obs || '',
                 // Atributos para persistencia contable
                 id: datos.id || '',
+                filasSistema: Array.isArray(datos.filasSistema) ? datos.filasSistema : [],
                 rKey: datos.rKey || '',
                 diffKilos: datos.delta_kg,
                 kilosProveedor: datos.kg_proveedor,
@@ -5485,6 +5486,54 @@
             }
         }
 
+        function expandirOperacionesMultiFila(listaNovedades) {
+            const ops = [];
+            (listaNovedades || []).forEach(nov => {
+                if (!nov) return;
+                if (nov.tipoNovedad === 'DESVIACION' && Array.isArray(nov.filasSistema) && nov.filasSistema.length > 1) {
+                    const targetKg = Number(nov.kilosProveedor || nov.kg_proveedor || 0);
+                    let bestIdx = 0;
+                    let bestDiff = Infinity;
+                    nov.filasSistema.forEach((f, idx) => {
+                        const diff = Math.abs((Number(f.kg) || 0) - targetKg);
+                        if (diff < bestDiff) {
+                            bestDiff = diff;
+                            bestIdx = idx;
+                        }
+                    });
+                    const bestRow = nov.filasSistema[bestIdx];
+                    nov.filasSistema.forEach((f, idx) => {
+                        if (idx === bestIdx) return;
+                        ops.push({
+                            ...nov,
+                            _uid: `${nov._uid}_dup_${idx}`,
+                            tipoNovedad: 'ELIMINAR',
+                            id: f.id || '',
+                            producto: nov.producto,
+                            kilosSistema: Number(f.kg) || 0,
+                            kilos: Number(f.kg) || 0,
+                            esDuplicadoEnDesviacion: true,
+                            conservadoInfo: `${bestRow.id || 'fila principal'} (${(Number(bestRow.kg) || 0).toLocaleString('es-CO')} Kg)`
+                        });
+                    });
+                    if (Math.abs((Number(bestRow.kg) || 0) - targetKg) > 0.01) {
+                        ops.push({
+                            ...nov,
+                            _uid: `${nov._uid}_adj`,
+                            tipoNovedad: 'DESVIACION',
+                            id: bestRow.id || nov.id || '',
+                            kilosSistema: Number(bestRow.kg) || 0,
+                            kilosProveedor: targetKg,
+                            diffKilos: (Number(bestRow.kg) || 0) - targetKg
+                        });
+                    }
+                    return;
+                }
+                ops.push(nov);
+            });
+            return ops;
+        }
+
         async function confirmarYEliminarNovedadInmediata(uid) {
             const nov = mapaNovedadesPorUid[uid];
             if (!nov) {
@@ -5495,35 +5544,55 @@
             const prodOrig = nov.producto;
             const kilosStr = (nov.kilosSistema || nov.kg || 0).toLocaleString('es-CO');
             const fechaStr = nov.fecha || '';
-            const idStr = nov.id ? ` [ID: ${nov.id}]` : '';
-            const confirmMsg = `⚠️ ¿Seguro que deseas ELIMINAR definitivamente de Google Sheets este registro erróneo?\n\n• Fecha: ${fechaStr}\n• Materia: "${prodOrig}"\n• Peso: ${kilosStr} Kg${idStr}\n• Proveedor: ${nov.proveedor || ''}\n\nEsta acción borrará la fila de la hoja Recolecciones y no se puede deshacer.`;
+            const filas = (Array.isArray(nov.filasSistema) && nov.filasSistema.length > 1) ? nov.filasSistema : null;
+            const idStr = filas
+                ? `\n• Filas en Sheets (${filas.length}): ` + filas.map(f => `${(Number(f.kg) || 0).toLocaleString('es-CO')} Kg [${f.id || 's/ID'}]`).join(' + ')
+                : (nov.id ? ` [ID: ${nov.id}]` : '');
+            const confirmMsg = `⚠️ ¿Seguro que deseas ELIMINAR definitivamente de Google Sheets ${filas ? `las ${filas.length} filas de este registro` : 'este registro erróneo'}?\n\n• Fecha: ${fechaStr}\n• Materia: "${prodOrig}"\n• Peso total: ${kilosStr} Kg${idStr}\n• Proveedor: ${nov.proveedor || ''}\n\nEsta acción borrará ${filas ? 'las filas' : 'la fila'} de la hoja Recolecciones y no se puede deshacer.`;
 
             if (!confirm(confirmMsg)) return;
 
-            const novElim = {
-                ...nov,
-                tipoNovedad: 'ELIMINAR',
-                producto: prodOrig,
-                kilos: nov.kilosSistema || nov.kg || 0
-            };
+            const opsElim = filas
+                ? filas.map((f, idx) => ({
+                    ...nov,
+                    _uid: `${nov._uid}_elim_${idx}`,
+                    tipoNovedad: 'ELIMINAR',
+                    id: f.id || '',
+                    producto: prodOrig,
+                    kilosSistema: Number(f.kg) || 0,
+                    kilos: Number(f.kg) || 0
+                }))
+                : [{
+                    ...nov,
+                    tipoNovedad: 'ELIMINAR',
+                    producto: prodOrig,
+                    kilos: nov.kilosSistema || nov.kg || 0
+                }];
 
-            mostrarToastNotificacion(`⏳ Eliminando "${prodOrig}" (${kilosStr} Kg) de Google Sheets...`, 'info');
+            mostrarToastNotificacion(`⏳ Eliminando "${prodOrig}" (${kilosStr} Kg${filas ? ` · ${filas.length} filas` : ''}) de Google Sheets...`, 'info');
 
             try {
-                const respuesta = await enviarNovedadesConciliacionASheets([novElim]);
-                if (respuesta && respuesta.result === 'success') {
-                    const noEnc = (respuesta.detalles || []).filter(d => String(d.accion || '').startsWith('NO_ENCONTRADO'));
-                    if (noEnc.length > 0) {
-                        mostrarToastNotificacion(`⚠️ Google Sheets no encontró la fila de "${prodOrig}" para eliminar. Actualizando desde Sheets...`, 'warning');
+                let noEncTotal = 0;
+                for (let ei = 0; ei < opsElim.length; ei++) {
+                    const op = opsElim[ei];
+                    const respuesta = await enviarNovedadesConciliacionASheets([op]);
+                    if (respuesta && respuesta.result === 'success') {
+                        const noEnc = (respuesta.detalles || []).filter(d => String(d.accion || '').startsWith('NO_ENCONTRADO'));
+                        noEncTotal += noEnc.length;
+                        if (noEnc.length === 0) {
+                            actualizarEstadoLocalTrasSincronizacion([op], respuesta);
+                        }
                     } else {
-                        actualizarEstadoLocalTrasSincronizacion([novElim], respuesta);
-                        mostrarToastNotificacion(`✅ Eliminado en Sheets: "${prodOrig}" (${kilosStr} Kg). Sincronizando en vivo...`, 'success');
+                        throw new Error((respuesta && respuesta.error) || 'Respuesta inesperada del servidor');
                     }
-                    await new Promise(r => setTimeout(r, 400));
-                    await sincronizarSheetsYReconciliarEnVivo('Eliminación');
-                } else {
-                    throw new Error((respuesta && respuesta.error) || 'Respuesta inesperada del servidor');
                 }
+                if (noEncTotal > 0) {
+                    mostrarToastNotificacion(`⚠️ ${noEncTotal} fila(s) de "${prodOrig}" no se encontraron en Sheets. Actualizando desde Sheets...`, 'warning');
+                } else {
+                    mostrarToastNotificacion(`✅ Eliminado en Sheets: "${prodOrig}" (${kilosStr} Kg). Sincronizando en vivo...`, 'success');
+                }
+                await new Promise(r => setTimeout(r, 400));
+                await sincronizarSheetsYReconciliarEnVivo('Eliminación');
             } catch (err) {
                 alert(`Error al eliminar de Google Sheets: ${err.message || err.toString()}`);
             }
@@ -5535,9 +5604,13 @@
                 alert('No se encontró la información de la novedad.');
                 return;
             }
-            const accionTitulo = nov.tipoNovedad === 'FALTANTE' ? 'Registrar Faltante en Google Sheets' : 'Igualar Peso al Proveedor en Google Sheets';
-            mostrarModalConfirmacionNovedades(accionTitulo, [nov], async () => {
-                await ejecutarSincronizacionNovedades([nov]);
+            const ops = expandirOperacionesMultiFila([nov]);
+            const tieneDuplicados = ops.some(o => o.esDuplicadoEnDesviacion);
+            const accionTitulo = nov.tipoNovedad === 'FALTANTE'
+                ? 'Registrar Faltante en Google Sheets'
+                : (tieneDuplicados ? 'Depurar Duplicados e Igualar al Proveedor en Sheets' : 'Igualar Peso al Proveedor en Google Sheets');
+            mostrarModalConfirmacionNovedades(accionTitulo, ops, async () => {
+                await ejecutarSincronizacionNovedades(ops);
             });
         }
 
@@ -5548,8 +5621,9 @@
                 alert('Por favor selecciona al menos una novedad para sincronizar.');
                 return;
             }
-            mostrarModalConfirmacionNovedades(`Sincronizar ${lista.length} Novedades en Google Sheets`, lista, async () => {
-                await ejecutarSincronizacionNovedades(lista);
+            const ops = expandirOperacionesMultiFila(lista);
+            mostrarModalConfirmacionNovedades(`Sincronizar ${ops.length} Operaciones en Google Sheets`, ops, async () => {
+                await ejecutarSincronizacionNovedades(ops);
             });
         }
 
@@ -5578,10 +5652,13 @@
                     detalle = `Se cambiará materia de <strong>${nov.productoAnterior || nov.producto}</strong> a <strong>${nov.productoNuevo}</strong> (${(nov.kilosSistema || nov.kg || 0).toLocaleString()} Kg) recalculando precio y total en Sheets.`;
                 } else if (esElim) {
                     color = '#dc2626';
-                    icono = '🗑️ ELIMINAR';
-                    detalle = `Se eliminará definitivamente de Google Sheets el registro erróneo de <strong>${nov.producto}</strong> (${(nov.kilosSistema || nov.kg || 0).toLocaleString()} Kg).`;
+                    icono = nov.esDuplicadoEnDesviacion ? '🗑️ ELIMINAR DUPLICADO' : '🗑️ ELIMINAR';
+                    const idTag = nov.id ? ` [<code>${nov.id}</code>]` : '';
+                    const extraKeep = nov.conservadoInfo ? ` (se conserva <strong>${nov.conservadoInfo}</strong>)` : '';
+                    detalle = `Se eliminará de Google Sheets la fila ${nov.esDuplicadoEnDesviacion ? 'duplicada' : 'errónea'} de <strong>${nov.producto}</strong> por <strong>${(nov.kilosSistema || nov.kg || 0).toLocaleString('es-CO')} Kg</strong>${idTag}${extraKeep}.`;
                 } else {
-                    detalle = `Se ajustará peso de <strong>${nov.kilosSistema.toLocaleString()} Kg</strong> ➔ <strong>${nov.kilosProveedor.toLocaleString()} Kg</strong> (Δ ${nov.diffKilos > 0 ? '+' : ''}${nov.diffKilos.toFixed(1)} Kg).`;
+                    const idTag = nov.id ? ` [<code>${nov.id}</code>]` : '';
+                    detalle = `Se ajustará peso de <strong>${nov.kilosSistema.toLocaleString('es-CO')} Kg</strong> ➔ <strong>${nov.kilosProveedor.toLocaleString('es-CO')} Kg</strong> (Δ ${nov.diffKilos > 0 ? '+' : ''}${nov.diffKilos.toFixed(1)} Kg)${idTag}.`;
                 }
 
                 return `
@@ -5746,22 +5823,41 @@
             }
 
             try {
-                const respuesta = await enviarNovedadesConciliacionASheets(listaNovedades);
-                if (respuesta && respuesta.result === 'success') {
-                    cerrarModalConfirmarNovedades();
-                    const noEnc = (respuesta.detalles || []).filter(d => String(d.accion || '').startsWith('NO_ENCONTRADO'));
-                    actualizarEstadoLocalTrasSincronizacion(listaNovedades, respuesta);
-                    if (noEnc.length > 0) {
-                        mostrarToastNotificacion(`⚠️ ${noEnc.length} registro(s) no se encontraron en Sheets; refrescando base real...`, 'warning');
-                    } else {
-                        mostrarToastNotificacion(`✅ ${listaNovedades.length} novedad${listaNovedades.length > 1 ? 'es' : ''} aplicada${listaNovedades.length > 1 ? 's' : ''} en Sheets. Verificando en vivo...`, 'success');
+                const eliminaciones = listaNovedades.filter(n => n && (n.tipoNovedad === 'ELIMINAR' || n.tipoNovedad === 'ELIMINAR_SOBRANTE'));
+                const otrasOps = listaNovedades.filter(n => n && n.tipoNovedad !== 'ELIMINAR' && n.tipoNovedad !== 'ELIMINAR_SOBRANTE');
+                const todosDetalles = [];
+
+                // Enviar cada ELIMINAR de forma secuencial para garantizar índices 100% exactos incluso en Webhooks previos
+                for (let ei = 0; ei < eliminaciones.length; ei++) {
+                    if (btnSync) btnSync.innerHTML = `<span>⏳ Eliminando duplicado ${ei + 1}/${eliminaciones.length}...</span>`;
+                    const respDel = await enviarNovedadesConciliacionASheets([eliminaciones[ei]]);
+                    if (!respDel || respDel.result !== 'success') {
+                        throw new Error((respDel && respDel.error) || 'Error al eliminar fila en Sheets');
                     }
-                    deseleccionarTodasNovedades();
-                    await new Promise(r => setTimeout(r, 450));
-                    await sincronizarSheetsYReconciliarEnVivo('Verificación de cambios');
-                } else {
-                    throw new Error((respuesta && respuesta.error) || 'Respuesta desconocida del servidor');
+                    if (Array.isArray(respDel.detalles)) todosDetalles.push(...respDel.detalles);
+                    actualizarEstadoLocalTrasSincronizacion([eliminaciones[ei]], respDel);
                 }
+
+                if (otrasOps.length > 0) {
+                    if (btnSync) btnSync.innerHTML = `<span>⏳ Sincronizando ${otrasOps.length} ajuste(s)...</span>`;
+                    const respOtras = await enviarNovedadesConciliacionASheets(otrasOps);
+                    if (!respOtras || respOtras.result !== 'success') {
+                        throw new Error((respOtras && respOtras.error) || 'Respuesta desconocida del servidor');
+                    }
+                    if (Array.isArray(respOtras.detalles)) todosDetalles.push(...respOtras.detalles);
+                    actualizarEstadoLocalTrasSincronizacion(otrasOps, respOtras);
+                }
+
+                cerrarModalConfirmarNovedades();
+                const noEnc = todosDetalles.filter(d => String(d.accion || '').startsWith('NO_ENCONTRADO'));
+                if (noEnc.length > 0) {
+                    mostrarToastNotificacion(`⚠️ ${noEnc.length} registro(s) no se encontraron en Sheets; refrescando base real...`, 'warning');
+                } else {
+                    mostrarToastNotificacion(`✅ ${listaNovedades.length} operación${listaNovedades.length > 1 ? 'es' : ''} aplicada${listaNovedades.length > 1 ? 's' : ''} en Sheets. Verificando en vivo...`, 'success');
+                }
+                deseleccionarTodasNovedades();
+                await new Promise(r => setTimeout(r, 450));
+                await sincronizarSheetsYReconciliarEnVivo('Verificación de cambios');
             } catch (err) {
                 alert(`Error al sincronizar con Google Sheets: ${err.message || err.toString()}`);
             } finally {
@@ -6670,7 +6766,23 @@
                 let pDia = Number(r.PRECIO) || 0;
                 if (pDia > 0 && pDia < 20) pDia = Math.round(pDia * 1000);
                 if (pDia > 0) recPreciosDia[key] = pDia;
-                recMeta[key] = { ...dInfo, punto: r.PUNTO || '', id: r.ID || '', ruta: r.RUTA || '', conductor: r.CONDUCTOR || '', proveedor: r.PROVEEDOR || '' };
+                if (!recMeta[key]) {
+                    recMeta[key] = { ...dInfo, punto: r.PUNTO || '', id: r.ID || '', ruta: r.RUTA || '', conductor: r.CONDUCTOR || '', proveedor: r.PROVEEDOR || '', filas: [] };
+                } else {
+                    if (r.PUNTO) recMeta[key].punto = r.PUNTO;
+                    if (r.ID) recMeta[key].id = r.ID;
+                    if (r.RUTA) recMeta[key].ruta = r.RUTA;
+                    if (r.CONDUCTOR) recMeta[key].conductor = r.CONDUCTOR;
+                    if (r.PROVEEDOR) recMeta[key].proveedor = r.PROVEEDOR;
+                }
+                recMeta[key].filas.push({
+                    id: r.ID || '',
+                    kg: kg,
+                    materia: r.MATERIA || prodHom,
+                    punto: r.PUNTO || '',
+                    proveedor: r.PROVEEDOR || '',
+                    fecha: r.FECHA || dInfo.fechaStr
+                });
             });
 
             // 6. Motor Forense Universal + Opción 2 (Smart Match por Peso y Fecha)
@@ -6986,6 +7098,7 @@
                             estado: '🟡 Desviación de Peso',
                             obs: `Diferencia de ${deltaKg > 0 ? '+' : ''}${deltaKg.toFixed(1)} Kg entre factura proveedor y recolección.`,
                             id: (recMeta[key] ? recMeta[key].id : '') || '',
+                            filasSistema: (recMeta[key] && Array.isArray(recMeta[key].filas)) ? recMeta[key].filas : [],
                             rKey: key,
                             ruta: (recMeta[key] ? recMeta[key].ruta : '') || '',
                             conductor: (recMeta[key] ? recMeta[key].conductor : '') || '',
@@ -7109,6 +7222,7 @@
                         _smartMatchRaw: rawLabel,
                         _smartMatchTarget: cand.rProd,
                         id: (recMeta[cand.rKey] ? recMeta[cand.rKey].id : '') || '',
+                        filasSistema: (recMeta[cand.rKey] && Array.isArray(recMeta[cand.rKey].filas)) ? recMeta[cand.rKey].filas : [],
                         rKey: cand.rKey,
                         ruta: (recMeta[cand.rKey] ? recMeta[cand.rKey].ruta : '') || '',
                         conductor: (recMeta[cand.rKey] ? recMeta[cand.rKey].conductor : '') || '',
@@ -7160,6 +7274,7 @@
                     facturaDoc: '',
                     obs: 'Registrado en recolecciones pero no aparece cobrado en el Excel del proveedor.',
                     id: (recMeta[rKey] ? recMeta[rKey].id : '') || '',
+                    filasSistema: (recMeta[rKey] && Array.isArray(recMeta[rKey].filas)) ? recMeta[rKey].filas : [],
                     rKey: rKey,
                     ruta: (recMeta[rKey] ? recMeta[rKey].ruta : '') || '',
                     conductor: (recMeta[rKey] ? recMeta[rKey].conductor : '') || '',

@@ -1306,12 +1306,18 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
 
           var nuevoValor = (prevPrecio > 0 && kgTarget > 0) ? Math.round(prevPrecio * kgTarget * 100) / 100 : '';
           var prevObs = String(rowData[8] || '').trim();
-          var notaAjuste = "Ajustado por Conciliador Proveedor (Antes: " + prevKg + " Kg, Nuevo: " + kgTarget + " Kg)";
-          var obsFinal = prevObs ? (prevObs + " | " + notaAjuste) : notaAjuste;
+          var cambioPeso = Math.abs(prevKg - kgTarget) >= 0.001;
+          var obsFinal = prevObs;
+          if (cambioPeso) {
+            var notaAjuste = "Ajustado por Conciliador Proveedor (Antes: " + prevKg + " Kg, Nuevo: " + kgTarget + " Kg)";
+            obsFinal = prevObs ? (prevObs + " | " + notaAjuste) : notaAjuste;
+          }
 
           // Actualizar Col H (Kg), I (Observaciones), K (Precio si estaba vacío), L (Valor)
           sheet.getRange(rowToUpdate, 8).setValue(kgTarget);
-          sheet.getRange(rowToUpdate, 9).setValue(sanitizarParaHoja(capitalizarOracion(obsFinal)));
+          if (cambioPeso) {
+            sheet.getRange(rowToUpdate, 9).setValue(sanitizarParaHoja(capitalizarOracion(obsFinal)));
+          }
           if (prevPrecio > 0) {
             sheet.getRange(rowToUpdate, 11).setValue(prevPrecio);
           }
@@ -1486,6 +1492,16 @@ function aplicarNovedadesConciliacionSheet(ss, rawPayload) {
           var idBorrado = allData[rowArrIndex][0];
           sheet.deleteRow(rowToDelete);
           allData.splice(rowArrIndex, 1);
+          if (targetRow >= rowToDelete) targetRow--;
+          // Re-indexar idRowIndexMap para mantener índices 1-based exactos tras eliminar fila
+          idRowIndexMap = {};
+          for (var rr = 0; rr < allData.length; rr++) {
+            var rIdCurr = String(allData[rr][0] || '').trim();
+            if (rIdCurr) {
+              if (!idRowIndexMap[rIdCurr]) idRowIndexMap[rIdCurr] = [];
+              idRowIndexMap[rIdCurr].push(rr + 2);
+            }
+          }
           actualizados++;
           detalles.push({
             id: idBorrado,

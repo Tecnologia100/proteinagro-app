@@ -1156,3 +1156,9 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Verificación en Vivo tras Guardar Cambios (`sincronizarSheetsYReconciliarEnVivo`):** Luego de ejecutar cualquier cambio (`Eliminar`, `Reclasificar`, `Igualar a Proveedor`, `Registrar en Sheets`), aplica parche local estricto por proveedor/sucursal + `applyFilters()` y re-descarga automáticamente la base real desde Google Sheets (GViz `select *` / Webhook) recalculando la matriz en vivo sin perder el Excel cargado.
 - **Botón Manual en Conciliación:** Botón `🔄 Actualizar desde Sheets` (`#btnSyncLiveSheetsConc`) en `#reconcileResults` para refrescar desde Sheets en 1 clic sin volver a cargar el archivo.
 - **Recarga Inteligente (`recargarVersionConciliador`):** El botón superior `🔄 Recargar (F5)` invoca `abrirConciliadorFlotante()` en Sheets o recarga con *cache-buster* `?_v=...` en navegador.
+
+---
+
+### 48. Resolución Inteligente de Filas Apiladas / Duplicadas en Desviaciones (`CONCILIADOR.html v1.9.13` & `Code.gs`)
+- **Descomposición Multi-Fila (`expandirOperacionesMultiFila`):** `recMeta[key].filas` conserva todas las filas de Sheets por fecha/producto. Al pulsar `Igualar a Proveedor` sobre un día con filas duplicadas apiladas (ej. `1.335 + 1.210 + 1.210,9`), conserva automáticamente la fila más cercana al peso del proveedor (`1.210,9`), elimina por ID los duplicados sobrantes de forma secuencial segura y verifica en vivo contra Google Sheets.
+- **Blindaje en `Code.gs`:** Re-indexado de `idRowIndexMap` y ajuste de `targetRow` tras cada `sheet.deleteRow`, y supresión de notas de observación redundantes cuando el peso no cambia (`|prevKg - kgTarget| < 0.001`).

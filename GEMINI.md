@@ -841,6 +841,14 @@ i.fecha), consolidándose directamente en la fila de ese día.
 - **Botón Manual en Conciliación:** Agregado botón `🔄 Actualizar desde Sheets` (`#btnSyncLiveSheetsConc`) en la barra de resultados para refrescar datos desde Sheets sin perder el Excel cargado; si `procesarTablaGviz` / `procesarRecoleccionesWebhook` corren con el modal abierto, también recalculan la conciliación.
 - **Recarga Inteligente de Versión (`recargarVersionConciliador`):** El botón superior `🔄 Recargar (F5)` invoca `google.script.run.abrirConciliadorFlotante()` en Google Sheets o recarga con *cache-buster* `?_v=...` en navegador.
 
+### 48. Resolución Inteligente de Filas Apiladas / Duplicadas en Desviaciones (`CONCILIADOR.html v1.9.13` & `Code.gs`)
+- **Causa Raíz Resuelta:** Cuando en una misma fecha/producto existían varias filas en Google Sheets (ej. `22/10/2026 | Caribe Cavasa | Hueso Blanco`: `1.335` + `1.210` + `1.210,9` = `3.755,9 Kg`), `recMeta[key]` conservaba solo el último ID (`1.210,9 Kg`), por lo que pulsar `Igualar a Proveedor` sobrescribía `1.210,9 -> 1.210,9` sin tocar los 2 duplicados.
+- **Solución en `CONCILIADOR.html` (`v1.9.13`):**
+  - `recMeta[key].filas` ahora registra todas las filas de Sheets que integran cada celda agrupada.
+  - `expandirOperacionesMultiFila()` descompone automáticamente cualquier `DESVIACION` multi-fila conservando la fila más cercana al peso del proveedor, emitiendo `ELIMINAR` explícito por ID para los duplicados sobrantes (y ajuste solo si la fila conservada aún difiere), mostrando el desglose exacto en el modal de confirmación.
+  - `ejecutarSincronizacionNovedades` y `confirmarYEliminarNovedadInmediata` envían cada `ELIMINAR` de forma secuencial para evitar corrimiento de índices incluso en implementaciones previas del Webhook, seguido de `sincronizarSheetsYReconciliarEnVivo()`.
+- **Blindaje en `Code.gs`:** En `aplicarNovedadesConciliacionSheet`, tras `sheet.deleteRow(rowToDelete)` se decrementa `targetRow` y se re-indexa `idRowIndexMap`; además, en `AJUSTAR_PESO` se omite escribir notas redundantes en `Observaciones` cuando `|prevKg - kgTarget| < 0.001`.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
