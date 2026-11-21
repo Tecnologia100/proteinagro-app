@@ -1162,3 +1162,12 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 ### 48. Resolución Inteligente de Filas Apiladas / Duplicadas en Desviaciones (`CONCILIADOR.html v1.9.13` & `Code.gs`)
 - **Descomposición Multi-Fila (`expandirOperacionesMultiFila`):** `recMeta[key].filas` conserva todas las filas de Sheets por fecha/producto. Al pulsar `Igualar a Proveedor` sobre un día con filas duplicadas apiladas (ej. `1.335 + 1.210 + 1.210,9`), conserva automáticamente la fila más cercana al peso del proveedor (`1.210,9`), elimina por ID los duplicados sobrantes de forma secuencial segura y verifica en vivo contra Google Sheets.
 - **Blindaje en `Code.gs`:** Re-indexado de `idRowIndexMap` y ajuste de `targetRow` tras cada `sheet.deleteRow`, y supresión de notas de observación redundantes cuando el peso no cambia (`|prevKg - kgTarget| < 0.001`).
+
+---
+
+### 49. Inclusión de Meses Intermedios en Rango del Informe de Materia Prima (`CONCILIADOR.html v1.9.14`)
+- **Causa Raíz Resuelta:** `exportarInformeAnualMateriaPrima()` agregaba a `selectedMonths` solo el mes de `fechaDesde` y el mes de `fechaHasta`, omitiendo todos los meses intermedios (ej. `01/08/2026` a `31/10/2026` generaba `AGOSTO` y `OCTUBRE` sin `SEPTIEMBRE`).
+- **Solución Implementada:**
+  - Construcción continua mes a mes (`periodosToExport`) entre `fechaDesde` y `fechaHasta` (incluyendo septiembre y cualquier mes intermedio, incluso en rangos multi-año).
+  - Validación por fecha completa con `parseDate(row.FECHA)` comprobando coincidencia estricta de año y mes (`rowDate.getFullYear() === pYear && (rowDate.getMonth() + 1) === m`), y soporte en `parseDate` para `YYYY/MM/DD` y `DD-MM-YYYY`.
+  - Titulación segura de hojas y archivo (`INFORME_MATERIA_PRIMA_AGOSTO_SEPTIEMBRE_OCTUBRE_2026.xlsx`).

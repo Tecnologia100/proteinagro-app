@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** 19 de Noviembre 2026 (Versión 1.9.10)  
+> **Última Actualización:** 21 de Noviembre 2026 (PWA v1.9.10 · Conciliador v1.9.14)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -848,6 +848,13 @@ i.fecha), consolidándose directamente en la fila de ese día.
   - `expandirOperacionesMultiFila()` descompone automáticamente cualquier `DESVIACION` multi-fila conservando la fila más cercana al peso del proveedor, emitiendo `ELIMINAR` explícito por ID para los duplicados sobrantes (y ajuste solo si la fila conservada aún difiere), mostrando el desglose exacto en el modal de confirmación.
   - `ejecutarSincronizacionNovedades` y `confirmarYEliminarNovedadInmediata` envían cada `ELIMINAR` de forma secuencial para evitar corrimiento de índices incluso en implementaciones previas del Webhook, seguido de `sincronizarSheetsYReconciliarEnVivo()`.
 - **Blindaje en `Code.gs`:** En `aplicarNovedadesConciliacionSheet`, tras `sheet.deleteRow(rowToDelete)` se decrementa `targetRow` y se re-indexa `idRowIndexMap`; además, en `AJUSTAR_PESO` se omite escribir notas redundantes en `Observaciones` cuando `|prevKg - kgTarget| < 0.001`.
+
+### 49. Inclusión de Meses Intermedios en Rango del Informe de Materia Prima (`CONCILIADOR.html v1.9.14`)
+- **Causa Raíz Resuelta:** En `exportarInformeAnualMateriaPrima()`, el rango de fechas agregaba únicamente el mes inicial (`fechaDesde`) y el mes final (`fechaHasta`) a `selectedMonths` (`Set`), omitiendo los meses intermedios (ej. al consultar de `01/08/2026` a `31/10/2026` exportaba solo `AGOSTO` y `OCTUBRE`, saltándose `SEPTIEMBRE`).
+- **Solución Implementada (`CONCILIADOR.html v1.9.14`):**
+  - Se reemplazó el `Set` de dos puntos por iteración continua mes a mes desde `(startYear, startMonth)` hasta `(endYear, endMonth)` inclusive (`periodosToExport`), soportando rangos dentro del mismo año y multi-año, así como orden invertido.
+  - En los meses dinámicos de `rawData`, se utiliza `parseDate(row.FECHA)` (ampliado para tolerar `DD/MM/YYYY`, `YYYY/MM/DD`, `YYYY-MM-DD` y `DD-MM-YYYY`) validando coincidencia exacta de mes **y año** (`(rowDate.getMonth() + 1) === m && rowDate.getFullYear() === pYear`).
+  - Nombres de archivo acotados (`<= 4` meses listados completos como `INFORME_MATERIA_PRIMA_AGOSTO_SEPTIEMBRE_OCTUBRE_2026.xlsx`, y rango compacto `MES_INICIO_A_MES_FIN` para rangos largos).
 
 ---
 
