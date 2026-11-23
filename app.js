@@ -1,5 +1,5 @@
 // Interruptor maestro de pausa del servicio (true = "Cuenta en pausa" | false = Operación normal)
-const CUENTA_EN_PAUSA = true;
+const CUENTA_EN_PAUSA = false;
 
 function aplicarEstadoCuentaEnPausa() {
     if (!CUENTA_EN_PAUSA) return false;
@@ -7095,8 +7095,8 @@ function solicitarRecargaSeguraApp(motivo) {
         }
         return false;
     }
-    console.log(`🔄 Aplicando actualización v1.9.11 (${motivo})...`);
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.11&t=' + Date.now();
+    console.log(`🔄 Aplicando actualización v1.9.12 (${motivo})...`);
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.12&t=' + Date.now();
     return true;
 }
 
@@ -7105,9 +7105,9 @@ function inicializarServiceWorkerPWA() {
         let refreshing = false;
 
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.9.11')
+            navigator.serviceWorker.register('/sw.js?v=1.9.12')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.9.11 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.9.12 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
