@@ -1,3 +1,19 @@
+// Interruptor maestro de pausa del servicio (true = "Cuenta en pausa" | false = Operación normal)
+const CUENTA_EN_PAUSA = true;
+
+function aplicarEstadoCuentaEnPausa() {
+    if (!CUENTA_EN_PAUSA) return false;
+    const pauseOverlay = document.getElementById('pause-overlay');
+    const loginOv = document.getElementById('login-overlay');
+    const drvView = document.getElementById('driver-view');
+    const admView = document.getElementById('admin-view');
+    if (loginOv) loginOv.style.display = 'none';
+    if (drvView) drvView.style.display = 'none';
+    if (admView) admView.style.display = 'none';
+    if (pauseOverlay) pauseOverlay.style.display = 'flex';
+    return true;
+}
+
 var isAutoSyncRunning = false;
 // === CONFIGURACIÓN DE FIREBASE & GOOGLE SHEETS ===
 // TODO: Reemplazar con credenciales reales en producción
@@ -7079,64 +7095,19 @@ function solicitarRecargaSeguraApp(motivo) {
         }
         return false;
     }
-    console.log(`🔄 Aplicando actualización v1.9.10 (${motivo})...`);
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.10&t=' + Date.now();
+    console.log(`🔄 Aplicando actualización v1.9.11 (${motivo})...`);
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.11&t=' + Date.now();
     return true;
 }
 
-// Inicializar selectores dinámicos y catálogos al cargar el DOM
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Inicializar inmediatamente con catálogo base pre-cargado (0ms de latencia, 100% offline-ready)
-    procesarPuntosRutasDinamicos(CATALOGO_PUNTOS_RUTAS_DEFAULT);
-    renderDynamicProducts(DEFAULT_PRODUCTOS);
-    
-    // Cargar conductores activos de inmediato desde caché local o valores por defecto reales
-    let initialDrivers = DEFAULT_CONDUCTORES;
-    try {
-        const cachedDrivers = localStorage.getItem('proteinagro_conductores_cache');
-        if (cachedDrivers) {
-            const parsed = JSON.parse(cachedDrivers);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                initialDrivers = parsed.map(d => {
-                    const norm = aNombrePropio(d);
-                    if (norm.toLowerCase() === 'carolina') return 'Carolina Becerra';
-                    if (norm.toLowerCase() === 'daniela') return 'Daniela Marquez';
-                    return norm;
-                });
-            }
-        }
-    } catch(e) {}
-    renderDynamicDrivers(initialDrivers);
-
-    renderDynamicRoutes(DEFAULT_RUTAS);
-    initRutasYProveedores();
-    initAdminSupportModal();
-    initAdminEditModal();
-    initAdminGestionTarifasModal();
-    initNovedadesModal();
-    inicializarSelectorAtados();
-    inicializarModuloEvidenciaPesaje();
-    inicializarModalVistoBueno();
-
-    // 2. Sincronizar en segundo plano con Google Sheets si hay internet
-    cargarCatalogosDinamicos();
-
-    // 3. Restaurar sesión activa de conductor si la página fue refrescada
-    try {
-        const savedDriver = sessionStorage.getItem('proteinagro_current_driver');
-        if (savedDriver) {
-            entrarComoConductor(savedDriver);
-        }
-    } catch(e) {}
-
-    // 4. Registrar Service Worker v1.9.10 para PWA instalable con actualización segura (protege capturas activas)
+function inicializarServiceWorkerPWA() {
     if ('serviceWorker' in navigator) {
         let refreshing = false;
 
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.9.10')
+            navigator.serviceWorker.register('/sw.js?v=1.9.11')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.9.10 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.9.11 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -7184,6 +7155,60 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+}
+
+// Inicializar selectores dinámicos y catálogos al cargar el DOM
+document.addEventListener('DOMContentLoaded', () => {
+    // Registrar siempre Service Worker para asegurar actualizaciones futuras (incluso en pausa)
+    inicializarServiceWorkerPWA();
+
+    // Si la cuenta está en pausa, bloquear vistas y mostrar pantalla discreta sin tocar datos locales
+    if (aplicarEstadoCuentaEnPausa()) {
+        return;
+    }
+
+    // 1. Inicializar inmediatamente con catálogo base pre-cargado (0ms de latencia, 100% offline-ready)
+    procesarPuntosRutasDinamicos(CATALOGO_PUNTOS_RUTAS_DEFAULT);
+    renderDynamicProducts(DEFAULT_PRODUCTOS);
+    
+    // Cargar conductores activos de inmediato desde caché local o valores por defecto reales
+    let initialDrivers = DEFAULT_CONDUCTORES;
+    try {
+        const cachedDrivers = localStorage.getItem('proteinagro_conductores_cache');
+        if (cachedDrivers) {
+            const parsed = JSON.parse(cachedDrivers);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                initialDrivers = parsed.map(d => {
+                    const norm = aNombrePropio(d);
+                    if (norm.toLowerCase() === 'carolina') return 'Carolina Becerra';
+                    if (norm.toLowerCase() === 'daniela') return 'Daniela Marquez';
+                    return norm;
+                });
+            }
+        }
+    } catch(e) {}
+    renderDynamicDrivers(initialDrivers);
+
+    renderDynamicRoutes(DEFAULT_RUTAS);
+    initRutasYProveedores();
+    initAdminSupportModal();
+    initAdminEditModal();
+    initAdminGestionTarifasModal();
+    initNovedadesModal();
+    inicializarSelectorAtados();
+    inicializarModuloEvidenciaPesaje();
+    inicializarModalVistoBueno();
+
+    // 2. Sincronizar en segundo plano con Google Sheets si hay internet
+    cargarCatalogosDinamicos();
+
+    // 3. Restaurar sesión activa de conductor si la página fue refrescada
+    try {
+        const savedDriver = sessionStorage.getItem('proteinagro_current_driver');
+        if (savedDriver) {
+            entrarComoConductor(savedDriver);
+        }
+    } catch(e) {}
 });
 
 // ==============================================================================
