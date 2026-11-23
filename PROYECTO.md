@@ -1,7 +1,7 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.9.10`  
-> **Última Actualización:** 18 de Noviembre 2026  
+> **Versión Actual:** `v=1.9.12`  
+> **Última Actualización:** 23 de Noviembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
 
@@ -1171,3 +1171,10 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - Construcción continua mes a mes (`periodosToExport`) entre `fechaDesde` y `fechaHasta` (incluyendo septiembre y cualquier mes intermedio, incluso en rangos multi-año).
   - Validación por fecha completa con `parseDate(row.FECHA)` comprobando coincidencia estricta de año y mes (`rowDate.getFullYear() === pYear && (rowDate.getMonth() + 1) === m`), y soporte en `parseDate` para `YYYY/MM/DD` y `DD-MM-YYYY`.
   - Titulación segura de hojas y archivo (`INFORME_MATERIA_PRIMA_AGOSTO_SEPTIEMBRE_OCTUBRE_2026.xlsx`).
+
+---
+
+### 46. Integración de LISTA_DE_PRECIOS2.xlsx (103 Filas, Vigencia 23/11/2026) e Inactivación de ACEITE (v1.9.12)
+- **Cobertura (`Code.gs`):** Constante `LISTA_PRECIOS2_NOV23_2026` con **103 filas** (18 proveedores, incluyendo `Ciudad del Campo` general en ambas Rutas 2 + sedes `Granahorrar`, `Surtimercar`, `Punto Rojo`; omitiendo `Jairo Varela` hasta confirmar ruta). `Districarnes LG` y `La Cosecha de Mi Tierra` actualizan solo `HUESO BLANCO = $200`; los otros 16 actualizan `HUESO BLANCO = $200` y `HUESO DE CERDO = $200`.
+- **Inactivación de `ACEITE` y Retiro 2027:** `Carnicos La Fama` y `Yénifer Díaz (Villagorgona)` marcan `ACEITE` como `Inactivo` (incluyendo fila previa `2026-01-01` cuando `hoy >= 2026-11-23`). Los 7 proveedores de `Retirar desde enero 2027` conservan `Activo` hoy con nota en `Observaciones`.
+- **Menú y Webhook:** `action=aplicarListaPrecios2Nov23` y menú `📊 Conciliador > 📅 Cargar Lista de Precios 2 (23/Nov/2026)` 100% idempotentes con respaldo `Tarifas_Backup_PreLista2_YYYYMMDD`.

@@ -856,6 +856,14 @@ i.fecha), consolidándose directamente en la fila de ese día.
   - En los meses dinámicos de `rawData`, se utiliza `parseDate(row.FECHA)` (ampliado para tolerar `DD/MM/YYYY`, `YYYY/MM/DD`, `YYYY-MM-DD` y `DD-MM-YYYY`) validando coincidencia exacta de mes **y año** (`(rowDate.getMonth() + 1) === m && rowDate.getFullYear() === pYear`).
   - Nombres de archivo acotados (`<= 4` meses listados completos como `INFORME_MATERIA_PRIMA_AGOSTO_SEPTIEMBRE_OCTUBRE_2026.xlsx`, y rango compacto `MES_INICIO_A_MES_FIN` para rangos largos).
 
+
+### 46. Integración de `LISTA_DE_PRECIOS2.xlsx` (103 Filas, Vigencia `2026-11-23`) e Inactivación de `ACEITE` (`v1.9.12`)
+- **Alcance y Reglas Confirmadas (`Code.gs`):**
+  - Constante `LISTA_PRECIOS2_NOV23_2026` con **103 filas** (18 proveedores, 20 pestañas válidas, omitiendo `Jairo Varela` hasta confirmar ruta): `Districarnes LG` y `La Cosecha de Mi Tierra` solo `HUESO BLANCO = $200`; los demás 16 proveedores (incluyendo `Ciudad del Campo` general en ambas Rutas 2 + sedes `Granahorrar`, `Surtimercar`, `Punto Rojo`) actualizan `HUESO BLANCO = $200` y `HUESO DE CERDO = $200`, `SEBO EN RAMA = $900`, `DESPERDICIO = $50`, más `MANTECA = $2.500` en `Carnicos La Fama` y `Yénifer Díaz`, y `PIEL POLLO = $50` en `La Esperanza`.
+  - **Inactivación de `ACEITE`:** En `Carnicos La Fama` y `Yénifer Díaz (Villagorgona)`, `ACEITE` pasa a `Inactivo` (incluyendo fila previa `2026-01-01` cuando `hoy >= 2026-11-23`).
+  - **Retiro enero 2027:** Los 7 proveedores siguen `Activo` hoy con nota `Retirar desde 2027-01-01 (Último día: 31/12/2026)` en `Observaciones`.
+  - **Idempotencia y Menú:** `ejecutarAplicarListaEspecifica_`, endpoint `action=aplicarListaPrecios2Nov23` (`doGet`/`doPost`), respaldo `Tarifas_Backup_PreLista2_YYYYMMDD`, menú `📊 Conciliador > 📅 Cargar Lista de Precios 2 (23/Nov/2026)` y suite E2E `10/10 PASS`.
+
 ---
 
 ## 📦 3. Procedimientos de Respaldo y Despliegue
