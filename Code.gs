@@ -103,6 +103,9 @@ function doGet(e) {
     if (e && e.parameter && e.parameter.action === 'aplicarListaPreciosNov23') {
       return aplicarListaPreciosNov23Sheet_(ss);
     }
+    if (e && e.parameter && e.parameter.action === 'aplicarListaPrecios2Nov23') {
+      return aplicarListaPrecios2Nov23Sheet_(ss);
+    }
 
     // 1. Obtener Productos (filtrando Inactivos)
     var sheetProductos = ss.getSheetByName("Productos");
@@ -2922,6 +2925,10 @@ function doPost(e) {
     if (action === 'aplicarListaPreciosNov23') {
       return aplicarListaPreciosNov23Sheet_(ss);
     }
+
+    if (action === 'aplicarListaPrecios2Nov23') {
+      return aplicarListaPrecios2Nov23Sheet_(ss);
+    }
     
     return guardarRecoleccionSheet(ss, payload);
   } catch (error) {
@@ -2955,6 +2962,7 @@ function onOpen() {
       .addItem('📷 Habilitar Columnas de Soporte (R:T)', 'menuHabilitarColumnasSoporte')
       .addItem('💰 Liquidar Precios Vacíos en Recolecciones', 'menuLiquidarPreciosVacios')
       .addItem('📅 Cargar Lista de Precios 23/Nov/2026 (Idempotente)', 'menuAplicarListaPreciosNov23')
+      .addItem('📅 Cargar Lista de Precios 2 (23/Nov/2026)', 'menuAplicarListaPrecios2Nov23')
       .addSeparator()
       .addItem('🚀 Abrir Conciliador (Ventana Aparte)', 'abrirConciliadorNuevaVentana')
       .addItem('📋 Descargar Plantilla Oficial (.xlsx)', 'abrirDescargaPlantillaSheets')
@@ -4064,6 +4072,112 @@ var LISTA_PRECIOS_NOV23_2026 = [
   { ruta: "Ruta 6: Oriente/Sur", proveedor: "Mercaunion", punto: "", producto: "DESPERDICIO", precio: 50, vigenteDesde: "2026-11-23" },
   { ruta: "Ruta 4: Buga / Roldanillo / Zarzal / Tuluá", proveedor: "Jhonatan Martinez", punto: "", producto: "SEBO EN RAMA", precio: 1000, vigenteDesde: "2026-11-23" }
 ];
+var LISTA_PRECIOS2_NOV23_2026 = [
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Districarnes LG", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Districarnes LG", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Districarnes LG", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "La Cosecha de Mi Tierra", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "La Cosecha de Mi Tierra", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "La Cosecha de Mi Tierra", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Comercializadora R Y E", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Comercializadora R Y E", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Comercializadora R Y E", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Comercializadora R Y E", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Baratón Carnes Berlín", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Baratón Carnes Berlín", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Baratón Carnes Berlín", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Baratón Carnes Berlín", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Granahorrar", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Granahorrar", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Granahorrar", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Granahorrar", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Granahorrar", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Granahorrar", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Granahorrar", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Granahorrar", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Surtimercar", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Surtimercar", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Surtimercar", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Surtimercar", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Surtimercar", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Surtimercar", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Surtimercar", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Surtimercar", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Punto Rojo", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Punto Rojo", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Punto Rojo", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali (Norte / Centro / Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Punto Rojo", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Punto Rojo", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Punto Rojo", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Punto Rojo", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudad del Campo", punto: "Ciudad del Campo Punto Rojo", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Jaime Zuluaga", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Jaime Zuluaga", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Jaime Zuluaga", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Jaime Zuluaga", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Milton Muñoz", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Milton Muñoz", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Milton Muñoz", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Milton Muñoz", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudadela del Río", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudadela del Río", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudadela del Río", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Ciudadela del Río", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026) | Retirar desde 2027-01-01 (Último día: 31/12/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Carnicos La Fama", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Carnicos La Fama", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Carnicos La Fama", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Carnicos La Fama", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Carnicos La Fama", punto: "", producto: "MANTECA", precio: 2500, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 2: Cali Sur / Oriente/ Juanchito)", proveedor: "Carnicos La Fama", punto: "", producto: "ACEITE", precio: "", estado: "Inactivo", observaciones: "Aceite no se recibe hasta nuevo aviso - Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Nutrialimentos Valdez (Villagorgona)", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Nutrialimentos Valdez (Villagorgona)", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Nutrialimentos Valdez (Villagorgona)", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Nutrialimentos Valdez (Villagorgona)", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Yénifer Díaz (Villagorgona)", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Yénifer Díaz (Villagorgona)", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Yénifer Díaz (Villagorgona)", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Yénifer Díaz (Villagorgona)", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Yénifer Díaz (Villagorgona)", punto: "", producto: "MANTECA", precio: 2500, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Yénifer Díaz (Villagorgona)", punto: "", producto: "ACEITE", precio: "", estado: "Inactivo", observaciones: "Aceite no se recibe hasta nuevo aviso - Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Jorge Adrián Rodas (Villagorgona)", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Jorge Adrián Rodas (Villagorgona)", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Jorge Adrián Rodas (Villagorgona)", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Jorge Adrián Rodas (Villagorgona)", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Ricardo Gil", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Ricardo Gil", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Ricardo Gil", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Ricardo Gil", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Central Henry Martinez", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Central Henry Martinez", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Central Henry Martinez", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Central Henry Martinez", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Orlando Giraldo", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Orlando Giraldo", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Orlando Giraldo", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Orlando Giraldo", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Carnicería Fabián López (Águila Roja)", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Carnicería Fabián López (Águila Roja)", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Carnicería Fabián López (Águila Roja)", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Carnicería Fabián López (Águila Roja)", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Jose Alex Pareja", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Jose Alex Pareja", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Jose Alex Pareja", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 5: Palmira / Villagorgona / Carmelo", proveedor: "Jose Alex Pareja", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "La Esperanza", punto: "", producto: "HUESO BLANCO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "La Esperanza", punto: "", producto: "HUESO DE CERDO", precio: 200, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "La Esperanza", punto: "", producto: "SEBO EN RAMA", precio: 900, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "La Esperanza", punto: "", producto: "DESPERDICIO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" },
+  { ruta: "Ruta 6: Oriente/Sur", proveedor: "La Esperanza", punto: "", producto: "PIEL POLLO", precio: 50, estado: "Activo", observaciones: "Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)", vigenteDesde: "2026-11-23" }
+];
+
 
 // ==============================================================================
 // GESTOR RÁPIDO DE TARIFAS ADMIN: CONSULTA HTTP (action=getTarifas)
@@ -4081,7 +4195,10 @@ function obtenerTarifasHttp_(ss) {
         tarifas: [],
         nov23YaCargada: false,
         nov23Count: 0,
-        nov23Total: LISTA_PRECIOS_NOV23_2026.length
+        nov23Total: LISTA_PRECIOS_NOV23_2026.length,
+        lista2YaCargada: false,
+        lista2Count: 0,
+        lista2Total: LISTA_PRECIOS2_NOV23_2026.length
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -4144,6 +4261,16 @@ function obtenerTarifasHttp_(ss) {
       }
     }
 
+    var lista2Count = 0;
+    for (var n2 = 0; n2 < LISTA_PRECIOS2_NOV23_2026.length; n2++) {
+      var item2 = LISTA_PRECIOS2_NOV23_2026[n2];
+      var vig2 = item2.vigenteDesde || '2026-11-23';
+      var kSpec2 = normalizarTexto(item2.ruta) + '|' + normalizarTexto(item2.proveedor) + '|' + normalizarTexto(item2.punto) + '|' + normalizarTexto(item2.producto) + '|' + vig2;
+      if (clavesEnHoja[kSpec2]) {
+        lista2Count++;
+      }
+    }
+
     return ContentService.createTextOutput(JSON.stringify({
       result: 'success',
       hoy: hoy,
@@ -4151,7 +4278,10 @@ function obtenerTarifasHttp_(ss) {
       tarifas: tarifas,
       nov23YaCargada: (nov23Count >= LISTA_PRECIOS_NOV23_2026.length),
       nov23Count: nov23Count,
-      nov23Total: LISTA_PRECIOS_NOV23_2026.length
+      nov23Total: LISTA_PRECIOS_NOV23_2026.length,
+      lista2YaCargada: (lista2Count >= LISTA_PRECIOS2_NOV23_2026.length),
+      lista2Count: lista2Count,
+      lista2Total: LISTA_PRECIOS2_NOV23_2026.length
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("Error en obtenerTarifasHttp_: " + err.toString());
@@ -4589,9 +4719,9 @@ function actualizarTarifasMasivoSheet_(ss, rawPayload) {
 }
 
 // ==============================================================================
-// CARGA IDEMPOTENTE LISTA DE PRECIOS 23/NOV/2026 (86 FILAS + PRODUCTOS)
+// CARGA IDEMPOTENTE DE LISTAS DE PRECIOS (MOTOR GENERALIZADO + LISTA 1 Y LISTA 2)
 // ==============================================================================
-function ejecutarAplicarListaPreciosNov23_(ss) {
+function ejecutarAplicarListaEspecifica_(ss, lista, opts) {
   var lock = LockService.getScriptLock();
   var lockAcquired = false;
   try {
@@ -4606,8 +4736,11 @@ function ejecutarAplicarListaPreciosNov23_(ss) {
     var sheetTarifas = ss.getSheetByName("Tarifas");
     if (!sheetTarifas) throw new Error("No existe la pestaña Tarifas.");
 
-    var hoyCompact = obtenerFechaHoyIsoColombia_().replace(/-/g, '');
-    var backupSheetName = crearRespaldoSiNoExiste_(ss, sheetTarifas, 'Tarifas_Backup_PreNov23_' + hoyCompact);
+    var opciones = opts || {};
+    var hoyIso = obtenerFechaHoyIsoColombia_();
+    var hoyCompact = hoyIso.replace(/-/g, '');
+    var backupPrefix = opciones.backupPrefix || 'Tarifas_Backup_PreNov23_';
+    var backupSheetName = crearRespaldoSiNoExiste_(ss, sheetTarifas, backupPrefix + hoyCompact);
 
     // Garantizar Columna H Vigente_Desde (dejando '2026-01-01' en todas las filas existentes)
     var vigColIdx = garantizarColumnaVigenciaTarifas_(sheetTarifas);
@@ -4645,27 +4778,43 @@ function ejecutarAplicarListaPreciosNov23_(ss) {
       };
     }
 
-    var obsOficial = 'Actualización LISTA_DE_PRECIOS.xlsx (Vigencia 23/11/2026)';
+    var defaultObs = opciones.defaultObs || 'Actualización LISTA_DE_PRECIOS.xlsx (Vigencia 23/11/2026)';
     var insertadas = 0;
     var actualizadas = 0;
     var sinCambios = 0;
     var filasNuevas = [];
     var productosLista = [];
+    var inactivarAnterioresMap = {};
 
-    for (var n = 0; n < LISTA_PRECIOS_NOV23_2026.length; n++) {
-      var item = LISTA_PRECIOS_NOV23_2026[n];
+    for (var n = 0; n < lista.length; n++) {
+      var item = lista[n];
       var vig = item.vigenteDesde || '2026-11-23';
-      productosLista.push(item.producto);
+      var itemEstado = String(item.estado || 'Activo').trim() || 'Activo';
+      var esInactivo = (itemEstado.toLowerCase() === 'inactivo');
+      var itemObs = (item.observaciones !== undefined && item.observaciones !== null && String(item.observaciones).trim() !== '')
+        ? String(item.observaciones).trim()
+        : defaultObs;
+      var itemPrecioNorm = parsePrecioMoneda(item.precio);
+      var itemPrecioCelda = (item.precio === '' || item.precio === null || item.precio === undefined) ? '' : item.precio;
+
+      if (!esInactivo) {
+        productosLista.push(item.producto);
+      } else {
+        var key3Inact = normalizarTexto(item.proveedor) + '|' + normalizarTexto(item.punto) + '|' + normalizarTexto(item.producto);
+        if (!inactivarAnterioresMap[key3Inact] || vig > inactivarAnterioresMap[key3Inact]) {
+          inactivarAnterioresMap[key3Inact] = vig;
+        }
+      }
 
       var kSpec = normalizarTexto(item.ruta) + '|' + normalizarTexto(item.proveedor) + '|' + normalizarTexto(item.punto) + '|' + normalizarTexto(item.producto) + '|' + vig;
       var match = existentesMap[kSpec];
 
       if (match) {
-        if (match.precio !== item.precio || match.estado.toLowerCase() !== 'activo' || match.obs !== obsOficial) {
-          sheetTarifas.getRange(match.row1, colIdx.precio + 1).setValue(item.precio);
-          sheetTarifas.getRange(match.row1, colIdx.estado + 1).setValue('Activo');
+        if (match.precio !== itemPrecioNorm || match.estado.toLowerCase() !== itemEstado.toLowerCase() || match.obs !== itemObs) {
+          sheetTarifas.getRange(match.row1, colIdx.precio + 1).setValue(itemPrecioCelda);
+          sheetTarifas.getRange(match.row1, colIdx.estado + 1).setValue(itemEstado);
           if (colIdx.obs !== -1) {
-            sheetTarifas.getRange(match.row1, colIdx.obs + 1).setValue(obsOficial);
+            sheetTarifas.getRange(match.row1, colIdx.obs + 1).setValue(itemObs);
           }
           actualizadas++;
         } else {
@@ -4678,14 +4827,14 @@ function ejecutarAplicarListaPreciosNov23_(ss) {
         nuevaFila[colIdx.prov] = sanitizarParaHoja(item.proveedor);
         nuevaFila[colIdx.punto] = sanitizarParaHoja(item.punto);
         nuevaFila[colIdx.prod] = sanitizarParaHoja(item.producto);
-        nuevaFila[colIdx.precio] = item.precio;
-        nuevaFila[colIdx.estado] = 'Activo';
-        if (colIdx.obs !== -1) nuevaFila[colIdx.obs] = obsOficial;
+        nuevaFila[colIdx.precio] = itemPrecioCelda;
+        nuevaFila[colIdx.estado] = itemEstado;
+        if (colIdx.obs !== -1) nuevaFila[colIdx.obs] = itemObs;
         nuevaFila[colIdx.vigenteDesde] = vig;
 
         filasNuevas.push(nuevaFila);
         insertadas++;
-        existentesMap[kSpec] = { row1: -1, precio: item.precio, estado: 'Activo', obs: obsOficial };
+        existentesMap[kSpec] = { row1: -1, precio: itemPrecioNorm, estado: itemEstado, obs: itemObs };
       }
     }
 
@@ -4700,27 +4849,71 @@ function ejecutarAplicarListaPreciosNov23_(ss) {
       sheetTarifas.getRange(curLastRow + 1, 1, filasNuevas.length, lastCol).setValues(filasNuevas);
     }
 
-    // Asegurar productos nuevos (ej. HUESO DE POLLO) en pestaña Productos como Activo
+    // Si algún ítem viene marcado 'Inactivo' (ej. ACEITE en puntos suspendidos),
+    // marcar también cualquier fila anterior de ese Proveedor + Punto + Producto como 'Inactivo'
+    // cuando hoy ya es >= vigenteDesde para ocultarlo inmediatamente en doGet y GViz.
+    var inactivadasAnteriores = 0;
+    var keysInactivar = Object.keys(inactivarAnterioresMap);
+    if (keysInactivar.length > 0 && rawData.length > 0) {
+      for (var rIdx = 0; rIdx < rawData.length; rIdx++) {
+        var prevProv = String(rawData[rIdx][colIdx.prov] || '').trim();
+        var prevPunto = String(rawData[rIdx][colIdx.punto] || '').trim();
+        var prevProd = String(rawData[rIdx][colIdx.prod] || '').trim();
+        var prevKey3 = normalizarTexto(prevProv) + '|' + normalizarTexto(prevPunto) + '|' + normalizarTexto(prevProd);
+        var vigLimite = inactivarAnterioresMap[prevKey3];
+        if (!vigLimite || hoyIso < vigLimite) continue;
+
+        var prevVig = normalizarFechaIso_(rawData[rIdx][colIdx.vigenteDesde], '2026-01-01');
+        if (prevVig < vigLimite) {
+          var prevEstado = String(rawData[rIdx][colIdx.estado] || '').trim().toLowerCase();
+          if (prevEstado !== 'inactivo') {
+            sheetTarifas.getRange(rIdx + 2, colIdx.estado + 1).setValue('Inactivo');
+            inactivadasAnteriores++;
+          }
+        }
+      }
+    }
+
+    // Asegurar productos activos nuevos en pestaña Productos como Activo
     var productosAgregados = asegurarProductosEnMaestro_(ss, productosLista);
 
-    var msgNov23 = 'Lista de precios 23/11/2026 procesada (86 filas): ' + insertadas + ' insertadas, ' + actualizadas + ' actualizadas, ' + sinCambios + ' sin cambios.';
+    var labelLista = opciones.labelLista || ('Lista de precios 23/11/2026 procesada (' + lista.length + ' filas)');
+    var msgRes = labelLista + ': ' + insertadas + ' insertadas, ' + actualizadas + ' actualizadas, ' + sinCambios + ' sin cambios' +
+      (inactivadasAnteriores > 0 ? (', ' + inactivadasAnteriores + ' filas anteriores inactivadas.') : '.');
     return {
       result: 'success',
       vigencia: '2026-11-23',
-      totalLista: LISTA_PRECIOS_NOV23_2026.length,
+      totalLista: lista.length,
       insertadas: insertadas,
       actualizadas: actualizadas,
       sinCambios: sinCambios,
+      inactivadasAnteriores: inactivadasAnteriores,
       productosAgregados: productosAgregados,
       backupSheetName: backupSheetName,
-      mensaje: msgNov23,
-      message: msgNov23
+      mensaje: msgRes,
+      message: msgRes
     };
   } finally {
     if (lockAcquired) {
       try { lock.releaseLock(); } catch (eRel) {}
     }
   }
+}
+
+function ejecutarAplicarListaPreciosNov23_(ss) {
+  return ejecutarAplicarListaEspecifica_(ss, LISTA_PRECIOS_NOV23_2026, {
+    backupPrefix: 'Tarifas_Backup_PreNov23_',
+    defaultObs: 'Actualización LISTA_DE_PRECIOS.xlsx (Vigencia 23/11/2026)',
+    labelLista: 'Lista de precios 23/11/2026 procesada (' + LISTA_PRECIOS_NOV23_2026.length + ' filas)'
+  });
+}
+
+function ejecutarAplicarListaPrecios2Nov23_(ss) {
+  return ejecutarAplicarListaEspecifica_(ss, LISTA_PRECIOS2_NOV23_2026, {
+    backupPrefix: 'Tarifas_Backup_PreLista2_',
+    defaultObs: 'Actualización LISTA_DE_PRECIOS2.xlsx (Vigencia 23/11/2026)',
+    labelLista: 'Lista de precios 2 (23/11/2026) procesada (' + LISTA_PRECIOS2_NOV23_2026.length + ' filas)'
+  });
 }
 
 function aplicarListaPreciosNov23Sheet_(ss) {
@@ -4730,6 +4923,20 @@ function aplicarListaPreciosNov23Sheet_(ss) {
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("Error en aplicarListaPreciosNov23Sheet_: " + err.toString());
+    return ContentService.createTextOutput(JSON.stringify({
+      result: 'error',
+      error: err.message || err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function aplicarListaPrecios2Nov23Sheet_(ss) {
+  try {
+    var res = ejecutarAplicarListaPrecios2Nov23_(ss);
+    return ContentService.createTextOutput(JSON.stringify(res))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log("Error en aplicarListaPrecios2Nov23Sheet_: " + err.toString());
     return ContentService.createTextOutput(JSON.stringify({
       result: 'error',
       error: err.message || err.toString()
@@ -4766,5 +4973,37 @@ function menuAplicarListaPreciosNov23() {
     ui.alert('📅 Lista de Precios 23/Nov/2026', msg, ui.ButtonSet.OK);
   } catch (e) {
     ui.alert('❌ Error al cargar lista de precios', e.toString(), ui.ButtonSet.OK);
+  }
+}
+
+function menuAplicarListaPrecios2Nov23() {
+  var ui = SpreadsheetApp.getUi();
+  var resp = ui.alert(
+    '📅 Cargar Lista de Precios 2 (23/Nov/2026)',
+    '¿Deseas cargar las 103 tarifas oficiales de LISTA_DE_PRECIOS2.xlsx con vigencia desde 2026-11-23?\n\n' +
+    '🛡️ Seguridad:\n' +
+    '• Se creará un respaldo automático Tarifas_Backup_PreLista2_YYYYMMDD.\n' +
+    '• Se garantizará la columna Vigente_Desde en Columna H (sin tocar A..G).\n' +
+    '• Se respetarán estados Inactivo (ej. ACEITE en puntos suspendidos).\n' +
+    '• Es 100% idempotente: puedes ejecutarlo varias veces sin crear duplicados.',
+    ui.ButtonSet.YES_NO
+  );
+  if (resp !== ui.Button.YES) return;
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss.toast('Cargando Lista de Precios 2 (23/11/2026) y creando respaldo...', '📅 ProteinAgro', 10);
+    var res = ejecutarAplicarListaPrecios2Nov23_(ss);
+    var msg = '✅ Proceso completado con éxito:\n\n' +
+      '• Total Lista 2 oficial: ' + res.totalLista + ' tarifas\n' +
+      '• Nuevas filas insertadas: ' + res.insertadas + '\n' +
+      '• Filas actualizadas: ' + res.actualizadas + '\n' +
+      '• Filas ya existentes sin cambios: ' + res.sinCambios + '\n' +
+      '• Filas anteriores inactivadas: ' + res.inactivadasAnteriores + '\n' +
+      '• Productos nuevos agregados a maestro: ' + (res.productosAgregados.length > 0 ? res.productosAgregados.join(', ') : 'Ninguno') + '\n' +
+      (res.backupSheetName ? ('• Pestaña de respaldo: ' + res.backupSheetName) : '');
+    ui.alert('📅 Lista de Precios 2 (23/Nov/2026)', msg, ui.ButtonSet.OK);
+  } catch (e) {
+    ui.alert('❌ Error al cargar Lista de Precios 2', e.toString(), ui.ButtonSet.OK);
   }
 }
