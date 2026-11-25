@@ -5661,7 +5661,7 @@ document.getElementById('btn-close-receipt')?.addEventListener('click', () => {
     if (typeof pendingAppReloadAfterSave !== 'undefined' && pendingAppReloadAfterSave) {
         if (typeof tieneCapturaActivaSinGuardar !== 'function' || !tieneCapturaActivaSinGuardar()) {
             pendingAppReloadAfterSave = false;
-            window.location.href = window.location.origin + window.location.pathname + '?v=1.9.10&t=' + Date.now();
+            window.location.href = window.location.origin + window.location.pathname + '?v=1.9.13&t=' + Date.now();
         }
     }
 });
@@ -5737,7 +5737,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.10&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.13&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -7095,8 +7095,8 @@ function solicitarRecargaSeguraApp(motivo) {
         }
         return false;
     }
-    console.log(`🔄 Aplicando actualización v1.9.12 (${motivo})...`);
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.12&t=' + Date.now();
+    console.log(`🔄 Aplicando actualización v1.9.13 (${motivo})...`);
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.13&t=' + Date.now();
     return true;
 }
 
@@ -7105,9 +7105,9 @@ function inicializarServiceWorkerPWA() {
         let refreshing = false;
 
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.9.12')
+            navigator.serviceWorker.register('/sw.js?v=1.9.13')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.9.12 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.9.13 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {

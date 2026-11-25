@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** 21 de Noviembre 2026 (PWA v1.9.10 · Conciliador v1.9.14)  
+> **Última Actualización:** 25 de Noviembre 2026 (PWA v1.9.13 · Conciliador v1.9.14)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -863,6 +863,13 @@ i.fecha), consolidándose directamente en la fila de ese día.
   - **Inactivación de `ACEITE`:** En `Carnicos La Fama` y `Yénifer Díaz (Villagorgona)`, `ACEITE` pasa a `Inactivo` (incluyendo fila previa `2026-01-01` cuando `hoy >= 2026-11-23`).
   - **Retiro enero 2027:** Los 7 proveedores siguen `Activo` hoy con nota `Retirar desde 2027-01-01 (Último día: 31/12/2026)` en `Observaciones`.
   - **Idempotencia y Menú:** `ejecutarAplicarListaEspecifica_`, endpoint `action=aplicarListaPrecios2Nov23` (`doGet`/`doPost`), respaldo `Tarifas_Backup_PreLista2_YYYYMMDD`, menú `📊 Conciliador > 📅 Cargar Lista de Precios 2 (23/Nov/2026)` y suite E2E `10/10 PASS`.
+
+### 50. Unificación de Versiones y Sincronización Total de Badges PWA (`v1.9.13`)
+- **Diagnóstico y Causa Raíz:** En las versiones 1.9.11 y 1.9.12 se actualizaron el Service Worker y el bundle JS/CSS, pero se omitió actualizar las etiquetas visibles de versión en `index.html` (líneas 67, 151, 154, 481, 484 y 761) y las URLs de redirección forzada en `app.js` (`forzarActualizacionApp`), las cuales permanecían ancladas en `v1.9.10`. Al pulsar los botones de actualización, el navegador recargaba forzosamente con `?v=1.9.10`, manteniendo la percepción de versión desactualizada.
+- **Corrección Integral:**
+  - `index.html`: Badges de cabecera de Conductor y Administrador, botón de acceso, footer y tags de versión unificados a `v1.9.13`.
+  - `app.js`: Redirección en `forzarActualizacionApp`, recarga diferida post-comprobante y registro de Service Worker alineados a `?v=1.9.13`.
+  - `sw.js`: Bumping de caché a `proteinagro-v1.9.13` para forzar la purga y activación inmediata en todos los dispositivos de campo y cabina.
 
 ---
 

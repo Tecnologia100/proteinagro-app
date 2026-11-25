@@ -1,7 +1,7 @@
 # 🌿 Sistema Digital de Recolección Materia Prima - ProteinAgro
 > **Documento Integral del Proyecto en Markdown**  
-> **Versión Actual:** `v=1.9.12`  
-> **Última Actualización:** 23 de Noviembre 2026  
+> **Versión Actual:** `v=1.9.13`  
+> **Última Actualización:** 25 de Noviembre 2026  
 > **Despliegue de Producción:** [https://proteinagro-app.vercel.app](https://proteinagro-app.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Tecnologia100/proteinagro-app](https://github.com/Tecnologia100/proteinagro-app)  
 
@@ -1178,3 +1178,12 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
 - **Cobertura (`Code.gs`):** Constante `LISTA_PRECIOS2_NOV23_2026` con **103 filas** (18 proveedores, incluyendo `Ciudad del Campo` general en ambas Rutas 2 + sedes `Granahorrar`, `Surtimercar`, `Punto Rojo`; omitiendo `Jairo Varela` hasta confirmar ruta). `Districarnes LG` y `La Cosecha de Mi Tierra` actualizan solo `HUESO BLANCO = $200`; los otros 16 actualizan `HUESO BLANCO = $200` y `HUESO DE CERDO = $200`.
 - **Inactivación de `ACEITE` y Retiro 2027:** `Carnicos La Fama` y `Yénifer Díaz (Villagorgona)` marcan `ACEITE` como `Inactivo` (incluyendo fila previa `2026-01-01` cuando `hoy >= 2026-11-23`). Los 7 proveedores de `Retirar desde enero 2027` conservan `Activo` hoy con nota en `Observaciones`.
 - **Menú y Webhook:** `action=aplicarListaPrecios2Nov23` y menú `📊 Conciliador > 📅 Cargar Lista de Precios 2 (23/Nov/2026)` 100% idempotentes con respaldo `Tarifas_Backup_PreLista2_YYYYMMDD`.
+
+---
+
+### 50. Unificación de Versiones y Sincronización Total de Badges PWA (v1.9.13)
+- **Diagnóstico:** En v1.9.11 y v1.9.12 se actualizaron el Service Worker y el bundle JS/CSS, pero se omitió actualizar las etiquetas visibles de versión en `index.html` (líneas 67, 151, 154, 481, 484 y 761) y las URLs de redirección forzada en `app.js` (`forzarActualizacionApp`), las cuales continuaban apuntando a `v1.9.10`.
+- **Solución Aplicada:**
+  - `index.html`: Badges de cabecera de Conductor y Administrador, botón de acceso, footer y tags de versión unificados a `v1.9.13`.
+  - `app.js`: Redirección en `forzarActualizacionApp`, recarga diferida post-comprobante y registro de Service Worker alineados a `?v=1.9.13`.
+  - `sw.js`: Bumping de caché a `proteinagro-v1.9.13` para forzar la purga y activación inmediata en todos los dispositivos de campo y cabina.
