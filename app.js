@@ -535,6 +535,10 @@ const entrarComoConductor = (nombre = null) => {
             sessionStorage.setItem('proteinagro_current_driver', cleanNombre);
             sessionStorage.setItem('proteinagro_role', 'conductor');
         } catch(e) {}
+        try {
+            localStorage.setItem('proteinagro_current_driver', cleanNombre);
+            localStorage.setItem('proteinagro_role', 'conductor');
+        } catch(e) {}
 
         const select = document.getElementById('conductor');
         if (select) {
@@ -710,9 +714,41 @@ const logout = () => {
         sessionStorage.removeItem('proteinagro_current_driver');
         sessionStorage.removeItem('proteinagro_role');
     } catch(e) {}
+    try {
+        localStorage.removeItem('proteinagro_current_driver');
+        localStorage.removeItem('proteinagro_role');
+    } catch(e) {}
+    if (typeof limpiarBorradorRecoleccionEnCurso === 'function') {
+        limpiarBorradorRecoleccionEnCurso();
+    }
+    try {
+        isRestoringOrResettingDraft = true;
+        isCameraCaptureInProgress = false;
+        lastCameraOpenTimestamp = 0;
+        if (typeof collectedProducts !== 'undefined') collectedProducts = [];
+        currentProduct = null;
+        if (typeof renderAddedProducts === 'function') renderAddedProducts();
+        const formRec = document.getElementById('recoleccion-form');
+        if (formRec) formRec.reset();
+        if (typeof limpiarCamposFacturaCaribe === 'function') limpiarCamposFacturaCaribe();
+        if (typeof actualizarVisibilidadFacturaCaribe === 'function') actualizarVisibilidadFacturaCaribe();
+        if (typeof limpiarFotoEvidenciaPesaje === 'function') limpiarFotoEvidenciaPesaje();
+        if (typeof capturedNovedadPhoto !== 'undefined') capturedNovedadPhoto = null;
+        if (typeof hasSignatureDrawn !== 'undefined') hasSignatureDrawn = false;
+        if (typeof ctx !== 'undefined' && ctx && typeof canvas !== 'undefined' && canvas) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        if (typeof resetearDropdownSucursal === 'function') {
+            resetearDropdownSucursal('Primero seleccione un proveedor');
+        }
+    } catch(e) {} finally {
+        isRestoringOrResettingDraft = false;
+    }
 
     const modalTarifas = document.getElementById('modal-gestion-tarifas');
     if (modalTarifas) modalTarifas.style.display = 'none';
+    const modalNov = document.getElementById('modal-novedad');
+    if (modalNov) modalNov.style.display = 'none';
 
     loginOverlay.style.display = 'flex';
     driverView.style.display = 'none';
@@ -2087,7 +2123,15 @@ function renderDynamicDrivers(drivers) {
             select.appendChild(opt);
         });
         if (currentVal) {
-            select.value = aNombrePropio(currentVal);
+            const cleanCurrent = aNombrePropio(currentVal);
+            select.value = cleanCurrent;
+            if (!select.value) {
+                const optMissing = document.createElement('option');
+                optMissing.value = cleanCurrent;
+                optMissing.textContent = cleanCurrent;
+                select.appendChild(optMissing);
+                select.value = cleanCurrent;
+            }
             if (CURRENT_LOGGED_DRIVER) {
                 select.setAttribute('disabled', 'disabled');
                 select.classList.add('driver-locked');
@@ -2149,10 +2193,27 @@ function renderDynamicRoutes(routes) {
     select.appendChild(optOtra);
     if (currentVal) {
         select.value = currentVal;
+        if (!select.value && currentVal !== 'OTRA') {
+            const keyTarget = normalizarClaveRuta(currentVal);
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value && select.options[i].value !== 'OTRA' &&
+                    normalizarClaveRuta(select.options[i].value) === keyTarget) {
+                    select.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+        if (!select.value && currentVal !== 'OTRA') {
+            const optKeep = document.createElement('option');
+            optKeep.value = currentVal;
+            optKeep.textContent = currentVal;
+            select.insertBefore(optKeep, optOtra);
+            select.value = currentVal;
+        }
     }
     const activeProv = document.getElementById('proveedor')?.value || '';
     if (activeProv && activeProv !== 'OTRO' && activeProv !== 'TODOS') {
-        populardropdownSucursales(activeProv);
+        populardropdownSucursales(activeProv, true);
     } else {
         resetearDropdownSucursal();
     }
@@ -2225,7 +2286,7 @@ function procesarPuntosRutasDinamicos(puntosArray) {
     populardropdownProveedoresPorRuta(activeRuta);
     const activeProv = document.getElementById('proveedor')?.value || '';
     if (activeProv && activeProv !== 'OTRO' && activeProv !== 'TODOS') {
-        populardropdownSucursales(activeProv);
+        populardropdownSucursales(activeProv, true);
     } else {
         resetearDropdownSucursal();
     }
@@ -2762,7 +2823,11 @@ async function cargarCatalogosDinamicos() {
         }
     } catch(e) {}
 
-    renderDynamicProducts(DEFAULT_PRODUCTOS);
+    if (typeof actualizarCatalogoProductosSegunSeleccion === 'function') {
+        actualizarCatalogoProductosSegunSeleccion();
+    } else {
+        renderDynamicProducts(DEFAULT_PRODUCTOS);
+    }
     renderDynamicDrivers(fallbackDrivers);
     renderDynamicRoutes(DEFAULT_RUTAS);
 }
@@ -2829,6 +2894,9 @@ btnRegistrarProducto.addEventListener('click', () => {
     kilosInput.value = '';
     actualizarInterfazUnidadProducto(null);
     if (kilosGroup) kilosGroup.style.display = 'none';
+    if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+        guardarBorradorRecoleccionEnCurso();
+    }
 });
 
 function renderAddedProducts() {
@@ -2863,6 +2931,149 @@ function renderAddedProducts() {
 // MÓDULO: CAPTURA DE FACTURA FÍSICA EN SITIO Y CONCILIACIÓN CARIBE (v1.8.1)
 // ==============================================================================
 let capturedFacturaPhoto = null;
+let capturedNovedadPhoto = null;
+let isCameraCaptureInProgress = false;
+let lastCameraOpenTimestamp = 0;
+let cameraCaptureResetTimer = null;
+
+function marcarCapturaCamaraActiva(activa, targetName = '') {
+    if (cameraCaptureResetTimer) {
+        clearTimeout(cameraCaptureResetTimer);
+        cameraCaptureResetTimer = null;
+    }
+    if (activa) {
+        isCameraCaptureInProgress = true;
+        lastCameraOpenTimestamp = Date.now();
+        if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+            guardarBorradorRecoleccionEnCurso(targetName);
+        }
+    } else {
+        cameraCaptureResetTimer = setTimeout(() => {
+            isCameraCaptureInProgress = false;
+            cameraCaptureResetTimer = null;
+        }, 15000);
+    }
+}
+
+function comprimirImagenDesdeArchivo(file, maxDim = 1024, quality = 0.70) {
+    if (!file) return Promise.reject(new Error('Archivo de imagen no válido'));
+
+    const procesarImagenEnCanvas = (img) => {
+        const canvasEl = document.createElement('canvas');
+        let width = img.naturalWidth || img.width || 0;
+        let height = img.naturalHeight || img.height || 0;
+        if (width <= 0 || height <= 0) {
+            throw new Error('Dimensiones de imagen inválidas');
+        }
+        if (width > height) {
+            if (width > maxDim) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+            }
+        } else {
+            if (height > maxDim) {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+            }
+        }
+        canvasEl.width = width;
+        canvasEl.height = height;
+        const cCtx = canvasEl.getContext('2d');
+        cCtx.drawImage(img, 0, 0, width, height);
+        const compressed = canvasEl.toDataURL('image/jpeg', quality);
+        canvasEl.width = 0;
+        canvasEl.height = 0;
+        return compressed;
+    };
+
+    // Ruta óptima sin Base64 gigante en RAM: URL.createObjectURL + limpieza inmediata
+    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        return new Promise((resolve, reject) => {
+            const objectUrl = URL.createObjectURL(file);
+            const img = new Image();
+            const limpiarRecursos = () => {
+                try { URL.revokeObjectURL(objectUrl); } catch (e) {}
+                img.onload = null;
+                img.onerror = null;
+                img.src = '';
+            };
+            img.onload = () => {
+                try {
+                    const out = procesarImagenEnCanvas(img);
+                    limpiarRecursos();
+                    resolve(out);
+                } catch (errCanvas) {
+                    limpiarRecursos();
+                    reject(errCanvas);
+                }
+            };
+            img.onerror = () => {
+                limpiarRecursos();
+                reject(new Error('No se pudo cargar la fotografía capturada'));
+            };
+            img.src = objectUrl;
+        });
+    }
+
+    // Fallback para entornos sin URL.createObjectURL
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Error leyendo archivo de imagen'));
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    const out = procesarImagenEnCanvas(img);
+                    img.onload = null;
+                    img.onerror = null;
+                    img.src = '';
+                    resolve(out);
+                } catch (errCanvas) {
+                    reject(errCanvas);
+                }
+            };
+            img.onerror = () => reject(new Error('No se pudo decodificar la imagen'));
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function aplicarFotoEnInterfaz(tipo, dataUrl) {
+    if (tipo === 'factura') {
+        capturedFacturaPhoto = dataUrl || null;
+        const fotoInput = document.getElementById('factura-foto-input');
+        const previewBox = document.getElementById('factura-foto-preview-box');
+        const previewImg = document.getElementById('factura-foto-preview');
+        const btnCam = document.getElementById('btn-capturar-factura');
+        if (!capturedFacturaPhoto && fotoInput) fotoInput.value = '';
+        if (previewImg) previewImg.src = capturedFacturaPhoto || '';
+        if (previewBox) previewBox.style.display = capturedFacturaPhoto ? 'block' : 'none';
+        if (btnCam) btnCam.style.display = capturedFacturaPhoto ? 'none' : 'flex';
+    } else if (tipo === 'evidencia') {
+        capturedSoportePhoto = dataUrl || null;
+        const fotoInput = document.getElementById('evidencia-foto-input');
+        const previewBox = document.getElementById('evidencia-foto-preview-box');
+        const previewImg = document.getElementById('evidencia-foto-preview');
+        const btnCam = document.getElementById('btn-capturar-evidencia');
+        const badge = document.getElementById('evidencia-tipo-badge');
+        if (!capturedSoportePhoto && fotoInput) fotoInput.value = '';
+        if (badge) badge.textContent = capturedSoporteTipo;
+        if (previewImg) previewImg.src = capturedSoportePhoto || '';
+        if (previewBox) previewBox.style.display = capturedSoportePhoto ? 'block' : 'none';
+        if (btnCam) btnCam.style.display = capturedSoportePhoto ? 'none' : 'flex';
+    } else if (tipo === 'novedad') {
+        capturedNovedadPhoto = dataUrl || null;
+        const fotoInput = document.getElementById('novedad-foto-input');
+        const previewBox = document.getElementById('novedad-preview-box');
+        const previewImg = document.getElementById('novedad-preview-img');
+        const btnTomarFoto = document.getElementById('btn-tomar-foto-novedad');
+        if (!capturedNovedadPhoto && fotoInput) fotoInput.value = '';
+        if (previewImg) previewImg.src = capturedNovedadPhoto || '';
+        if (previewBox) previewBox.style.display = capturedNovedadPhoto ? 'block' : 'none';
+        if (btnTomarFoto) btnTomarFoto.style.display = capturedNovedadPhoto ? 'none' : 'flex';
+    }
+}
 
 // Tarifas oficiales de referencia para Caribe vigentes hasta el 2026-11-22 (alerta en vivo de discrepancia)
 const TARIFAS_REFERENCIA_CARIBE = {
@@ -3027,20 +3238,12 @@ function evaluarDiscrepanciaFacturaCaribe() {
 function limpiarCamposFacturaCaribe() {
     const numInput = document.getElementById('factura-numero');
     const valInput = document.getElementById('factura-valor');
-    const fotoInput = document.getElementById('factura-foto-input');
-    const previewBox = document.getElementById('factura-foto-preview-box');
-    const previewImg = document.getElementById('factura-foto-preview');
-    const btnCam = document.getElementById('btn-capturar-factura');
     const alertBox = document.getElementById('factura-discrepancia-alert');
 
     if (numInput) numInput.value = '';
     if (valInput) valInput.value = '';
-    if (fotoInput) fotoInput.value = '';
-    if (previewBox) previewBox.style.display = 'none';
-    if (previewImg) previewImg.src = '';
-    if (btnCam) btnCam.style.display = 'flex';
     if (alertBox) alertBox.style.display = 'none';
-    capturedFacturaPhoto = null;
+    aplicarFotoEnInterfaz('factura', null);
 }
 
 function actualizarVisibilidadFacturaCaribe() {
@@ -3063,56 +3266,37 @@ function actualizarVisibilidadFacturaCaribe() {
 document.getElementById('factura-valor')?.addEventListener('input', evaluarDiscrepanciaFacturaCaribe);
 document.getElementById('sucursal')?.addEventListener('change', evaluarDiscrepanciaFacturaCaribe);
 document.getElementById('btn-capturar-factura')?.addEventListener('click', () => {
-    document.getElementById('factura-foto-input')?.click();
+    marcarCapturaCamaraActiva(true, 'factura');
+    const fotoInput = document.getElementById('factura-foto-input');
+    if (fotoInput) {
+        fotoInput.value = '';
+        fotoInput.click();
+    }
 });
 document.getElementById('btn-eliminar-foto-factura')?.addEventListener('click', () => {
-    capturedFacturaPhoto = null;
-    const fotoInput = document.getElementById('factura-foto-input');
-    const previewBox = document.getElementById('factura-foto-preview-box');
-    const previewImg = document.getElementById('factura-foto-preview');
-    const btnCam = document.getElementById('btn-capturar-factura');
-    if (fotoInput) fotoInput.value = '';
-    if (previewBox) previewBox.style.display = 'none';
-    if (previewImg) previewImg.src = '';
-    if (btnCam) btnCam.style.display = 'flex';
+    aplicarFotoEnInterfaz('factura', null);
+    if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+        guardarBorradorRecoleccionEnCurso();
+    }
 });
-document.getElementById('factura-foto-input')?.addEventListener('change', (event) => {
+document.getElementById('factura-foto-input')?.addEventListener('change', async (event) => {
     const file = event.target.files && event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const img = new Image();
-        img.onload = function() {
-            const canvas = document.createElement('canvas');
-            const maxDim = 1024;
-            let width = img.width;
-            let height = img.height;
-            if (width > height) {
-                if (width > maxDim) {
-                    height = Math.round((height * maxDim) / width);
-                    width = maxDim;
-                }
-            } else {
-                if (height > maxDim) {
-                    width = Math.round((width * maxDim) / height);
-                    height = maxDim;
-                }
-            }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            capturedFacturaPhoto = canvas.toDataURL('image/jpeg', 0.70);
-            const previewImg = document.getElementById('factura-foto-preview');
-            const previewBox = document.getElementById('factura-foto-preview-box');
-            const btnCam = document.getElementById('btn-capturar-factura');
-            if (previewImg) previewImg.src = capturedFacturaPhoto;
-            if (previewBox) previewBox.style.display = 'block';
-            if (btnCam) btnCam.style.display = 'none';
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    if (!file) {
+        marcarCapturaCamaraActiva(false);
+        return;
+    }
+    try {
+        const compressedDataUrl = await comprimirImagenDesdeArchivo(file, 1024, 0.70);
+        aplicarFotoEnInterfaz('factura', compressedDataUrl);
+        if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+            guardarBorradorRecoleccionEnCurso();
+        }
+    } catch (errFoto) {
+        console.warn('⚠️ Error procesando foto de factura:', errFoto);
+        alert('No se pudo procesar la fotografía de la factura. Por favor intente nuevamente.');
+    } finally {
+        marcarCapturaCamaraActiva(false);
+    }
 });
 
 // ==============================================================================
@@ -3130,77 +3314,60 @@ function inicializarModuloEvidenciaPesaje() {
             capturedSoporteTipo = btn.getAttribute('data-tipo') || 'Báscula / Reloj';
             const badge = document.getElementById('evidencia-tipo-badge');
             if (badge) badge.textContent = capturedSoporteTipo;
+            if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+                guardarBorradorRecoleccionEnCurso();
+            }
         });
     });
 
     document.getElementById('btn-capturar-evidencia')?.addEventListener('click', () => {
-        document.getElementById('evidencia-foto-input')?.click();
+        marcarCapturaCamaraActiva(true, 'evidencia');
+        const fotoInput = document.getElementById('evidencia-foto-input');
+        if (fotoInput) {
+            fotoInput.value = '';
+            fotoInput.click();
+        }
     });
 
     document.getElementById('btn-eliminar-foto-evidencia')?.addEventListener('click', () => {
         limpiarFotoEvidenciaPesaje();
+        if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+            guardarBorradorRecoleccionEnCurso();
+        }
     });
 
-    document.getElementById('evidencia-foto-input')?.addEventListener('change', (event) => {
+    document.getElementById('evidencia-foto-input')?.addEventListener('change', async (event) => {
         const file = event.target.files && event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                const canvasEl = document.createElement('canvas');
-                const maxDim = 1024;
-                let width = img.width;
-                let height = img.height;
-                if (width > height) {
-                    if (width > maxDim) {
-                        height = Math.round((height * maxDim) / width);
-                        width = maxDim;
-                    }
-                } else {
-                    if (height > maxDim) {
-                        width = Math.round((width * maxDim) / height);
-                        height = maxDim;
-                    }
-                }
-                canvasEl.width = width;
-                canvasEl.height = height;
-                const cCtx = canvasEl.getContext('2d');
-                cCtx.drawImage(img, 0, 0, width, height);
-                capturedSoportePhoto = canvasEl.toDataURL('image/jpeg', 0.70);
-
-                const previewImg = document.getElementById('evidencia-foto-preview');
-                const previewBox = document.getElementById('evidencia-foto-preview-box');
-                const btnCam = document.getElementById('btn-capturar-evidencia');
-                const badge = document.getElementById('evidencia-tipo-badge');
-
-                if (badge) badge.textContent = capturedSoporteTipo;
-                if (previewImg) previewImg.src = capturedSoportePhoto;
-                if (previewBox) previewBox.style.display = 'block';
-                if (btnCam) btnCam.style.display = 'none';
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+        if (!file) {
+            marcarCapturaCamaraActiva(false);
+            return;
+        }
+        try {
+            const compressedDataUrl = await comprimirImagenDesdeArchivo(file, 1024, 0.70);
+            aplicarFotoEnInterfaz('evidencia', compressedDataUrl);
+            if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+                guardarBorradorRecoleccionEnCurso();
+            }
+        } catch (errEvid) {
+            console.warn('⚠️ Error procesando foto de evidencia:', errEvid);
+            alert('No se pudo procesar la fotografía de evidencia. Por favor intente nuevamente.');
+        } finally {
+            marcarCapturaCamaraActiva(false);
+        }
     });
 }
 
 function limpiarFotoEvidenciaPesaje() {
-    capturedSoportePhoto = null;
-    const fotoInput = document.getElementById('evidencia-foto-input');
-    const previewBox = document.getElementById('evidencia-foto-preview-box');
-    const previewImg = document.getElementById('evidencia-foto-preview');
-    const btnCam = document.getElementById('btn-capturar-evidencia');
-    if (fotoInput) fotoInput.value = '';
-    if (previewBox) previewBox.style.display = 'none';
-    if (previewImg) previewImg.src = '';
-    if (btnCam) btnCam.style.display = 'flex';
+    aplicarFotoEnInterfaz('evidencia', null);
 }
 
 window.eliminarProductoRegistrado = function(index) {
     if (index >= 0 && index < collectedProducts.length) {
         collectedProducts.splice(index, 1);
         renderAddedProducts();
+        if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+            guardarBorradorRecoleccionEnCurso();
+        }
     }
 };
 
@@ -3744,6 +3911,11 @@ async function ejecutarGuardadoRecoleccion(dataParams, nombreEntregado) {
         actualizarVisibilidadFacturaCaribe();
         limpiarFotoEvidenciaPesaje();
         pendingRecoleccionData = null;
+        isCameraCaptureInProgress = false;
+        lastCameraOpenTimestamp = 0;
+        if (typeof limpiarBorradorRecoleccionEnCurso === 'function') {
+            limpiarBorradorRecoleccionEnCurso();
+        }
 
         // Mostrar Comprobante Digital Modal al conductor e información del recibo
         mostrarComprobanteDigital({ ...data, firma: firmaURL, id: recordId });
@@ -5285,7 +5457,7 @@ function getProveedoresParaRuta(rutaSeleccionada) {
 function populardropdownSucursalesPorRuta(rutaSeleccionada) {
     const provSel = document.getElementById('proveedor')?.value;
     if (provSel && provSel !== 'TODOS' && provSel !== 'OTRO') {
-        populardropdownSucursales(provSel);
+        populardropdownSucursales(provSel, true);
     } else {
         resetearDropdownSucursal("Primero seleccione un proveedor");
     }
@@ -5313,9 +5485,11 @@ function actualizarItinerarioDelDia() {
     bannerText.innerHTML = `📅 <strong>Hoy es ${hoyNombre}:</strong> ${itinHoy}`;
 }
 
-function populardropdownSucursales(proveedorSeleccionado) {
+function populardropdownSucursales(proveedorSeleccionado, preservarSeleccionPrevia = false) {
     const sucursalSelect = document.getElementById('sucursal');
     if (!sucursalSelect) return;
+
+    const valorPrevioSucursal = preservarSeleccionPrevia ? (sucursalSelect.value || '') : '';
 
     if (!proveedorSeleccionado || proveedorSeleccionado === 'TODOS') {
         resetearDropdownSucursal("Primero seleccione un proveedor");
@@ -5356,6 +5530,36 @@ function populardropdownSucursales(proveedorSeleccionado) {
     optOtra.value = 'OTRA_SUCURSAL';
     optOtra.textContent = '➕ Otro Punto / Sucursal...';
     sucursalSelect.appendChild(optOtra);
+
+    if (preservarSeleccionPrevia && valorPrevioSucursal) {
+        let restored = false;
+        for (let i = 0; i < sucursalSelect.options.length; i++) {
+            if (sucursalSelect.options[i].value === valorPrevioSucursal) {
+                sucursalSelect.selectedIndex = i;
+                restored = true;
+                break;
+            }
+        }
+        if (!restored && valorPrevioSucursal !== 'OTRA_SUCURSAL') {
+            const targetNorm = normalizarClaveTarifa(valorPrevioSucursal);
+            for (let i = 0; i < sucursalSelect.options.length; i++) {
+                if (sucursalSelect.options[i].value && sucursalSelect.options[i].value !== 'OTRA_SUCURSAL' &&
+                    normalizarClaveTarifa(sucursalSelect.options[i].value) === targetNorm) {
+                    sucursalSelect.selectedIndex = i;
+                    restored = true;
+                    break;
+                }
+            }
+        }
+        if (!restored) {
+            const optExtra = document.createElement('option');
+            optExtra.value = valorPrevioSucursal;
+            optExtra.textContent = valorPrevioSucursal;
+            sucursalSelect.insertBefore(optExtra, optOtra);
+            sucursalSelect.value = valorPrevioSucursal;
+        }
+    }
+
     actualizarCatalogoProductosSegunSeleccion();
 }
 
@@ -5490,13 +5694,33 @@ function populardropdownProveedoresPorRuta(rutaSeleccionada, mostrandoTodos = fa
     optOtro.textContent = '➕ Otro Proveedor No Listado...';
     proveedorSelect.appendChild(optOtro);
 
-    // Restaurar valor previo si aún es válido
+    // Restaurar valor previo si aún es válido (con respaldo normalizado para sincronizaciones asíncronas)
     if (valorPrevio && valorPrevio !== 'TODOS') {
+        let matched = false;
         for (let i = 0; i < proveedorSelect.options.length; i++) {
             if (proveedorSelect.options[i].value === valorPrevio) {
                 proveedorSelect.selectedIndex = i;
+                matched = true;
                 break;
             }
+        }
+        if (!matched && valorPrevio !== 'OTRO') {
+            const targetNorm = norm(valorPrevio);
+            for (let i = 0; i < proveedorSelect.options.length; i++) {
+                const v = proveedorSelect.options[i].value;
+                if (v && v !== 'OTRO' && norm(v) === targetNorm) {
+                    proveedorSelect.selectedIndex = i;
+                    matched = true;
+                    break;
+                }
+            }
+        }
+        if (!matched) {
+            const optExtra = document.createElement('option');
+            optExtra.value = valorPrevio;
+            optExtra.textContent = valorPrevio;
+            proveedorSelect.insertBefore(optExtra, optOtro);
+            proveedorSelect.value = valorPrevio;
         }
     }
 }
@@ -5661,7 +5885,7 @@ document.getElementById('btn-close-receipt')?.addEventListener('click', () => {
     if (typeof pendingAppReloadAfterSave !== 'undefined' && pendingAppReloadAfterSave) {
         if (typeof tieneCapturaActivaSinGuardar !== 'function' || !tieneCapturaActivaSinGuardar()) {
             pendingAppReloadAfterSave = false;
-            window.location.href = window.location.origin + window.location.pathname + '?v=1.9.13&t=' + Date.now();
+            window.location.href = window.location.origin + window.location.pathname + '?v=1.9.14&t=' + Date.now();
         }
     }
 });
@@ -5737,7 +5961,7 @@ window.forzarActualizacionApp = async function() {
     } catch (err) {
         console.warn('Error limpiando caché:', err);
     }
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.13&t=' + Date.now();
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.14&t=' + Date.now();
 };
 
 // ==============================================================================
@@ -6662,7 +6886,7 @@ function initNovedadesModal() {
 
     if (!btnAbrirModal || !modal || !formNovedad) return;
 
-    let capturedNovedadPhoto = null;
+    capturedNovedadPhoto = capturedNovedadPhoto || null;
 
     const actualizarVistaEvidenciaSegunCausal = (causal) => {
         const ayudaFoto = document.getElementById('novedad-foto-ayuda');
@@ -6705,6 +6929,9 @@ function initNovedadesModal() {
     const cerrarModal = () => {
         modal.style.display = 'none';
         actualizarVistaEvidenciaSegunCausal('');
+        if (!isRestoringOrResettingDraft && typeof guardarBorradorRecoleccionEnCurso === 'function') {
+            guardarBorradorRecoleccionEnCurso();
+        }
     };
 
     btnCerrar?.addEventListener('click', cerrarModal);
@@ -6812,59 +7039,44 @@ function initNovedadesModal() {
 
         // Abrir modal
         modal.style.display = 'flex';
+        if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+            guardarBorradorRecoleccionEnCurso();
+        }
     });
 
     // Control de Captura de Fotografía
+    const abrirCamaraNovedad = () => {
+        marcarCapturaCamaraActiva(true, 'novedad');
+        if (fotoInput) {
+            fotoInput.value = '';
+            fotoInput.click();
+        }
+    };
     if (btnTomarFoto) {
-        btnTomarFoto.addEventListener('click', () => {
-            fotoInput?.click();
-        });
+        btnTomarFoto.addEventListener('click', abrirCamaraNovedad);
     }
     if (btnCambiarFoto) {
-        btnCambiarFoto.addEventListener('click', () => {
-            fotoInput?.click();
-        });
+        btnCambiarFoto.addEventListener('click', abrirCamaraNovedad);
     }
 
-    fotoInput?.addEventListener('change', (event) => {
+    fotoInput?.addEventListener('change', async (event) => {
         const file = event.target.files && event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                // Compresión inteligente en canvas: máximo 960px y JPEG calidad 0.72 (~80-120 KB)
-                const canvas = document.createElement('canvas');
-                const maxDim = 960;
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height) {
-                    if (width > maxDim) {
-                        height = Math.round((height * maxDim) / width);
-                        width = maxDim;
-                    }
-                } else {
-                    if (height > maxDim) {
-                        width = Math.round((width * maxDim) / height);
-                        height = maxDim;
-                    }
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                capturedNovedadPhoto = canvas.toDataURL('image/jpeg', 0.72);
-                if (previewImg) previewImg.src = capturedNovedadPhoto;
-                if (previewBox) previewBox.style.display = 'block';
-                if (btnTomarFoto) btnTomarFoto.style.display = 'none';
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+        if (!file) {
+            marcarCapturaCamaraActiva(false);
+            return;
+        }
+        try {
+            const compressedDataUrl = await comprimirImagenDesdeArchivo(file, 960, 0.72);
+            aplicarFotoEnInterfaz('novedad', compressedDataUrl);
+            if (typeof guardarBorradorRecoleccionEnCurso === 'function') {
+                guardarBorradorRecoleccionEnCurso();
+            }
+        } catch (errNov) {
+            console.warn('⚠️ Error procesando foto de novedad:', errNov);
+            alert('No se pudo procesar la fotografía de la novedad. Por favor intente nuevamente.');
+        } finally {
+            marcarCapturaCamaraActiva(false);
+        }
     });
 
     // Envío del Formulario de Novedad
@@ -7024,17 +7236,28 @@ function initNovedadesModal() {
                 console.warn("⚠️ Firestore demoró o falló, novedad respaldada en local y Sheets:", fsErr);
             }
 
-            // Cerrar modal de novedad
-            cerrarModal();
+            // Cerrar modal de novedad y limpiar borrador
+            isRestoringOrResettingDraft = true;
+            try {
+                aplicarFotoEnInterfaz('novedad', null);
+                cerrarModal();
 
-            // Limpiar selector de punto y proveedor en formulario principal para el siguiente cliente
-            resetearDropdownSucursal("Primero seleccione un proveedor");
-            const provSelect = document.getElementById('proveedor');
-            if (provSelect) provSelect.selectedIndex = 0;
-            const customProvGroup = document.getElementById('custom-proveedor-group');
-            if (customProvGroup) customProvGroup.style.display = 'none';
-            const customSucGroup = document.getElementById('custom-sucursal-group');
-            if (customSucGroup) customSucGroup.style.display = 'none';
+                // Limpiar selector de punto y proveedor en formulario principal para el siguiente cliente
+                resetearDropdownSucursal("Primero seleccione un proveedor");
+                const provSelect = document.getElementById('proveedor');
+                if (provSelect) provSelect.selectedIndex = 0;
+                const customProvGroup = document.getElementById('custom-proveedor-group');
+                if (customProvGroup) customProvGroup.style.display = 'none';
+                const customSucGroup = document.getElementById('custom-sucursal-group');
+                if (customSucGroup) customSucGroup.style.display = 'none';
+                limpiarCamposFacturaCaribe();
+                actualizarVisibilidadFacturaCaribe();
+                isCameraCaptureInProgress = false;
+                lastCameraOpenTimestamp = 0;
+                limpiarBorradorRecoleccionEnCurso();
+            } finally {
+                isRestoringOrResettingDraft = false;
+            }
 
             // Mostrar Comprobante Digital Modal al conductor con opción de WhatsApp
             mostrarComprobanteDigital({ ...dataNovedad });
@@ -7051,12 +7274,448 @@ function initNovedadesModal() {
 }
 
 // ==============================================================================
-// PROTECCIÓN CONTRA RECARGA PWA DURANTE CAPTURA ACTIVA DEL CONDUCTOR (v1.9.10)
+// PERSISTENCIA AUTOMÁTICA DE BORRADOR Y BLINDAJE ANTI-REINICIO EN CÁMARA (v1.9.14)
+// ==============================================================================
+const PROTEINAGRO_DRAFT_STORAGE_KEY = 'proteinagro_draft_recoleccion';
+const PROTEINAGRO_DRAFT_TTL_MS = 12 * 60 * 60 * 1000;
+let draftSaveDebounceTimer = null;
+let isRestoringOrResettingDraft = false;
+let draftRestoredThisBoot = false;
+
+function limpiarBorradorRecoleccionEnCurso() {
+    if (draftSaveDebounceTimer) {
+        clearTimeout(draftSaveDebounceTimer);
+        draftSaveDebounceTimer = null;
+    }
+    try {
+        localStorage.removeItem(PROTEINAGRO_DRAFT_STORAGE_KEY);
+    } catch (e) {}
+}
+
+function programarGuardadoBorradorRecoleccion(delayMs = 250) {
+    if (isRestoringOrResettingDraft) return;
+    if (draftSaveDebounceTimer) clearTimeout(draftSaveDebounceTimer);
+    draftSaveDebounceTimer = setTimeout(() => {
+        draftSaveDebounceTimer = null;
+        guardarBorradorRecoleccionEnCurso();
+    }, delayMs);
+}
+
+function guardarBorradorRecoleccionEnCurso(cameraTarget = '') {
+    if (isRestoringOrResettingDraft) return false;
+    try {
+        const drvView = document.getElementById('driver-view');
+        const driverActivo = CURRENT_LOGGED_DRIVER ||
+            sessionStorage.getItem('proteinagro_current_driver') ||
+            localStorage.getItem('proteinagro_current_driver') || '';
+        if (!driverActivo) return false;
+        if (drvView && (drvView.style.display === 'none' || window.getComputedStyle(drvView).display === 'none')) {
+            return false;
+        }
+
+        const rutaVal = document.getElementById('ruta')?.value || '';
+        const customRutaVal = document.getElementById('custom-ruta')?.value || '';
+        const provVal = document.getElementById('proveedor')?.value || '';
+        const customProvVal = document.getElementById('custom-proveedor')?.value || '';
+        const sucVal = document.getElementById('sucursal')?.value || '';
+        const customSucVal = document.getElementById('custom-sucursal')?.value || '';
+        const kilosVal = document.getElementById('kilos')?.value || '';
+        const facturaNumVal = document.getElementById('factura-numero')?.value || '';
+        const facturaVal = document.getElementById('factura-valor')?.value || '';
+        const obsVal = document.getElementById('observaciones')?.value || '';
+
+        const modalNov = document.getElementById('modal-novedad');
+        const novedadAbierta = Boolean(modalNov && modalNov.style.display !== 'none' && modalNov.style.display !== '');
+        const novedadCausal = document.getElementById('novedad-causal')?.value || '';
+        const novedadObs = document.getElementById('novedad-observaciones')?.value || '';
+
+        const tieneContenido = Boolean(
+            rutaVal ||
+            (provVal && provVal !== 'TODOS') ||
+            sucVal ||
+            customRutaVal.trim() ||
+            customProvVal.trim() ||
+            customSucVal.trim() ||
+            (Array.isArray(collectedProducts) && collectedProducts.length > 0) ||
+            currentProduct ||
+            kilosVal.trim() ||
+            facturaNumVal.trim() ||
+            facturaVal.trim() ||
+            obsVal.trim() ||
+            capturedFacturaPhoto ||
+            capturedSoportePhoto ||
+            capturedNovedadPhoto ||
+            novedadAbierta ||
+            cameraTarget
+        );
+
+        if (!tieneContenido) {
+            limpiarBorradorRecoleccionEnCurso();
+            return false;
+        }
+
+        const draft = {
+            version: 1,
+            updatedAt: Date.now(),
+            cameraTarget: cameraTarget || '',
+            conductor: aNombrePropio(driverActivo),
+            ruta: rutaVal,
+            customRuta: customRutaVal,
+            proveedor: provVal,
+            customProveedor: customProvVal,
+            sucursal: sucVal,
+            customSucursal: customSucVal,
+            mostrarTodosProductos: typeof MOSTRAR_TODOS_LOS_PRODUCTOS !== 'undefined' ? Boolean(MOSTRAR_TODOS_LOS_PRODUCTOS) : false,
+            collectedProducts: Array.isArray(collectedProducts) ? collectedProducts.map(p => ({ ...p })) : [],
+            currentProduct: currentProduct || null,
+            kilos: kilosVal,
+            facturaNumero: facturaNumVal,
+            facturaValor: facturaVal,
+            observaciones: obsVal,
+            capturedSoporteTipo: capturedSoporteTipo || 'Báscula / Reloj',
+            capturedFacturaPhoto: capturedFacturaPhoto || null,
+            capturedSoportePhoto: capturedSoportePhoto || null,
+            novedadModalOpen: novedadAbierta,
+            novedadCausal: novedadCausal,
+            novedadObs: novedadObs,
+            capturedNovedadPhoto: capturedNovedadPhoto || null
+        };
+
+        try {
+            localStorage.setItem(PROTEINAGRO_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+            return true;
+        } catch (quotaErr) {
+            console.warn('⚠️ Cuota localStorage alcanzada al respaldar fotos en borrador; guardando campos y materias sin fotos:', quotaErr);
+            const draftSinFotos = {
+                ...draft,
+                capturedFacturaPhoto: null,
+                capturedSoportePhoto: null,
+                capturedNovedadPhoto: null,
+                fotosOmitidasPorCuota: true
+            };
+            try {
+                localStorage.setItem(PROTEINAGRO_DRAFT_STORAGE_KEY, JSON.stringify(draftSinFotos));
+                return true;
+            } catch (e2) {
+                return false;
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ Aviso guardando borrador de recolección:', e);
+        return false;
+    }
+}
+
+function asignarValorSelectConRespaldo(selectEl, targetVal, normFn, insertarAntesDeVal) {
+    if (!selectEl || !targetVal) return false;
+    for (let i = 0; i < selectEl.options.length; i++) {
+        if (selectEl.options[i].value === targetVal) {
+            selectEl.selectedIndex = i;
+            return true;
+        }
+    }
+    if (typeof normFn === 'function' && targetVal !== insertarAntesDeVal && targetVal !== 'TODOS') {
+        const targetNorm = normFn(targetVal);
+        for (let i = 0; i < selectEl.options.length; i++) {
+            const optVal = selectEl.options[i].value;
+            if (optVal && optVal !== insertarAntesDeVal && optVal !== 'TODOS' && normFn(optVal) === targetNorm) {
+                selectEl.selectedIndex = i;
+                return true;
+            }
+        }
+    }
+    const opt = document.createElement('option');
+    opt.value = targetVal;
+    opt.textContent = targetVal;
+    const refOpt = insertarAntesDeVal
+        ? Array.from(selectEl.options).find(o => o.value === insertarAntesDeVal)
+        : null;
+    if (refOpt) {
+        selectEl.insertBefore(opt, refOpt);
+    } else {
+        selectEl.appendChild(opt);
+    }
+    selectEl.value = targetVal;
+    return true;
+}
+
+function restaurarBorradorRecoleccionEnCurso() {
+    let raw = null;
+    try {
+        raw = localStorage.getItem(PROTEINAGRO_DRAFT_STORAGE_KEY);
+    } catch (e) {}
+    if (!raw) return false;
+
+    let draft = null;
+    try {
+        draft = JSON.parse(raw);
+    } catch (e) {
+        limpiarBorradorRecoleccionEnCurso();
+        return false;
+    }
+    if (!draft || typeof draft !== 'object') return false;
+
+    if (!draft.updatedAt || (Date.now() - Number(draft.updatedAt)) > PROTEINAGRO_DRAFT_TTL_MS) {
+        limpiarBorradorRecoleccionEnCurso();
+        return false;
+    }
+
+    const driverActivo = CURRENT_LOGGED_DRIVER ||
+        sessionStorage.getItem('proteinagro_current_driver') ||
+        localStorage.getItem('proteinagro_current_driver') || '';
+    if (draft.conductor && driverActivo && normalizarClaveTarifa(draft.conductor) !== normalizarClaveTarifa(driverActivo)) {
+        return false;
+    }
+
+    isRestoringOrResettingDraft = true;
+    try {
+        const rutaEl = document.getElementById('ruta');
+        const customRutaGrp = document.getElementById('custom-ruta-group');
+        const customRutaInp = document.getElementById('custom-ruta');
+        const provEl = document.getElementById('proveedor');
+        const customProvGrp = document.getElementById('custom-proveedor-group');
+        const customProvInp = document.getElementById('custom-proveedor');
+        const sucEl = document.getElementById('sucursal');
+        const customSucGrp = document.getElementById('custom-sucursal-group');
+        const customSucInp = document.getElementById('custom-sucursal');
+
+        // 1. Restaurar Ruta
+        if (rutaEl && draft.ruta) {
+            asignarValorSelectConRespaldo(rutaEl, draft.ruta, normalizarClaveRuta, 'OTRA');
+            populardropdownProveedoresPorRuta(rutaEl.value);
+            renderizarCronogramaRuta(rutaEl.value);
+            if (draft.ruta === 'OTRA') {
+                if (customRutaGrp) customRutaGrp.style.display = 'block';
+                if (customRutaInp) {
+                    customRutaInp.required = true;
+                    customRutaInp.value = draft.customRuta || '';
+                }
+            }
+        }
+
+        // 2. Restaurar Proveedor
+        if (provEl && draft.proveedor && draft.proveedor !== 'TODOS') {
+            asignarValorSelectConRespaldo(provEl, draft.proveedor, normalizarClaveTarifa, 'OTRO');
+            if (draft.proveedor === 'OTRO') {
+                if (customProvGrp) customProvGrp.style.display = 'block';
+                if (customProvInp) {
+                    customProvInp.required = true;
+                    customProvInp.value = draft.customProveedor || '';
+                }
+                if (sucEl) {
+                    sucEl.disabled = false;
+                    sucEl.innerHTML = '<option value="OTRA_SUCURSAL" selected>➕ Otro Punto / Sucursal...</option>';
+                }
+                if (customSucGrp) customSucGrp.style.display = 'block';
+                if (customSucInp) {
+                    customSucInp.required = true;
+                    customSucInp.value = draft.customSucursal || '';
+                }
+            } else {
+                if (customProvGrp) customProvGrp.style.display = 'none';
+                if (customProvInp) customProvInp.required = false;
+                populardropdownSucursales(provEl.value, false);
+            }
+        }
+
+        // 3. Restaurar Punto / Sucursal
+        if (sucEl && draft.sucursal) {
+            sucEl.disabled = false;
+            asignarValorSelectConRespaldo(sucEl, draft.sucursal, normalizarClaveTarifa, 'OTRA_SUCURSAL');
+            if (draft.sucursal === 'OTRA_SUCURSAL') {
+                if (customSucGrp) customSucGrp.style.display = 'block';
+                if (customSucInp) {
+                    customSucInp.required = true;
+                    customSucInp.value = draft.customSucursal || '';
+                }
+            }
+        }
+
+        // 4. Restaurar productos recolectados y selección actual
+        MOSTRAR_TODOS_LOS_PRODUCTOS = Boolean(draft.mostrarTodosProductos);
+        actualizarCatalogoProductosSegunSeleccion();
+
+        if (Array.isArray(draft.collectedProducts) && draft.collectedProducts.length > 0) {
+            collectedProducts = draft.collectedProducts.map(p => ({ ...p }));
+            renderAddedProducts();
+        }
+
+        if (draft.currentProduct) {
+            currentProduct = draft.currentProduct;
+            const selProdInput = document.getElementById('producto-seleccionado');
+            if (selProdInput) selProdInput.value = currentProduct;
+            document.querySelectorAll('.product-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.value === currentProduct);
+            });
+            actualizarInterfazUnidadProducto(currentProduct);
+            if (kilosGroup) kilosGroup.style.display = 'block';
+        }
+
+        if (kilosInput && draft.kilos) {
+            kilosInput.value = draft.kilos;
+            if (kilosGroup) kilosGroup.style.display = 'block';
+            if (draft.currentProduct && esProductoAtado(draft.currentProduct)) {
+                actualizarEstadoBotonesAtados(String(draft.kilos).trim());
+            }
+        }
+
+        // 5. Visibilidad y campos de Factura Física (Caribe)
+        actualizarVisibilidadFacturaCaribe();
+        let provEfectivo = provEl ? provEl.value : '';
+        if (provEfectivo === 'OTRO' && customProvInp) provEfectivo = customProvInp.value;
+        if (esProveedorCaribe(provEfectivo)) {
+            const numInp = document.getElementById('factura-numero');
+            const valInp = document.getElementById('factura-valor');
+            if (numInp && draft.facturaNumero) numInp.value = draft.facturaNumero;
+            if (valInp && draft.facturaValor) valInp.value = draft.facturaValor;
+            if (draft.capturedFacturaPhoto) {
+                aplicarFotoEnInterfaz('factura', draft.capturedFacturaPhoto);
+            }
+            evaluarDiscrepanciaFacturaCaribe();
+        }
+
+        // 6. Evidencia fotográfica de pesaje en sitio
+        if (draft.capturedSoporteTipo) {
+            capturedSoporteTipo = draft.capturedSoporteTipo;
+            document.querySelectorAll('.btn-tipo-evidencia').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-tipo') === capturedSoporteTipo);
+            });
+            const badgeTipo = document.getElementById('evidencia-tipo-badge');
+            if (badgeTipo) badgeTipo.textContent = capturedSoporteTipo;
+        }
+        if (draft.capturedSoportePhoto) {
+            aplicarFotoEnInterfaz('evidencia', draft.capturedSoportePhoto);
+        }
+
+        // 7. Observaciones
+        const obsEl = document.getElementById('observaciones');
+        if (obsEl && draft.observaciones) obsEl.value = draft.observaciones;
+
+        // 8. Restaurar Modal de Novedades si estaba abierto antes de la recarga
+        if (draft.novedadModalOpen) {
+            const btnAbrirNov = document.getElementById('btn-abrir-modal-novedad');
+            if (btnAbrirNov) btnAbrirNov.click();
+            const causalEl = document.getElementById('novedad-causal');
+            const novObsEl = document.getElementById('novedad-observaciones');
+            if (causalEl && draft.novedadCausal) {
+                causalEl.value = draft.novedadCausal;
+                causalEl.dispatchEvent(new Event('change'));
+            }
+            if (novObsEl && draft.novedadObs) novObsEl.value = draft.novedadObs;
+            if (draft.capturedNovedadPhoto) {
+                aplicarFotoEnInterfaz('novedad', draft.capturedNovedadPhoto);
+            }
+        }
+
+        const hayProgresoVisible = Boolean(
+            (draft.collectedProducts && draft.collectedProducts.length > 0) ||
+            draft.capturedFacturaPhoto ||
+            draft.capturedSoportePhoto ||
+            draft.capturedNovedadPhoto ||
+            draft.facturaNumero ||
+            draft.facturaValor ||
+            draft.sucursal
+        );
+        if (hayProgresoVisible && !draftRestoredThisBoot) {
+            draftRestoredThisBoot = true;
+            if (typeof mostrarToastAutoSync === 'function') {
+                mostrarToastAutoSync('🔄 Recolección en curso recuperada automáticamente');
+            }
+        }
+        return true;
+    } catch (errRest) {
+        console.warn('⚠️ Error restaurando borrador en curso:', errRest);
+        return false;
+    } finally {
+        isRestoringOrResettingDraft = false;
+    }
+}
+
+function inicializarPersistenciaBorradorCampo() {
+    const formRec = document.getElementById('recoleccion-form');
+    if (formRec && !formRec.dataset.draftListenersAttached) {
+        formRec.dataset.draftListenersAttached = 'true';
+        formRec.addEventListener('change', () => {
+            if (!isRestoringOrResettingDraft) guardarBorradorRecoleccionEnCurso();
+        });
+        formRec.addEventListener('input', () => {
+            programarGuardadoBorradorRecoleccion(250);
+        });
+    }
+
+    const productGrid = document.getElementById('product-grid');
+    if (productGrid && !productGrid.dataset.draftListenerAttached) {
+        productGrid.dataset.draftListenerAttached = 'true';
+        productGrid.addEventListener('click', (e) => {
+            if (e.target && e.target.closest('.product-btn')) {
+                setTimeout(() => {
+                    if (!isRestoringOrResettingDraft) guardarBorradorRecoleccionEnCurso();
+                }, 0);
+            }
+        });
+    }
+
+    const quickSelector = document.getElementById('atados-quick-selector');
+    if (quickSelector && !quickSelector.dataset.draftListenerAttached) {
+        quickSelector.dataset.draftListenerAttached = 'true';
+        quickSelector.addEventListener('click', (e) => {
+            if (e.target && e.target.closest('.btn-quick-atado')) {
+                setTimeout(() => {
+                    if (!isRestoringOrResettingDraft) guardarBorradorRecoleccionEnCurso();
+                }, 0);
+            }
+        });
+    }
+
+    const formNov = document.getElementById('form-novedad');
+    if (formNov && !formNov.dataset.draftListenersAttached) {
+        formNov.dataset.draftListenersAttached = 'true';
+        formNov.addEventListener('change', () => {
+            if (!isRestoringOrResettingDraft) guardarBorradorRecoleccionEnCurso();
+        });
+        formNov.addEventListener('input', () => {
+            programarGuardadoBorradorRecoleccion(250);
+        });
+    }
+
+    if (!window._proteinagroDraftLifecycleBound) {
+        window._proteinagroDraftLifecycleBound = true;
+        window.addEventListener('pagehide', () => {
+            if (!isRestoringOrResettingDraft) guardarBorradorRecoleccionEnCurso();
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden' && !isRestoringOrResettingDraft) {
+                guardarBorradorRecoleccionEnCurso();
+            } else if (document.visibilityState === 'visible' && isCameraCaptureInProgress) {
+                marcarCapturaCamaraActiva(false);
+            }
+        });
+        window.addEventListener('focus', () => {
+            if (isCameraCaptureInProgress) {
+                marcarCapturaCamaraActiva(false);
+            }
+        });
+    }
+}
+
+window.guardarBorradorRecoleccionEnCurso = guardarBorradorRecoleccionEnCurso;
+window.restaurarBorradorRecoleccionEnCurso = restaurarBorradorRecoleccionEnCurso;
+window.limpiarBorradorRecoleccionEnCurso = limpiarBorradorRecoleccionEnCurso;
+
+// ==============================================================================
+// PROTECCIÓN CONTRA RECARGA PWA DURANTE CAPTURA ACTIVA DEL CONDUCTOR (v1.9.14)
 // ==============================================================================
 let pendingAppReloadAfterSave = false;
 
 function tieneCapturaActivaSinGuardar() {
     try {
+        if (typeof isCameraCaptureInProgress !== 'undefined' && isCameraCaptureInProgress) {
+            return true;
+        }
+        if (typeof lastCameraOpenTimestamp !== 'undefined' && lastCameraOpenTimestamp > 0 &&
+            (Date.now() - lastCameraOpenTimestamp) < 60000) {
+            return true;
+        }
         const drvView = document.getElementById('driver-view');
         if (!drvView || drvView.style.display === 'none' || window.getComputedStyle(drvView).display === 'none') {
             return false;
@@ -7071,15 +7730,35 @@ function tieneCapturaActivaSinGuardar() {
         if (typeof capturedFacturaPhoto !== 'undefined' && Boolean(capturedFacturaPhoto)) {
             return true;
         }
+        if (typeof capturedNovedadPhoto !== 'undefined' && Boolean(capturedNovedadPhoto)) {
+            return true;
+        }
         if ((typeof isDrawing !== 'undefined' && isDrawing) || (typeof hasSignatureDrawn !== 'undefined' && hasSignatureDrawn)) {
+            return true;
+        }
+        const provVal = (document.getElementById('proveedor')?.value || '').trim();
+        const sucVal = (document.getElementById('sucursal')?.value || '').trim();
+        if ((provVal && provVal !== 'TODOS') || sucVal) {
             return true;
         }
         const kInput = document.getElementById('kilos');
         if (kInput && String(kInput.value || '').trim() !== '') {
             return true;
         }
+        const factNum = document.getElementById('factura-numero');
+        const factVal = document.getElementById('factura-valor');
+        const obsEl = document.getElementById('observaciones');
+        if ((factNum && String(factNum.value || '').trim() !== '') ||
+            (factVal && String(factVal.value || '').trim() !== '') ||
+            (obsEl && String(obsEl.value || '').trim() !== '')) {
+            return true;
+        }
         const modalVB = document.getElementById('modal-visto-bueno');
         if (modalVB && modalVB.style.display !== 'none' && modalVB.style.display !== '') {
+            return true;
+        }
+        const modalNov = document.getElementById('modal-novedad');
+        if (modalNov && modalNov.style.display !== 'none' && modalNov.style.display !== '') {
             return true;
         }
     } catch (e) {}
@@ -7095,8 +7774,8 @@ function solicitarRecargaSeguraApp(motivo) {
         }
         return false;
     }
-    console.log(`🔄 Aplicando actualización v1.9.13 (${motivo})...`);
-    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.13&t=' + Date.now();
+    console.log(`🔄 Aplicando actualización v1.9.14 (${motivo})...`);
+    window.location.href = window.location.origin + window.location.pathname + '?v=1.9.14&t=' + Date.now();
     return true;
 }
 
@@ -7105,9 +7784,9 @@ function inicializarServiceWorkerPWA() {
         let refreshing = false;
 
         const registrarSW = () => {
-            navigator.serviceWorker.register('/sw.js?v=1.9.13')
+            navigator.serviceWorker.register('/sw.js?v=1.9.14')
                 .then(reg => {
-                    console.log('✅ Service Worker v1.9.13 activo (PWA instalable):', reg.scope);
+                    console.log('✅ Service Worker v1.9.14 activo (PWA instalable):', reg.scope);
                     reg.update();
                     
                     reg.onupdatefound = () => {
@@ -7132,9 +7811,11 @@ function inicializarServiceWorkerPWA() {
             window.addEventListener('load', registrarSW);
         }
 
-        // Al cambiar de pestaña y volver a la app en PC, comprobar si hay actualización
+        // Al cambiar de pestaña y volver a la app en PC, comprobar si hay actualización (nunca durante uso de cámara/captura)
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && navigator.onLine) {
+                if (typeof isCameraCaptureInProgress !== 'undefined' && isCameraCaptureInProgress) return;
+                if (typeof tieneCapturaActivaSinGuardar === 'function' && tieneCapturaActivaSinGuardar()) return;
                 navigator.serviceWorker.getRegistration().then(reg => {
                     if (reg) reg.update();
                 }).catch(() => {});
@@ -7198,15 +7879,18 @@ document.addEventListener('DOMContentLoaded', () => {
     inicializarSelectorAtados();
     inicializarModuloEvidenciaPesaje();
     inicializarModalVistoBueno();
+    inicializarPersistenciaBorradorCampo();
 
     // 2. Sincronizar en segundo plano con Google Sheets si hay internet
     cargarCatalogosDinamicos();
 
-    // 3. Restaurar sesión activa de conductor si la página fue refrescada
+    // 3. Restaurar sesión activa de conductor (sessionStorage o localStorage si Android mató la pestaña) y borrador en curso
     try {
-        const savedDriver = sessionStorage.getItem('proteinagro_current_driver');
-        if (savedDriver) {
+        const savedRole = sessionStorage.getItem('proteinagro_role') || localStorage.getItem('proteinagro_role');
+        const savedDriver = sessionStorage.getItem('proteinagro_current_driver') || localStorage.getItem('proteinagro_current_driver');
+        if (savedDriver && savedRole !== 'admin') {
             entrarComoConductor(savedDriver);
+            restaurarBorradorRecoleccionEnCurso();
         }
     } catch(e) {}
 });

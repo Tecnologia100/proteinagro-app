@@ -1187,3 +1187,14 @@ Para forzar la actualización de caché en navegadores de los conductores, incre
   - `index.html`: Badges de cabecera de Conductor y Administrador, botón de acceso, footer y tags de versión unificados a `v1.9.13`.
   - `app.js`: Redirección en `forzarActualizacionApp`, recarga diferida post-comprobante y registro de Service Worker alineados a `?v=1.9.13`.
   - `sw.js`: Bumping de caché a `proteinagro-v1.9.13` para forzar la purga y activación inmediata en todos los dispositivos de campo y cabina.
+
+---
+
+### 51. Blindaje Anti-Expulsión de Sesión y Pérdida de Datos al Tomar Foto en Celular (v1.9.14 - 26/11/2026)
+- **Causa Raíz:** En teléfonos con RAM ajustada o cámaras de alta resolución, Android cierra la pestaña en segundo plano al abrir la cámara nativa (`capture="environment"`) o al decodificar `FileReader.readAsDataURL`, borrando `sessionStorage` y variables RAM al recargar.
+- **Solución Aplicada (`app.js`, `index.html`, `sw.js`):**
+  - Persistencia de sesión de conductor en `localStorage` + `sessionStorage` (solo se cierra en `logout()` explícito).
+  - Auto-guardado y restauración automática del borrador en curso (`proteinagro_draft_recoleccion`: ruta, proveedor, punto, materias registradas, kilos, factura Caribe, observaciones, fotos y modal de novedades) con expiración de 12 h, respaldo ante `QuotaExceededError` y preservación de selecciones durante cargas asíncronas de Google Sheets (`populardropdownSucursales`).
+  - Optimización de memoria en `comprimirImagenDesdeArchivo` (`URL.createObjectURL`, `URL.revokeObjectURL`, liberación `0x0` de canvas) en factura, evidencia y novedades.
+  - Protección `isCameraCaptureInProgress` en `tieneCapturaActivaSinGuardar()` y bloqueo de `reg.update()` al regresar de cámara. Caché PWA `proteinagro-v1.9.14`.
+- **QA:** Suite automatizada `7/7 PASS` validando muerte simulada del navegador con `sessionStorage` vacío.

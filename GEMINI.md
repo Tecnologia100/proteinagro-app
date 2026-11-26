@@ -1,7 +1,7 @@
 # MEMORIA DEL PROYECTO: PROTEINAGRO (SISTEMA MATRIZ)
 
 > **Documento de Memoria y Reglas de Trabajo Permanente**  
-> **Última Actualización:** 25 de Noviembre 2026 (PWA v1.9.13 · Conciliador v1.9.14)  
+> **Última Actualización:** 26 de Noviembre 2026 (PWA v1.9.14 · Conciliador v1.9.14)  
 > **Repositorio:** `https://github.com/Tecnologia100/proteinagro-app.git`  
 > **Producción Web:** `https://proteinagro-app.vercel.app`  
 > **Base de Datos Google Sheets:** `https://docs.google.com/spreadsheets/d/1eQSRvG7vWkIoW3AT5e6Ahi7ndWF6P4OG_Alxo2Go0lU/edit?usp=sharing`  
@@ -870,6 +870,17 @@ i.fecha), consolidándose directamente en la fila de ese día.
   - `index.html`: Badges de cabecera de Conductor y Administrador, botón de acceso, footer y tags de versión unificados a `v1.9.13`.
   - `app.js`: Redirección en `forzarActualizacionApp`, recarga diferida post-comprobante y registro de Service Worker alineados a `?v=1.9.13`.
   - `sw.js`: Bumping de caché a `proteinagro-v1.9.13` para forzar la purga y activación inmediata en todos los dispositivos de campo y cabina.
+
+### 51. Blindaje Anti-Expulsión de Sesión y Pérdida de Datos al Tomar Foto en Celular (`v1.9.14`)
+- **Diagnóstico y Causa Raíz:**
+  - En dispositivos móviles con poca memoria RAM libre o cámaras de alta resolución (48–50 MP), al abrir la cámara nativa (`#factura-foto-input` con `capture="environment"`) el sistema Android suspende/cierra el proceso en segundo plano de Chrome/PWA (Low-Memory Killer), o la pestaña colapsa al decodificar la imagen cruda mediante `FileReader.readAsDataURL(file)` (~15–35 MB Base64 adicionales en el heap JS).
+  - Como la sesión del conductor (`proteinagro_current_driver`) vivía únicamente en `sessionStorage` y las materias primas en RAM JS, al recargar la página enviaba al conductor al Login (**"lo saca"**) y borraba los registros en curso.
+- **Solución en 4 Capas (`app.js`, `index.html`, `sw.js`):**
+  1. **Sesión Persistente en `localStorage` + `sessionStorage`:** `entrarComoConductor` persiste conductor y rol en ambos almacenamientos; `DOMContentLoaded` restaura desde `sessionStorage || localStorage`; `logout()` explícito limpia ambos almacenamientos y el formulario.
+  2. **Auto-Guardado y Restauración de Borrador (`proteinagro_draft_recoleccion`):** `guardarBorradorRecoleccionEnCurso()` y `restaurarBorradorRecoleccionEnCurso()` respaldan en tiempo real (y justo antes de abrir cualquier cámara / al ocultarse la app `pagehide`/`visibilitychange`) Ruta, Proveedor, Punto/Sucursal, `collectedProducts`, `currentProduct`, `#kilos`, `#factura-numero`, `#factura-valor`, `#observaciones`, fotos comprimidas (`capturedFacturaPhoto`, `capturedSoportePhoto`) y estado abierto de `#modal-novedad` (con expiración TTL de 12 h y tolerancia a `QuotaExceededError`). También se blindaron `populardropdownSucursales(..., true)`, `populardropdownProveedoresPorRuta`, `renderDynamicRoutes` y `renderDynamicDrivers` para que sincronizaciones asíncronas de Sheets no borren valores recién restaurados.
+  3. **Compresión de Foto Ligera en RAM (`comprimirImagenDesdeArchivo`):** Reemplazo de `FileReader.readAsDataURL` en los 3 capturadores (`#factura-foto-input`, `#evidencia-foto-input`, `#novedad-foto-input`) por `URL.createObjectURL(file)` + `URL.revokeObjectURL()` inmediato y liberación explícita del canvas temporal (`canvas.width = 0; canvas.height = 0`).
+  4. **Bloqueo de Recarga del Service Worker Durante Cámara:** Bandera `isCameraCaptureInProgress` + `lastCameraOpenTimestamp` y ampliación de `tieneCapturaActivaSinGuardar()` (incluyendo proveedor/punto seleccionado, campos de factura y `#modal-novedad`), evitando `reg.update()` y recargas durante captura activa. Bumping global a `v1.9.14`.
+- **Verificación:** `node -c app.js`, `node -c sw.js` y suite E2E `7/7 PASS` simulando muerte del proceso Android con destrucción total de `sessionStorage` + RAM, sincronización asíncrona posterior y manejo de cuota.
 
 ---
 
